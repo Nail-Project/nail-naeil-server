@@ -8,6 +8,10 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "lint": "eslint . && prettier --check .",
+    "lint:fix": "eslint . --fix && prettier --write .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "tsoa": "tsoa spec-and-routes"
@@ -29,6 +33,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -42,6 +47,7 @@
     "supertest": "^7.2.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1",
     "vitest": "^4.1.9"
   }
 }
