@@ -6,3 +6,19 @@ generator client {
 datasource db {
   provider = "mysql"
 }
+
+model Shop {
+  id            Int      @id @default(autoincrement())
+  name          String   @db.VarChar(100)
+  phoneNumber   String?  @map("phone_number") @db.VarChar(20)
+  address       String   @db.VarChar(255)
+  addressDetail String?  @map("address_detail") @db.VarChar(255)
+  locationGuide String?  @map("location_guide") @db.VarChar(255)
+  parkingInfo   String?  @map("parking_info") @db.VarChar(255)
+  latitude      Decimal  @db.Decimal(10, 7)
+  longitude     Decimal  @db.Decimal(10, 7)
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@map("shops")
+}
