@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { adminSwaggerSpec, userSwaggerSpec } from './config/swagger';
+import { errorHandler } from './common/middlewares/error-handler.middleware';
 
 export const app = express();
 
@@ -51,3 +52,5 @@ app.use(
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
+
+app.use(errorHandler);
