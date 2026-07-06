@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { adminSwaggerSpec, userSwaggerSpec } from './config/swagger';
+import userAuthRoute from './user/user-auth.route';
+import { errorHandler } from './common/middleware/error-handler';
 
 export const app = express();
 
@@ -51,3 +53,8 @@ app.use(
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
+
+app.use('/api/users', userAuthRoute);
+
+// ⚠️ 반드시 모든 라우트 등록 "뒤"에 위치해야 함
+app.use(errorHandler);
