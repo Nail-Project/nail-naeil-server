@@ -22,3 +22,22 @@ model Shop {
 
   @@map("shops")
 }
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  loginId     String   @unique @map("login_id") @db.VarChar(50)
+  password    String   @db.VarChar(255)
+  email       String   @unique @db.VarChar(100)
+  phoneNumber String?  @map("phone_number") @db.VarChar(20)
+  kakaoId     String?  @unique @map("kakao_id") @db.VarChar(100)
+  role        UserRole @default(CUSTOMER)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@map("users")
+}
