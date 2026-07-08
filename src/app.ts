@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { adminSwaggerSpec, userSwaggerSpec } from './config/swagger';
+import estimateRouter from './estimate/controllers/estimate.controller.js';
 
 export const app = express();
 
@@ -51,3 +52,5 @@ app.use(
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
+
+app.use('/api/v1/estimates', estimateRouter);
