@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   EstimateRequestFailedError,
   InternalServerError,
+  InvalidRequestError,
   LocationRequiredError,
   PhotoUploadFailedError,
   RequiredFieldMissingError,
   ReservationFailedError,
-} from './common.error';
+  RouteNotFoundError,
+} from '../../../src/common/errors/common.error';
 
 describe('common errors', () => {
   it('RequiredFieldMissingError는 400과 안내 메시지를 갖는다', () => {
@@ -56,5 +58,21 @@ describe('common errors', () => {
 
     expect(error.statusCode).toBe(500);
     expect(error.code).toBe('INTERNAL_SERVER_ERROR');
+  });
+
+  it('InvalidRequestError는 전달받은 상태 코드를 그대로 유지한다', () => {
+    const error = new InvalidRequestError(400, { reason: 'bad json' });
+
+    expect(error.statusCode).toBe(400);
+    expect(error.code).toBe('INVALID_REQUEST');
+    expect(error.data).toEqual({ reason: 'bad json' });
+  });
+
+  it('RouteNotFoundError는 404와 안내 메시지를 갖는다', () => {
+    const error = new RouteNotFoundError({ path: '/unknown' });
+
+    expect(error.statusCode).toBe(404);
+    expect(error.code).toBe('ROUTE_NOT_FOUND');
+    expect(error.data).toEqual({ path: '/unknown' });
   });
 });

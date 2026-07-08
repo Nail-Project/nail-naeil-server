@@ -67,3 +67,27 @@ export class InternalServerError extends AppError {
     });
   }
 }
+
+// express.json() 등 도메인 코드에 도달하기 전 미들웨어에서 발생하는 4xx 에러를
+// 그대로 500으로 뭉개지 않고 상태 코드를 보존해 응답하기 위한 범용 클래스.
+export class InvalidRequestError extends AppError {
+  constructor(statusCode: number, data?: unknown) {
+    super({
+      code: 'INVALID_REQUEST',
+      statusCode,
+      message: '요청 형식이 올바르지 않아요. 다시 확인해주세요.',
+      data,
+    });
+  }
+}
+
+export class RouteNotFoundError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'ROUTE_NOT_FOUND',
+      statusCode: 404,
+      message: '요청하신 경로를 찾을 수 없어요.',
+      data,
+    });
+  }
+}

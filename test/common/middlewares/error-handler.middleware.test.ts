@@ -1,9 +1,12 @@
 import express from 'express';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { errorHandler } from './error-handler.middleware';
-import { RequiredFieldMissingError } from '../errors/common.error';
-import { success } from '../responses/api-response';
+import { errorHandler } from '../../../src/common/middlewares/error-handler.middleware';
+import {
+  PhotoUploadFailedError,
+  RequiredFieldMissingError,
+} from '../../../src/common/errors/common.error';
+import { success } from '../../../src/common/responses/api-response';
 
 const createTestApp = () => {
   const app = express();
@@ -16,8 +19,18 @@ const createTestApp = () => {
     throw new RequiredFieldMissingError({ field: 'name' });
   });
 
+  app.get('/known-server-error', () => {
+    throw new PhotoUploadFailedError();
+  });
+
   app.get('/unknown-error', () => {
     throw new Error('예상하지 못한 오류');
+  });
+
+  app.get('/parse-error-like', () => {
+    const err = new SyntaxError('Unexpected token in JSON');
+    (err as SyntaxError & { statusCode: number }).statusCode = 400;
+    throw err;
   });
 
   app.use(errorHandler);
@@ -41,7 +54,9 @@ describe('errorHandler', () => {
     });
   });
 
-  it('AppError는 정의된 상태 코드와 에러 코드로 응답한다', async () => {
+  it('AppError(4xx)는 정의된 상태 코드와 에러 코드로 응답하고 로그를 남기지 않는다', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
     const res = await request(createTestApp()).get('/known-error');
 
     expect(res.status).toBe(400);
@@ -54,6 +69,17 @@ describe('errorHandler', () => {
       },
       success: null,
     });
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('AppError(5xx)는 정의된 상태 코드로 응답하면서 콘솔에 로그를 남긴다', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await request(createTestApp()).get('/known-server-error');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error.code).toBe('PHOTO_UPLOAD_FAILED');
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
   });
 
   it('예상하지 못한 예외는 500과 공통 에러 코드로 응답하고 콘솔에 로그를 남긴다', async () => {
@@ -66,5 +92,15 @@ describe('errorHandler', () => {
     expect(res.body.error.code).toBe('INTERNAL_SERVER_ERROR');
     expect(res.body.success).toBeNull();
     expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('AppError가 아니지만 statusCode를 가진 에러(예: express.json 파싱 오류)는 상태 코드를 보존한다', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await request(createTestApp()).get('/parse-error-like');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_REQUEST');
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 });

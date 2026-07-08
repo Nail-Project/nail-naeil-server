@@ -3,6 +3,7 @@ import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { adminSwaggerSpec, userSwaggerSpec } from './config/swagger';
 import { errorHandler } from './common/middlewares/error-handler.middleware';
+import { RouteNotFoundError } from './common/errors/common.error';
 
 export const app = express();
 
@@ -51,6 +52,10 @@ app.use(
  */
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
+});
+
+app.use((req, _res, next) => {
+  next(new RouteNotFoundError({ path: req.originalUrl }));
 });
 
 app.use(errorHandler);
