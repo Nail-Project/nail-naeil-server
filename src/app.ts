@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { adminSwaggerSpec, userSwaggerSpec } from './config/swagger';
-import estimateRouter from './estimate/controllers/estimate.controller.js';
+import estimateRouter from './estimate/controllers/estimate.controller';
 
 export const app = express();
 
