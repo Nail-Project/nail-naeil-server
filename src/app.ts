@@ -54,3 +54,12 @@ app.use(
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
+
+app.use((req, _res, next) => {
+  next(new RouteNotFoundError({ path: req.originalUrl }));
+});
+
+app.use(errorHandler);
+
+// 견적 관련 라우터 
+app.use('/api/v1/estimates', estimateRouter);

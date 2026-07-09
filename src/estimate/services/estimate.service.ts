@@ -1,15 +1,39 @@
-import { estimateRepository } from '../repositories/estimate.repository';
-import { CreateEstimateRequestType } from '../dtos/estimate.dto';
+import { EstimateRepository } from '../repositories/estimate.repository';
+import { CreateEstimateRequestType, CreateEstimateResponseDto } from '../dtos/estimate.dto';
+import { EstimateRequestFailedError } from '../../common/errors/common.error';
 
-export const estimateService = {
+export class EstimateService {
+  private readonly estimateRepository = new EstimateRepository();
+
   // 견적 요청 생성
-  createEstimate: async (dto: CreateEstimateRequestType) => {
-    return await estimateRepository.create(dto);
-  },
+  async createEstimate(dto: CreateEstimateRequestType): Promise<CreateEstimateResponseDto> {
+    try {
+      const result = await this.estimateRepository.create(dto);
+
+      return {
+        estimateId: Number(result.id),
+        nailType: result.nailType,
+        removalType: result.removalType,
+        startDate: result.startDate,
+        endDate: result.endDate,
+        preferredTime: result.preferredTime,
+        recommendType: result.recommendType,
+        description: result.description ?? null,
+        status: result.status,
+        images: result.images.map((img) => ({
+          imageId: Number(img.id),
+          imageUrl: img.imageUrl,
+        })),
+        createdAt: result.createdAt,
+      };
+    } catch {
+      throw new EstimateRequestFailedError();
+    }
+  }
 
   // 상태별 견적 목록 조회 및 응답 데이터 가공
-  getEstimatesByStatus: async (status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL') => {
-    const estimates = await estimateRepository.findByStatus(status);
+  async getEstimatesByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL') {
+    const estimates = await this.estimateRepository.findByStatus(status);
 
     return estimates.map((estimate) => {
       const proposals = estimate.proposals;
@@ -37,5 +61,5 @@ export const estimateService = {
         minPrice,
       };
     });
-  },
-};
+  }
+}

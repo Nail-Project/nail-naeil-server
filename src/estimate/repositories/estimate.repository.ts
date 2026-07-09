@@ -3,9 +3,9 @@ import { CreateEstimateRequestType } from '../dtos/estimate.dto';
 
 const prisma = new PrismaClient();
 
-export const estimateRepository = {
+export class EstimateRepository {
   // 견적 요청 생성 (이미지 URL 리스트 포함)
-  create: async (data: CreateEstimateRequestType) => {
+  async create(data: CreateEstimateRequestType) {
     const { images, ...estimateData } = data;
 
     return await prisma.estimateRequest.create({
@@ -23,10 +23,10 @@ export const estimateRepository = {
         images: true,
       },
     });
-  },
+  }
 
   // 상태별 견적 목록 조회 (ALL이면 전체 조회)
-  findByStatus: async (status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL') => {
+  async findByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL') {
     return await prisma.estimateRequest.findMany({
       where: status !== 'ALL' ? { status } : undefined,
       include: {
@@ -45,5 +45,5 @@ export const estimateRepository = {
       },
       orderBy: { createdAt: 'desc' },
     });
-  },
-};
+  }
+}
