@@ -1,12 +1,14 @@
 import { EstimateRepository } from '../repository/estimate.repository';
-import { CreateEstimateRequestType, CreateEstimateResponseDto } from '../dto/estimate.dto';
+import { CreateEstimateRequestType } from '../dto/create-estimate-request';
+import { CreateEstimateResponse } from '../dto/create-estimate-response';
+import { GetEstimatesResponse } from '../dto/get-estimates-response';
 import { EstimateRequestFailedError } from '../../common/errors/common.error';
 
 export class EstimateService {
   private readonly estimateRepository = new EstimateRepository();
 
   // 견적 요청 생성
-  async createEstimate(dto: CreateEstimateRequestType): Promise<CreateEstimateResponseDto> {
+  async createEstimate(dto: CreateEstimateRequestType): Promise<CreateEstimateResponse> {
     try {
       const result = await this.estimateRepository.create(dto);
 
@@ -32,7 +34,7 @@ export class EstimateService {
   }
 
   // 상태별 견적 목록 조회 및 응답 데이터 가공
-  async getEstimatesByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL') {
+  async getEstimatesByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL'): Promise<GetEstimatesResponse[]> {
     const estimates = await this.estimateRepository.findByStatus(status);
 
     return estimates.map((estimate) => {

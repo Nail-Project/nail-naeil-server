@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { EstimateService } from '../service/estimate.service';
-import { CreateEstimateRequest, GetEstimatesQuery } from '../dto/estimate.dto';
+import { CreateEstimateRequest } from '../dto/create-estimate-request';
+import { GetEstimatesQuery } from '../dto/get-estimates-query';
 import { EstimateValidationError } from '../error/estimate.error';
 import { success } from '../../common/responses/api-response';
 

@@ -1,5 +1,5 @@
-import { prisma } from '../../config/prisma';
-import { CreateEstimateRequestType } from '../dto/estimate.dto';
+import { prisma } from '../../infra/prisma';
+import { CreateEstimateRequestType } from '../dto/create-estimate-request';
 
 export class EstimateRepository {
   // 견적 요청 생성 (이미지 URL 리스트 포함)
