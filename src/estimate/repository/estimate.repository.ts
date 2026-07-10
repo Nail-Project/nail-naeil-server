@@ -23,6 +23,25 @@ export class EstimateRepository {
     });
   }
 
+  // 견적 결과 상세 조회
+  // rating, reviewCount, distance는 현재 Shop 테이블에 없으므로 추후 스키마 확장 후 추가 예정이다.
+  async findResultByRequestId(requestId: bigint) {
+    // 견적 요청 + 제안 목록 + 제안별 Shop 정보 + 제안별 가능 시간 한 번에 조회
+    return await prisma.estimateRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        proposals: {
+          include: {
+            // @relation으로 Shop 자동 join
+            shop: true,
+            // 제안별 가능한 예약 시간 목록
+            times: true,
+          },
+        },
+      },
+    });
+  }
+
   // 상태별 견적 목록 조회 (ALL이면 전체 조회)
   async findByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL') {
     return await prisma.estimateRequest.findMany({

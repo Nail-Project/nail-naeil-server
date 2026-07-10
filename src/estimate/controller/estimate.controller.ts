@@ -23,6 +23,24 @@ export class EstimateController {
     }
   };
 
+  // GET /api/v1/estimate/result/:request_id
+  getEstimateResult = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const request_id = req.params.request_id as string;
+      const parsedId = parseInt(request_id, 10);
+
+      // request_id가 숫자 형태가 아닌 경우 400
+      if (isNaN(parsedId)) {
+        throw new EstimateValidationError();
+      }
+
+      const result = await this.estimateService.getEstimateResult(BigInt(parsedId));
+      res.status(200).json(success(result));
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // GET /api/v1/estimate/:status
   getEstimatesByStatus = async (req: Request, res: Response, next: NextFunction) => {
     try {

@@ -1,7 +1,6 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
-  output   = "../src/generated/prisma"
 }
 
 
@@ -22,6 +21,8 @@ model Shop {
   longitude     Decimal  @db.Decimal(10, 7)
   createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  proposals     EstimateResponse[]
 
   @@map("shops")
 }
@@ -92,13 +93,14 @@ model EstimateResponse {
   removalPrice Int?           @map("removal_price")
   extraPrice   Int?           @map("extra_price")
   requestId    BigInt         @map("request_id")
-  shopId       BigInt         @map("shop_id")
+  shopId       Int            @map("shop_id")
   memo         String?        @db.Text
   status       ProposalStatus @default(PENDING)
   createdAt    DateTime       @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt    DateTime       @updatedAt @map("updated_at") @db.DateTime(3)
 
   request      EstimateRequest  @relation(fields: [requestId], references: [id])
+  shop         Shop             @relation(fields: [shopId], references: [id])
   times        ShopProposalTime[]
 
   @@map("estimate_response")

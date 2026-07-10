@@ -3,6 +3,8 @@ import { CreateEstimateRequestType } from '../dto/create-estimate-request';
 import { CreateEstimateResponse } from '../dto/create-estimate-response';
 import { GetEstimatesResponse } from '../dto/get-estimates-response';
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
+import { EstimateNotFoundError } from '../error/estimate.error';
+import { ResultEstimateResponse } from '../dto/result-estimate-response';
 
 export class EstimateService {
   private readonly estimateRepository = new EstimateRepository();
@@ -29,6 +31,51 @@ export class EstimateService {
         createdAt: result.createdAt,
       };
     } catch {
+      throw new EstimateRequestFailedError();
+    }
+  }
+
+  // 견적 결과 상세 조회
+  async getEstimateResult(requestId: bigint): Promise<ResultEstimateResponse> {
+    try {
+      const data = await this.estimateRepository.findResultByRequestId(requestId);
+
+      // 존재하지 않는 견적 요청 id인 경우 404
+      if (!data) {
+        throw new EstimateNotFoundError();
+      }
+
+      // TODO: 로그인 구현 후 data.userId와 현재 로그인한 userId 비교
+      //       일치하지 않으면 EstimateForbiddenError (403) throw
+
+      return {
+        requestId: Number(data.id),
+        proposals: data.proposals.map((proposal) => ({
+          proposalId: Number(proposal.id),
+          shopId: proposal.shopId,
+          shopName: proposal.shop.name,
+          // TODO: Shop 테이블에 rating, reviewCount, distance 컬럼 추가 후 연결 예정
+          rating: null,
+          reviewCount: null,
+          distance: null,
+          totalPrice: proposal.totalPrice,
+          // removalPrice가 존재하면 제거 비용 포함으로 판단
+          isRemovalIncluded: proposal.removalPrice !== null,
+          basePrice: proposal.basePrice,
+          removalPrice: proposal.removalPrice,
+          extraPrice: proposal.extraPrice,
+          memo: proposal.memo,
+          status: proposal.status,
+          times: proposal.times.map((time) => ({
+            timeId: Number(time.id),
+            proposalDatetime: time.proposalDatetime,
+            isSelected: time.isSelected,
+          })),
+        })),
+      };
+    } catch (error) {
+      // EstimateNotFoundError는 그대로 전달 (404)
+      if (error instanceof EstimateNotFoundError) throw error;
       throw new EstimateRequestFailedError();
     }
   }

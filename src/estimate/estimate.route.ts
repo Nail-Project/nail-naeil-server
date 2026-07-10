@@ -59,6 +59,34 @@ router.post('/', estimateController.createEstimate);
 
 /**
  * @openapi
+ * /api/v1/estimate/result/{request_id}:
+ *   get:
+ *     summary: 견적 결과 상세 조회
+ *     tags:
+ *       - Estimate
+ *     parameters:
+ *       - in: path
+ *         name: request_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 조회할 견적 요청 ID
+ *     responses:
+ *       200:
+ *         description: 견적 결과 조회 성공
+ *       400:
+ *         description: request_id 형식 오류
+ *       403:
+ *         description: 접근 권한 없음
+ *       404:
+ *         description: 해당 견적 요청을 찾을 수 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.get('/result/:request_id', estimateController.getEstimateResult);
+
+/**
+ * @openapi
  * /api/v1/estimate/{status}:
  *   get:
  *     summary: 상태별 견적 목록 조회
