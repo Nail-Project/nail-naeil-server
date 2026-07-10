@@ -1,7 +1,5 @@
-import { PrismaClient } from '../../../generated/prisma';
-import { CreateEstimateRequestType } from '../dtos/estimate.dto';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../config/prisma';
+import { CreateEstimateRequestType } from '../dto/estimate.dto';
 
 export class EstimateRepository {
   // 견적 요청 생성 (이미지 URL 리스트 포함)

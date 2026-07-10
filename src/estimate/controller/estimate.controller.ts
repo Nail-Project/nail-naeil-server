@@ -1,13 +1,13 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { EstimateService } from '../services/estimate.service';
-import { CreateEstimateRequest, GetEstimatesQuery } from '../dtos/estimate.dto';
-import { EstimateValidationError } from '../errors/estimate.error';
+import { Request, Response, NextFunction } from 'express';
+import { EstimateService } from '../service/estimate.service';
+import { CreateEstimateRequest, GetEstimatesQuery } from '../dto/estimate.dto';
+import { EstimateValidationError } from '../error/estimate.error';
 import { success } from '../../common/responses/api-response';
 
 export class EstimateController {
   private readonly estimateService = new EstimateService();
 
-  // POST /api/v1/estimates
+  // POST /api/v1/estimate
   createEstimate = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = CreateEstimateRequest.safeParse(req.body);
@@ -23,7 +23,7 @@ export class EstimateController {
     }
   };
 
-  // GET /api/v1/estimates?status=
+  // GET /api/v1/estimate?status=
   getEstimatesByStatus = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = GetEstimatesQuery.safeParse(req.query);
@@ -39,11 +39,3 @@ export class EstimateController {
     }
   };
 }
-
-const estimateController = new EstimateController();
-const router = Router();
-
-router.post('/', estimateController.createEstimate);
-router.get('/', estimateController.getEstimatesByStatus);
-
-export default router;

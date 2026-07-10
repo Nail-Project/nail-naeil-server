@@ -4,7 +4,7 @@ import swaggerUi from 'swagger-ui-express';
 import { adminSwaggerSpec, userSwaggerSpec } from './config/swagger';
 import { errorHandler } from './common/middlewares/error-handler.middleware';
 import { RouteNotFoundError } from './common/errors/common.error';
-import estimateRouter from './estimate/controllers/estimate.controller';
+import v1Router from './routes/v1.router';
 
 export const app = express();
 
@@ -55,11 +55,10 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+app.use('/api/v1', v1Router);
+
 app.use((req, _res, next) => {
   next(new RouteNotFoundError({ path: req.originalUrl }));
 });
 
 app.use(errorHandler);
-
-// 견적 관련 라우터 
-app.use('/api/v1/estimates', estimateRouter);

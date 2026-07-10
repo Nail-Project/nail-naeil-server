@@ -1,5 +1,5 @@
-import { EstimateRepository } from '../repositories/estimate.repository';
-import { CreateEstimateRequestType, CreateEstimateResponseDto } from '../dtos/estimate.dto';
+import { EstimateRepository } from '../repository/estimate.repository';
+import { CreateEstimateRequestType, CreateEstimateResponseDto } from '../dto/estimate.dto';
 import { EstimateRequestFailedError } from '../../common/errors/common.error';
 
 export class EstimateService {
