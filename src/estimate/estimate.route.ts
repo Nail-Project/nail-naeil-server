@@ -102,6 +102,31 @@ router.get('/result/:request_id', estimateController.getEstimateResult);
  *     responses:
  *       200:
  *         description: 예약 가능 시간 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 proposalId:
+ *                   type: integer
+ *                   example: 1
+ *                 times:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       timeId:
+ *                         type: integer
+ *                         example: 1
+ *                       proposalDatetime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-05-10T16:00:00"
+ *                         nullable: true
+ *                       isSelected:
+ *                         type: boolean
+ *                         example: false
+ *                         nullable: true
  *       400:
  *         description: proposal_id 형식 오류
  *       404:
