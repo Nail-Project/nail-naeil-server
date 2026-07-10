@@ -5,6 +5,7 @@ import { GetEstimatesResponse } from '../dto/get-estimates-response';
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
 import { EstimateNotFoundError } from '../error/estimate.error';
 import { ResultEstimateResponse } from '../dto/result-estimate-response';
+import { ProposalTimeResponse } from '../dto/proposal-time-response';
 
 export class EstimateService {
   private readonly estimateRepository = new EstimateRepository();
@@ -71,6 +72,31 @@ export class EstimateService {
             proposalDatetime: time.proposalDatetime,
             isSelected: time.isSelected,
           })),
+        })),
+      };
+    } catch (error) {
+      // EstimateNotFoundError는 그대로 전달 (404)
+      if (error instanceof EstimateNotFoundError) throw error;
+      throw new EstimateRequestFailedError();
+    }
+  }
+
+  // 샵 견적별 예약 가능 시간 조회
+  async getProposalTimes(proposalId: bigint): Promise<ProposalTimeResponse> {
+    try {
+      const data = await this.estimateRepository.findTimesByProposalId(proposalId);
+
+      // 존재하지 않는 견적 제안 id인 경우 404
+      if (!data) {
+        throw new EstimateNotFoundError();
+      }
+
+      return {
+        proposalId: Number(data.id),
+        times: data.times.map((time) => ({
+          timeId: Number(time.id),
+          proposalDatetime: time.proposalDatetime,
+          isSelected: time.isSelected,
         })),
       };
     } catch (error) {

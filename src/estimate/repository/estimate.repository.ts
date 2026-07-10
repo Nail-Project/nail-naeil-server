@@ -42,6 +42,26 @@ export class EstimateRepository {
     });
   }
 
+  // 샵 견적별 예약 가능 시간 조회
+  // proposal_id가 존재하지 않으면 null 반환 (서비스에서 404 처리)
+  async findTimesByProposalId(proposalId: bigint) {
+    return await prisma.estimateResponse.findUnique({
+      where: { id: proposalId },
+      select: {
+        id: true,
+        // 해당 견적 제안의 예약 가능 시간 목록
+        times: {
+          select: {
+            id: true,
+            proposalDatetime: true,
+            isSelected: true,
+          },
+          orderBy: { proposalDatetime: 'asc' },
+        },
+      },
+    });
+  }
+
   // 상태별 견적 목록 조회 (ALL이면 전체 조회)
   async findByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL') {
     return await prisma.estimateRequest.findMany({
