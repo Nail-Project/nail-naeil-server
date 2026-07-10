@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { EstimateService } from '../service/estimate.service';
 import { CreateEstimateRequest } from '../dto/create-estimate-request';
-import { GetEstimatesQuery } from '../dto/get-estimates-query';
-import { EstimateValidationError } from '../error/estimate.error';
+import { EstimateValidationError, InvalidEstimateStatusError } from '../error/estimate.error';
 import { success } from '../../common/responses/api-response';
 
 export class EstimateController {
@@ -24,16 +23,19 @@ export class EstimateController {
     }
   };
 
-  // GET /api/v1/estimate?status=
+  // GET /api/v1/estimate/:status
   getEstimatesByStatus = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const parsed = GetEstimatesQuery.safeParse(req.query);
+      const { status } = req.params;
+      const validStatuses = ['MATCHING', 'COMPLETED', 'EXPIRED', 'ALL'] as const;
 
-      if (!parsed.success) {
-        throw new EstimateValidationError(parsed.error.flatten());
+      if (!validStatuses.includes(status as (typeof validStatuses)[number])) {
+        throw new InvalidEstimateStatusError();
       }
 
-      const result = await this.estimateService.getEstimatesByStatus(parsed.data.status);
+      const result = await this.estimateService.getEstimatesByStatus(
+        status as (typeof validStatuses)[number],
+      );
       res.status(200).json(success(result));
     } catch (error) {
       next(error);

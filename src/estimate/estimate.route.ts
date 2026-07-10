@@ -59,25 +59,27 @@ router.post('/', estimateController.createEstimate);
 
 /**
  * @openapi
- * /api/v1/estimate:
+ * /api/v1/estimate/{status}:
  *   get:
  *     summary: 상태별 견적 목록 조회
  *     tags:
  *       - Estimate
  *     parameters:
- *       - in: query
+ *       - in: path
  *         name: status
+ *         required: true
  *         schema:
  *           type: string
  *           enum: [MATCHING, COMPLETED, EXPIRED, ALL]
- *           default: ALL
- *         description: 조회할 견적 상태 (기본값 ALL)
+ *         description: 조회할 견적 상태
  *     responses:
  *       200:
  *         description: 견적 목록 조회 성공
  *       400:
- *         description: 요청 값 유효성 검사 실패
+ *         description: 유효하지 않은 상태값
+ *       500:
+ *         description: 서버 오류
  */
-router.get('/', estimateController.getEstimatesByStatus);
+router.get('/:status', estimateController.getEstimatesByStatus);
 
 export default router;
