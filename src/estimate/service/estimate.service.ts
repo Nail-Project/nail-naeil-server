@@ -6,6 +6,7 @@ import { EstimateRequestFailedError, InternalServerError } from '../../common/er
 import { EstimateNotFoundError } from '../error/estimate.error';
 import { ResultEstimateResponse } from '../dto/result-estimate-response';
 import { ProposalTimeResponse } from '../dto/proposal-time-response';
+import { ProposalDetailResponse } from '../dto/proposal-detail-response';
 
 export class EstimateService {
   private readonly estimateRepository = new EstimateRepository();
@@ -98,6 +99,45 @@ export class EstimateService {
           proposalDatetime: time.proposalDatetime,
           isSelected: time.isSelected,
         })),
+      };
+    } catch (error) {
+      // EstimateNotFoundError는 그대로 전달 (404)
+      if (error instanceof EstimateNotFoundError) throw error;
+      throw new EstimateRequestFailedError();
+    }
+  }
+
+  // 샵 견적 상세 조회
+  async getProposalDetail(proposalId: bigint): Promise<ProposalDetailResponse> {
+    try {
+      const data = await this.estimateRepository.findProposalDetailById(proposalId);
+
+      // 존재하지 않는 견적 제안 id인 경우 404
+      if (!data) throw new EstimateNotFoundError();
+
+      return {
+        proposalId: Number(data.id),
+        shopName: data.shop.name,
+        // TODO: Shop 테이블에 rating, reviewCount 컬럼 추가 후 연결 예정
+        rating: null,
+        reviewCount: null,
+        totalPrice: data.totalPrice,
+        basePrice: data.basePrice,
+        removalPrice: data.removalPrice,
+        extraPrice: data.extraPrice,
+        memo: data.memo,
+        times: data.times.map((time) => ({
+          timeId: Number(time.id),
+          proposalDatetime: time.proposalDatetime,
+          isSelected: time.isSelected,
+        })),
+        designImages: data.request.images.map((img) => ({
+          imageId: Number(img.id),
+          imageUrl: img.imageUrl,
+        })),
+        address: data.shop.address,
+        locationGuide: data.shop.locationGuide,
+        parkingInfo: data.shop.parkingInfo,
       };
     } catch (error) {
       // EstimateNotFoundError는 그대로 전달 (404)

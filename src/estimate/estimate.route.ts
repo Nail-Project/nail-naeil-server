@@ -138,6 +138,32 @@ router.get('/:proposal_id/time', estimateController.getProposalTimes);
 
 /**
  * @openapi
+ * /api/v1/estimate/{proposal_id}/detail:
+ *   get:
+ *     summary: 샵 견적 상세 조회
+ *     tags:
+ *       - Estimate
+ *     parameters:
+ *       - in: path
+ *         name: proposal_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 샵 견적 ID
+ *     responses:
+ *       200:
+ *         description: 샵 견적 상세 조회 성공
+ *       400:
+ *         description: proposal_id 형식 오류
+ *       404:
+ *         description: 해당 견적을 찾을 수 없음
+ *       500:
+ *         description: 서버 오류
+ */
+router.get('/:proposal_id/detail', estimateController.getProposalDetail);
+
+/**
+ * @openapi
  * /api/v1/estimate/{status}:
  *   get:
  *     summary: 상태별 견적 목록 조회

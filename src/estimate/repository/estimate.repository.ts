@@ -62,6 +62,53 @@ export class EstimateRepository {
     });
   }
 
+  // 샵 견적 상세 조회
+  // proposalId가 존재하지 않으면 null 반환 (서비스에서 404 처리)
+  async findProposalDetailById(proposalId: bigint) {
+    return await prisma.estimateResponse.findUnique({
+      where: { id: proposalId },
+      select: {
+        id: true,
+        totalPrice: true,
+        basePrice: true,
+        removalPrice: true,
+        extraPrice: true,
+        memo: true,
+        // Shop 정보 join - 샵명, 주소, 위치 안내, 주차 정보
+        shop: {
+          select: {
+            name: true,
+            address: true,
+            locationGuide: true,
+            parkingInfo: true,
+            // TODO: rating, reviewCount 컬럼 추가 후 연결 예정
+          },
+        },
+        // 예약 가능 시간 목록 - 오름차순 정렬
+        times: {
+          select: {
+            id: true,
+            proposalDatetime: true,
+            isSelected: true,
+          },
+          orderBy: { proposalDatetime: 'asc' },
+        },
+        // 견적 요청에 첨부된 디자인 이미지 목록
+        request: {
+          select: {
+            images: {
+              select: {
+                id: true,
+                imageUrl: true,
+              },
+              orderBy: { id: 'asc' },
+            },
+          },
+        },
+      },
+    });
+  }
+
   // 상태별 견적 목록 조회 (ALL이면 전체 조회)
   async findByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL') {
     return await prisma.estimateRequest.findMany({
