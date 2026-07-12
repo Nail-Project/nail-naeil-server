@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import multer, { Multer, MulterError } from 'multer';
+import { Multer, MulterError } from 'multer';
 import { PhotoUploadFailedError } from '../errors/common.error';
 import { ImageRequiredError } from '../../image/error/image.error';
 
