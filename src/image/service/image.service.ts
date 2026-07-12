@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { PhotoUploadFailedError } from '../../common/errors/common.error';
+import { InvalidImageTypeError } from '../error/image.error';
 
 // -------------------------------------------------------------------
 // StorageService 인터페이스 - 로컬/S3 공통 계약
@@ -118,9 +119,9 @@ export class ImageService {
       storage: this.storage.getStorage(),
       limits: { fileSize: 10 * 1024 * 1024 }, // 10MB 제한
       fileFilter: (_req, file, cb) => {
-        // 이미지 파일만 허용
+        // 이미지 파일만 허용 - InvalidImageTypeError로 던져 wrapMulter에서 instanceof로 판별
         if (!file.mimetype.startsWith('image/')) {
-          return cb(new Error('이미지 파일만 업로드할 수 있습니다.'));
+          return cb(new InvalidImageTypeError());
         }
         cb(null, true);
       },
