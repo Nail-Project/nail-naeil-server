@@ -3,13 +3,16 @@ import path from 'path';
 import { prisma } from '../infra/prisma';
 
 // -------------------------------------------------------------------
-// 유틸 - N일 전 날짜 문자열 반환 (예: '2026-07-11')
+// 유틸 - 서울 시간 기준 N일 전 날짜 문자열 반환 (예: '2026-07-11')
+// toISOString()은 UTC 기준이라 KST(+9)로 보정 후 계산
+// 예: 2026-07-14 02:00 KST → UTC로는 2026-07-13 17:00 → 보정 없이 계산하면 날짜가 하루 어긋남
 // -------------------------------------------------------------------
+const SEOUL_OFFSET_MS = 9 * 60 * 60 * 1000;
+
 const getTargetDate = (daysAgo: number): string => {
-  const date = new Date();
-  date.setDate(date.getDate() - daysAgo);
-  // split 결과가 string | undefined 라서 ?? '' 로 타입 보정
-  return date.toISOString().split('T')[0] ?? '';
+  const date = new Date(Date.now() + SEOUL_OFFSET_MS);
+  date.setUTCDate(date.getUTCDate() - daysAgo);
+  return date.toISOString().slice(0, 10);
 };
 
 // -------------------------------------------------------------------
