@@ -47,10 +47,10 @@ export class LocalStorageService implements StorageService {
   }
 
   getFileUrl(file: Express.Multer.File): string {
-    // diskStorage는 file.destination + file.filename에 저장 경로가 담김
+    // multer가 저장 후 file.destination에 실제 저장된 경로를 담아줌
+    // getDateDir()를 재호출하지 않아 자정 경계에서 경로 불일치 방지
     // 예: http://localhost:3000/uploads/2026-07-11/uuid.jpg
-    const dateDir = this.getDateDir();
-    return `${this.baseUrl}/${dateDir}/${file.filename}`;
+    return `${this.baseUrl}/${file.destination}/${file.filename}`;
   }
 }
 
