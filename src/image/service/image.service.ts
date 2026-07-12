@@ -19,18 +19,24 @@ export interface StorageService {
 // uploads/ 폴더에 uuid 파일명으로 저장 후 서버 URL 반환
 // -------------------------------------------------------------------
 export class LocalStorageService implements StorageService {
-  private readonly uploadDir = 'uploads';
+  private readonly baseUploadDir = 'uploads';
   private readonly baseUrl = process.env.BASE_URL ?? 'http://localhost:3000';
 
-  getStorage(): multer.StorageEngine {
-    // uploads/ 폴더 없으면 자동 생성
-    if (!fs.existsSync(this.uploadDir)) {
-      fs.mkdirSync(this.uploadDir, { recursive: true });
-    }
+  // 오늘 날짜 기준 저장 폴더 경로 반환 (예: uploads/2026-07-11)
+  private getDateDir(): string {
+    const today = new Date().toISOString().split('T')[0];
+    return `${this.baseUploadDir}/${today}`;
+  }
 
+  getStorage(): multer.StorageEngine {
     return multer.diskStorage({
       destination: (_req, _file, cb) => {
-        cb(null, this.uploadDir);
+        // 날짜별 폴더 없으면 자동 생성 (예: uploads/2026-07-11/)
+        const dateDir = this.getDateDir();
+        if (!fs.existsSync(dateDir)) {
+          fs.mkdirSync(dateDir, { recursive: true });
+        }
+        cb(null, dateDir);
       },
       filename: (_req, file, cb) => {
         // 원본 확장자 유지 + uuid로 파일명 충돌 방지
@@ -41,8 +47,10 @@ export class LocalStorageService implements StorageService {
   }
 
   getFileUrl(file: Express.Multer.File): string {
-    // diskStorage는 file.filename에 저장된 파일명이 담김
-    return `${this.baseUrl}/uploads/${file.filename}`;
+    // diskStorage는 file.destination + file.filename에 저장 경로가 담김
+    // 예: http://localhost:3000/uploads/2026-07-11/uuid.jpg
+    const dateDir = this.getDateDir();
+    return `${this.baseUrl}/${dateDir}/${file.filename}`;
   }
 }
 
@@ -60,12 +68,15 @@ export class S3StorageService implements StorageService {
     //
     // const s3 = new S3Client({ region: process.env.AWS_REGION });
     //
+    // const today = new Date().toISOString().split('T')[0];
     // return multerS3({
     //   s3,
     //   bucket: process.env.S3_BUCKET_NAME!,
     //   key: (_req, file, cb) => {
     //     const ext = path.extname(file.originalname);
-    //     cb(null, `images/${uuidv4()}${ext}`);
+    //     // 날짜 prefix로 저장 - 스케줄러가 날짜별 조회 가능하도록
+    //     // 예: images/2026-07-11/uuid.jpg
+    //     cb(null, `images/${today}/${uuidv4()}${ext}`);
     //   },
     // });
 
