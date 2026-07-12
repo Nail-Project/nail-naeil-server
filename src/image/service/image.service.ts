@@ -58,6 +58,21 @@ export class LocalStorageService implements StorageService {
 // S3StorageService - AWS S3 버킷에 저장 (추후 전환용)
 // multer-s3 패키지 설치 및 AWS 환경변수 설정 후 활성화
 // npm install multer-s3 @aws-sdk/client-s3
+//
+// TODO: S3 전환 시 보안 강화 항목
+//
+// [1] 매직 바이트 검사 추가 (mimetype 위조 방지)
+//   - mimetype은 클라이언트가 헤더에 직접 설정하는 값이라 위조 가능
+//   - file-type 패키지로 파일 시그니처(매직 바이트)를 검사해 실제 이미지 여부 확인
+//   - multer-s3는 memoryStorage 방식으로 동작해 file.buffer 접근 가능 → 검사 붙이기 용이
+//   - npm install file-type
+//
+// [2] S3 버킷 private 설정 + Presigned URL 방식 적용
+//   - 버킷을 public으로 열면 URL만 알면 누구나 접근 가능 → 사적인 이미지 노출 위험
+//   - 버킷은 private으로 설정하고, 클라이언트가 이미지 요청 시 서버에서 임시 URL 발급
+//   - import { GetObjectCommand } from '@aws-sdk/client-s3';
+//   - import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+//   - const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket, Key }), { expiresIn: 3600 });
 // -------------------------------------------------------------------
 export class S3StorageService implements StorageService {
   getStorage(): multer.StorageEngine {
