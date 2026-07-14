@@ -1,4 +1,4 @@
-import { prisma } from '../config/prisma';
+import { prisma } from '../../config/prisma';
 
 export class UserRepository {
   findByLoginId(loginId: string) {
@@ -16,6 +16,8 @@ export class UserRepository {
     });
   }
 
+  
+
   create(data: {
     loginId: string;
     password: string;
@@ -24,4 +26,17 @@ export class UserRepository {
   }) {
     return prisma.user.create({ data });
   }
+
+  saveRefreshToken(userId: number, token: string, expiresAt: Date) {
+    return prisma.refreshToken.create({ data: { userId, token, expiresAt } });
+  }
+
+  findRefreshToken(token: string) {
+    return prisma.refreshToken.findUnique({ where: { token } });
+  }
+
+  deleteRefreshToken(token: string) {
+    return prisma.refreshToken.deleteMany({ where: { token } });
+  }
 }
+

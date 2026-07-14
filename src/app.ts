@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { adminSwaggerSpec, userSwaggerSpec } from './config/swagger';
-import userAuthRoute from './user/user-auth.route';
+import userAuthRoute from './user/route/user-auth.route';
 import { errorHandler } from './common/middleware/error-handler';
 
 export const app = express();

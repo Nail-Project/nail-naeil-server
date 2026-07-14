@@ -9,3 +9,6 @@ export const DuplicatedEmailError = () =>
 // 로그인 실패는 아이디/비번 구분 없이 하나로 응답 (계정 존재 여부 노출 방지)
 export const InvalidCredentialsError = () =>
   new AppError('INVALID_CREDENTIALS', 401, '아이디 또는 비밀번호가 올바르지 않습니다.');
+
+export const InvalidTokenError = () =>
+  new AppError('INVALID_TOKEN', 401, '유효하지 않은 토큰입니다.');

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { UserAuthService } from './user-auth.service';
-import { SignupUserRequest } from './dto/signup-user-request';
-import { LoginUserRequest } from './dto/login-user-request';
+import { UserAuthService } from '../service/user-auth.service';
+import { SignupUserRequest } from '../dto/signup-user-request';
+import { LoginUserRequest } from '../dto/login-user-request';
 
 export class UserAuthController {
   private readonly userAuthService = new UserAuthService();
@@ -89,13 +89,15 @@ export class UserAuthController {
    *                 example: pass1234
    *     responses:
    *       200:
-   *         description: 로그인 성공, accessToken 발급
+   *         description: 로그인 성공, accessToken/refreshToken 발급
    *         content:
    *           application/json:
    *             schema:
    *               type: object
    *               properties:
    *                 accessToken:
+   *                   type: string
+   *                 refreshToken:
    *                   type: string
    *       401:
    *         description: 아이디 또는 비밀번호 불일치
@@ -104,6 +106,79 @@ export class UserAuthController {
     try {
       const result = await this.userAuthService.login(req.body as LoginUserRequest);
       res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * @openapi
+   * /api/users/auth/refresh:
+   *   post:
+   *     summary: 액세스 토큰 재발급
+   *     tags:
+   *       - User Auth
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [refreshToken]
+   *             properties:
+   *               refreshToken:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: 재발급 성공, 새 accessToken/refreshToken 발급
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 accessToken:
+   *                   type: string
+   *                 refreshToken:
+   *                   type: string
+   *       401:
+   *         description: 유효하지 않은 토큰
+   */
+  refresh = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { refreshToken } = req.body as { refreshToken: string };
+      const result = await this.userAuthService.refresh(refreshToken);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * @openapi
+   * /api/users/auth/logout:
+   *   post:
+   *     summary: 로그아웃 (refresh token 폐기)
+   *     tags:
+   *       - User Auth
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [refreshToken]
+   *             properties:
+   *               refreshToken:
+   *                 type: string
+   *     responses:
+   *       204:
+   *         description: 로그아웃 성공
+   */
+  logout = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { refreshToken } = req.body as { refreshToken: string };
+      await this.userAuthService.logout(refreshToken);
+      res.status(204).send();
     } catch (error) {
       next(error);
     }
