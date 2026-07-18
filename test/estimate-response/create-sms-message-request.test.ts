@@ -35,6 +35,19 @@ describe('createSmsMessageRequestSchema', () => {
     ).toBe(false);
   });
 
+  it.each([null, [], '견적 문자', 123])(
+    '최상위 rawPayload가 객체가 아니면 거부한다: %j',
+    (rawPayload) => {
+      expect(
+        createSmsMessageRequestSchema.safeParse({
+          source: 'android-device-a1b2c3',
+          messageId: 'android-sms-1042',
+          rawPayload,
+        }).success,
+      ).toBe(false);
+    },
+  );
+
   it('수신 원천이 없으면 거부한다', () => {
     expect(
       createSmsMessageRequestSchema.safeParse({
