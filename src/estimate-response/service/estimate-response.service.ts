@@ -18,6 +18,7 @@ export class EstimateResponseService {
 
     return {
       id: message.id,
+      source: message.source,
       messageId: message.messageId,
       direction: 'INBOUND',
       status: message.status,

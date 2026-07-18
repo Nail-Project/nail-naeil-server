@@ -37,8 +37,9 @@ const estimateResponseRouter = Router();
  *         application/json:
  *           schema:
  *             type: object
- *             required: [messageId, rawPayload]
+ *             required: [source, messageId, rawPayload]
  *             properties:
+ *               source: { type: string, example: "android-device-a1b2c3" }
  *               messageId: { type: string, example: "android-sms-1042" }
  *               rawPayload:
  *                 type: object

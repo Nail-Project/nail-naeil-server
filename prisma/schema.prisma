@@ -75,6 +75,7 @@ model ShopProposalTime {
 
 model SmsMessage {
   id                 Int               @id @default(autoincrement())
+  source             String            @db.VarChar(100)
   messageId          String            @map("message_id") @db.VarChar(100)
   direction          SmsDirection
   rawPayload         Json              @map("raw_payload")
@@ -89,5 +90,6 @@ model SmsMessage {
   shop               Shop?             @relation(fields: [shopId], references: [id], onDelete: SetNull)
   estimateResponse   EstimateResponse? @relation(fields: [estimateResponseId], references: [id], onDelete: SetNull)
 
+  @@unique([source, direction, messageId])
   @@map("sms_messages")
 }

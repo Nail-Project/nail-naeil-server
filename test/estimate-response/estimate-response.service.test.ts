@@ -10,6 +10,7 @@ import type {
 import { EstimateResponseService } from '../../src/estimate-response/service/estimate-response.service';
 
 const smsRequest: CreateSmsMessageRequest = {
+  source: 'android-device-a1b2c3',
   messageId: 'android-sms-1042',
   rawPayload: {
     address: '01012345678',
@@ -22,6 +23,7 @@ class FakeRepository implements EstimateResponseRepository {
   async createSmsMessage(): Promise<CreatedSmsMessage> {
     return {
       id: 10,
+      source: 'android-device-a1b2c3',
       messageId: 'android-sms-1042',
       direction: 'INBOUND',
       status: 'PENDING',
@@ -96,6 +98,7 @@ describe('EstimateResponseService', () => {
 
     await expect(service.createSmsMessage(smsRequest)).resolves.toMatchObject({
       id: 10,
+      source: 'android-device-a1b2c3',
       messageId: 'android-sms-1042',
       direction: 'INBOUND',
       status: 'PENDING',

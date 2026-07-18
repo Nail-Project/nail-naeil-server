@@ -9,6 +9,7 @@ const createApp = () => {
   const service = {
     createSmsMessage: vi.fn().mockResolvedValue({
       id: 10,
+      source: 'android-device-a1b2c3',
       messageId: 'android-sms-1042',
       direction: 'INBOUND',
       status: 'PENDING',
@@ -73,6 +74,7 @@ describe('estimate response routes', () => {
     const response = await request(app)
       .post('/api/v1/estimate')
       .send({
+        source: 'android-device-a1b2c3',
         messageId: 'android-sms-1042',
         rawPayload: {
           address: '01012345678',

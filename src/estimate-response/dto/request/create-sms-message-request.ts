@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const createSmsMessageRequestSchema = z.object({
+  source: z.string().trim().min(1).max(100),
   messageId: z.string().trim().min(1).max(100),
   rawPayload: z.json(),
 });

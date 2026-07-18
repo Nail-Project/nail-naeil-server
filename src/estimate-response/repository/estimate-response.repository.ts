@@ -4,6 +4,7 @@ import type { CreateSmsMessageRequest } from '../dto/request/create-sms-message-
 
 export interface CreatedSmsMessage {
   id: number;
+  source: string;
   messageId: string;
   direction: 'OUTBOUND' | 'INBOUND';
   status: 'PENDING' | 'SENT' | 'PARSED' | 'FAILED';
@@ -59,14 +60,24 @@ export interface EstimateResponseRepository {
 
 export class PrismaEstimateResponseRepository implements EstimateResponseRepository {
   async createSmsMessage(request: CreateSmsMessageRequest): Promise<CreatedSmsMessage> {
-    return getPrisma().smsMessage.create({
-      data: {
+    return getPrisma().smsMessage.upsert({
+      where: {
+        source_direction_messageId: {
+          source: request.source,
+          direction: 'INBOUND',
+          messageId: request.messageId,
+        },
+      },
+      create: {
+        source: request.source,
         messageId: request.messageId,
         direction: 'INBOUND',
         rawPayload: request.rawPayload as Prisma.InputJsonValue,
       },
+      update: {},
       select: {
         id: true,
+        source: true,
         messageId: true,
         direction: true,
         status: true,
