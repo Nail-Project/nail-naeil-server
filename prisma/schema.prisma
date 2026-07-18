@@ -3,24 +3,91 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
-
 datasource db {
   provider = "mysql"
 }
 
 model Shop {
-  id            Int      @id @default(autoincrement())
-  name          String   @db.VarChar(100)
-  phoneNumber   String?  @map("phone_number") @db.VarChar(20)
-  address       String   @db.VarChar(255)
-  addressDetail String?  @map("address_detail") @db.VarChar(255)
-  locationGuide String?  @map("location_guide") @db.VarChar(255)
-  parkingInfo   String?  @map("parking_info") @db.VarChar(255)
-  latitude      Decimal  @db.Decimal(10, 7)
-  longitude     Decimal  @db.Decimal(10, 7)
-  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  id                Int                @id @default(autoincrement())
+  name              String             @db.VarChar(100)
+  phoneNumber       String?            @map("phone_number") @db.VarChar(20)
+  address           String             @db.VarChar(255)
+  addressDetail     String?            @map("address_detail") @db.VarChar(255)
+  locationGuide     String?            @map("location_guide") @db.VarChar(255)
+  parkingInfo       String?            @map("parking_info") @db.VarChar(255)
+  latitude          Decimal            @db.Decimal(10, 7)
+  longitude         Decimal            @db.Decimal(10, 7)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
+  estimateResponses EstimateResponse[]
+  smsMessages       SmsMessage[]
 
   @@map("shops")
 }
 
+enum EstimateResponseStatus {
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+enum SmsDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum SmsStatus {
+  PENDING
+  SENT
+  PARSED
+  FAILED
+}
+
+model EstimateResponse {
+  id            Int                    @id @default(autoincrement())
+  // TODO: [eun] 견적 요청 도메인 모델 병합 후 relation을 연결한다.
+  requestId     Int                    @map("request_id")
+  shopId        Int                    @map("shop_id")
+  totalPrice    Int                    @map("total_price")
+  basePrice     Int                    @map("base_price")
+  removalPrice  Int                    @default(0) @map("removal_price")
+  extraPrice    Int                    @default(0) @map("extra_price")
+  memo          String?                @db.Text
+  status        EstimateResponseStatus @default(SUBMITTED)
+  createdAt     DateTime               @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime               @updatedAt @map("updated_at") @db.DateTime(3)
+  shop          Shop                   @relation(fields: [shopId], references: [id])
+  proposalTimes ShopProposalTime[]
+  smsMessages   SmsMessage[]
+
+  @@map("estimate_responses")
+}
+
+model ShopProposalTime {
+  id               Int              @id @default(autoincrement())
+  proposalId       Int              @map("proposal_id")
+  proposalDatetime DateTime         @map("proposal_datetime") @db.DateTime(3)
+  isSelected       Boolean          @default(false) @map("is_selected")
+  proposal         EstimateResponse @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@map("shop_proposal_times")
+}
+
+model SmsMessage {
+  id                 Int               @id @default(autoincrement())
+  messageId          String            @map("message_id") @db.VarChar(100)
+  direction          SmsDirection
+  rawPayload         Json              @map("raw_payload")
+  status             SmsStatus         @default(PENDING)
+  errorMessage       String?           @map("error_message") @db.Text
+  // TODO: [eun] 견적 요청 도메인 모델 병합 후 relation을 연결한다.
+  requestId          Int?              @map("request_id")
+  shopId             Int?              @map("shop_id")
+  estimateResponseId Int?              @map("estimate_response_id")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  shop               Shop?             @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  estimateResponse   EstimateResponse? @relation(fields: [estimateResponseId], references: [id], onDelete: SetNull)
+
+  @@map("sms_messages")
+}
