@@ -3,8 +3,6 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
-
-
 datasource db {
   provider = "mysql"
 }
@@ -47,7 +45,6 @@ enum SmsStatus {
 
 model EstimateResponse {
   id            Int                    @id @default(autoincrement())
-  // TODO: [eun] 견적 요청 도메인 모델 병합 후 relation을 연결한다.
   requestId     Int                    @map("request_id")
   shopId        Int                    @map("shop_id")
   totalPrice    Int                    @map("total_price")
@@ -58,6 +55,7 @@ model EstimateResponse {
   status        EstimateResponseStatus @default(SUBMITTED)
   createdAt     DateTime               @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime               @updatedAt @map("updated_at") @db.DateTime(3)
+  request       EstimateRequest        @relation(fields: [requestId], references: [id])
   shop          Shop                   @relation(fields: [shopId], references: [id])
   proposalTimes ShopProposalTime[]
   smsMessages   SmsMessage[]
@@ -83,115 +81,81 @@ model SmsMessage {
   rawPayload         Json              @map("raw_payload")
   status             SmsStatus         @default(PENDING)
   errorMessage       String?           @map("error_message") @db.Text
-  // TODO: [eun] 견적 요청 도메인 모델 병합 후 relation을 연결한다.
   requestId          Int?              @map("request_id")
   shopId             Int?              @map("shop_id")
   estimateResponseId Int?              @map("estimate_response_id")
   createdAt          DateTime          @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  request            EstimateRequest?  @relation(fields: [requestId], references: [id], onDelete: SetNull)
   shop               Shop?             @relation(fields: [shopId], references: [id], onDelete: SetNull)
   estimateResponse   EstimateResponse? @relation(fields: [estimateResponseId], references: [id], onDelete: SetNull)
 
   @@unique([source, direction, messageId])
   @@map("sms_messages")
 }
+
+// ─── Estimate Request 도메인 ──────────────────────────────────────────────────
+
 enum NailType {
-  HAND
-  PEDICURE
-  BOTH
+  HAND      // 손 네일
+  PEDICURE  // 발 네일
+  BOTH      // 손 + 발
 }
 
 enum RemovalType {
-  EXTENSION
-  PARTS
-  BASIC
-  NONE
+  EXTENSION // 연장 제거
+  PARTS     // 부분 제거
+  BASIC     // 기본 제거
+  NONE      // 제거 없음
 }
 
 enum PreferredTime {
-  AM
-  PM
-  EVENING
-  ANY
+  AM      // 오전
+  PM      // 오후
+  EVENING // 저녁
+  ANY     // 무관
 }
 
 enum RecommendType {
-  BALANCED
-  CLOSE
-  WIDE
-  CHEAP
+  BALANCED // 균형 추천
+  CLOSE    // 가까운 순
+  WIDE     // 넓은 범위
+  CHEAP    // 저렴한 순
 }
 
 enum EstimateStatus {
-  MATCHING
-  COMPLETED
-  EXPIRED
-}
-
-enum ProposalStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
+  MATCHING   // 샵 매칭 중 (견적 응답 대기)
+  COMPLETED  // 견적 수락 완료
+  EXPIRED    // 요청 기간 만료
 }
 
 model EstimateRequest {
-  id            BigInt             @id @default(autoincrement())
-  nailType      NailType           @map("nail_type")
-  removalType   RemovalType        @map("removal_type")
-  startDate     DateTime           @map("start_date") @db.Date
-  endDate       DateTime           @map("end_date") @db.Date
-  preferredTime PreferredTime      @map("preferred_time")
-  description   String?            @db.Text
-  recommendType RecommendType      @map("recommend_type")
-  status        EstimateStatus     @default(MATCHING)
-  createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
-  userId        BigInt             @map("user_id")
-
+  id            Int               @id @default(autoincrement())
+  nailType      NailType          @map("nail_type")
+  removalType   RemovalType       @map("removal_type")
+  startDate     DateTime          @map("start_date") @db.Date
+  endDate       DateTime          @map("end_date") @db.Date
+  preferredTime PreferredTime     @map("preferred_time")
+  recommendType RecommendType     @map("recommend_type")
+  description   String?           @db.Text
+  status        EstimateStatus    @default(MATCHING)
+  // TODO: [yej] User 모델 추가 후 @relation 연결
+  userId        Int               @map("user_id")
+  createdAt     DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
   images        RequestImage[]
   proposals     EstimateResponse[]
+  smsMessages   SmsMessage[]
 
-  @@map("estimate_request")
-}
-
-model EstimateResponse {
-  id           BigInt         @id @default(autoincrement())
-  totalPrice   Int?           @map("total_price")
-  basePrice    Int?           @map("base_price")
-  removalPrice Int?           @map("removal_price")
-  extraPrice   Int?           @map("extra_price")
-  requestId    BigInt         @map("request_id")
-  shopId       Int            @map("shop_id")
-  memo         String?        @db.Text
-  status       ProposalStatus @default(PENDING)
-  createdAt    DateTime       @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt    DateTime       @updatedAt @map("updated_at") @db.DateTime(3)
-
-  request      EstimateRequest  @relation(fields: [requestId], references: [id])
-  shop         Shop             @relation(fields: [shopId], references: [id])
-  times        ShopProposalTime[]
-
-  @@map("estimate_response")
-}
-
-model ShopProposalTime {
-  id               BigInt           @id @default(autoincrement())
-  proposalId       BigInt           @map("proposal_id")
-  proposalDatetime DateTime?        @map("proposal_datetime")
-  isSelected       Boolean?         @map("is_selected")
-
-  proposal         EstimateResponse @relation(fields: [proposalId], references: [id])
-
-  @@map("shop_proposal_time")
+  @@map("estimate_requests")
 }
 
 model RequestImage {
-  id         BigInt          @id @default(autoincrement())
-  imageUrl   String          @map("image_url") @db.VarChar(255)
-  createdAt  DateTime        @default(now()) @map("created_at") @db.DateTime(3)
-  requestId  BigInt          @map("request_id")
+  id        Int             @id @default(autoincrement())
+  imageUrl  String          @map("image_url") @db.VarChar(255)
+  requestId Int             @map("request_id")
+  createdAt DateTime        @default(now()) @map("created_at") @db.DateTime(3)
+  request   EstimateRequest @relation(fields: [requestId], references: [id])
 
-  request    EstimateRequest @relation(fields: [requestId], references: [id])
-
-  @@map("request_image")
+  @@map("request_images")
 }

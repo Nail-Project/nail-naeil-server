@@ -1,0 +1,30 @@
+// POST /api/v1/estimate-request - 견적 요청 생성 시 Request Body 검증 스키마
+// zod로 런타임 검증 후 타입을 추론해 controller → service → repository에서 그대로 사용한다.
+import { z } from 'zod';
+
+export const CreateEstimateRequestSchema = z.object({
+  // 네일 종류: 손(HAND), 발(PEDICURE), 손+발(BOTH)
+  nailType: z.enum(['HAND', 'PEDICURE', 'BOTH']),
+
+  // 제거 종류: 연장(EXTENSION), 부분(PARTS), 기본(BASIC), 없음(NONE)
+  removalType: z.enum(['EXTENSION', 'PARTS', 'BASIC', 'NONE']),
+
+  // 희망 시술 기간 - ISO 날짜 문자열(YYYY-MM-DD) 형식으로 전달받아 DB 저장 시 Date로 변환
+  startDate: z.string().min(1),
+  endDate: z.string().min(1),
+
+  // 선호 시간대: 오전(AM), 오후(PM), 저녁(EVENING), 무관(ANY)
+  preferredTime: z.enum(['AM', 'PM', 'EVENING', 'ANY']),
+
+  // 샵 추천 기준: 균형(BALANCED), 가까운 순(CLOSE), 넓은 범위(WIDE), 저렴한 순(CHEAP)
+  recommendType: z.enum(['BALANCED', 'CLOSE', 'WIDE', 'CHEAP']),
+
+  // 추가 요청 사항 (선택)
+  description: z.string().optional(),
+
+  // 디자인 이미지 URL 목록 - image 도메인에서 미리 업로드 후 URL을 받아 전달한다.
+  // 빈 배열로 기본값을 설정해 프론트가 필드를 생략해도 정상 처리되도록 한다.
+  images: z.array(z.string()).optional().default([]),
+});
+
+export type CreateEstimateRequestDto = z.infer<typeof CreateEstimateRequestSchema>;
