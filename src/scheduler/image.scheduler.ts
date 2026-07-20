@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { prisma } from '../infra/prisma';
+import { getPrisma } from '../infra/prisma';
 
 // -------------------------------------------------------------------
 // 유틸 - 서울 시간 기준 N일 전 날짜 문자열 반환 (예: '2026-07-11')
@@ -49,7 +49,7 @@ const cleanupLocalImages = async (): Promise<void> => {
 
   // DB에서 해당 URL 목록 중 실제 사용 중인 것만 IN 쿼리로 한 번에 조회
   const urls = Array.from(urlToPath.keys());
-  const existingImages = await prisma.requestImage.findMany({
+  const existingImages = await getPrisma().requestImage.findMany({
     where: { imageUrl: { in: urls } },
     select: { imageUrl: true },
   });
