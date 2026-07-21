@@ -8,7 +8,7 @@ const estimateRequestRouter = Router();
 
 /**
  * @openapi
- * /api/v1/estimate-request:
+ * /api/v1/estimate:
  *   post:
  *     summary: 견적 요청 생성
  *     description: |
@@ -64,7 +64,7 @@ const estimateRequestRouter = Router();
 
 /**
  * @openapi
- * /api/v1/estimate-request:
+ * /api/v1/estimate/{status}:
  *   get:
  *     summary: 상태별 견적 요청 목록 조회
  *     description: |
@@ -73,7 +73,7 @@ const estimateRequestRouter = Router();
  *     tags:
  *       - Estimate Request
  *     parameters:
- *       - in: query
+ *       - in: path
  *         name: status
  *         required: true
  *         schema:
@@ -87,6 +87,6 @@ const estimateRequestRouter = Router();
  */
 
 estimateRequestRouter.post('/', controller.createEstimateRequest);
-estimateRequestRouter.get('/', controller.getEstimatesByStatus);
+estimateRequestRouter.get('/:status', controller.getEstimatesByStatus);
 
 export default estimateRequestRouter;

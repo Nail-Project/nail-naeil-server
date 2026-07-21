@@ -45,13 +45,10 @@ export class EstimateRequestController {
    */
   getEstimatesByStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { status } = req.query;
+      const { status } = req.params;
       const validStatuses = ['MATCHING', 'COMPLETED', 'EXPIRED', 'ALL'] as const;
 
-      if (
-        typeof status !== 'string' ||
-        !validStatuses.includes(status as (typeof validStatuses)[number])
-      ) {
+      if (!validStatuses.includes(status as (typeof validStatuses)[number])) {
         throw new InvalidEstimateRequestError();
       }
 
