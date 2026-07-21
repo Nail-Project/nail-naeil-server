@@ -23,9 +23,7 @@ class SmsService {
   //   예) import coolsms from 'coolsms-node-sdk';
   async send(to: string, text: string): Promise<void> {
     if (!SMS_ENABLED) {
-      // SMS 미연동 상태 - 발송 내용만 로그로 확인한다.
       console.log('[SmsService] SMS 미연동 상태 (SMS_ENABLED=false). 발송 건너뜀.');
-      console.log('[SmsService] 발송 예정 내용:\n' + text);
       return;
     }
 
