@@ -34,6 +34,10 @@ class SmsService {
     } catch (error) {
       // SMS 발송 실패는 견적 요청 자체를 막지 않는다.
       // 요청은 이미 DB에 저장됐으므로 로그만 남기고 계속 진행한다.
+      // TODO: [yej] SMS API 확정 후 실패 정책 결정 필요
+      //   - 재발송 로직 추가 여부 (예: 최대 3회 retry)
+      //   - SMS 발송 실패 시 별도 에러 코드(SMS_SEND_FAILED)로 클라이언트에 알릴지 여부
+      //   현재는 견적 요청이 DB에 저장된 이후라 SMS 실패로 전체를 막지 않고 로그만 남긴다.
       console.error('[SmsService] SMS 발송 실패:', error);
     }
   }
