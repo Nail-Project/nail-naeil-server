@@ -9,19 +9,31 @@ datasource db {
 
 model Shop {
   id                Int                @id @default(autoincrement())
+  dataSource        String?            @map("data_source") @db.VarChar(30)
+  externalStoreId   String?            @map("external_store_id") @db.VarChar(50)
   name              String             @db.VarChar(100)
   phoneNumber       String?            @map("phone_number") @db.VarChar(20)
   address           String             @db.VarChar(255)
   addressDetail     String?            @map("address_detail") @db.VarChar(255)
   locationGuide     String?            @map("location_guide") @db.VarChar(255)
   parkingInfo       String?            @map("parking_info") @db.VarChar(255)
+  provinceCode      String?            @map("province_code") @db.VarChar(10)
+  provinceName      String?            @map("province_name") @db.VarChar(50)
+  districtCode      String?            @map("district_code") @db.VarChar(10)
+  districtName      String?            @map("district_name") @db.VarChar(50)
+  adminDongCode     String?            @map("admin_dong_code") @db.VarChar(20)
+  adminDongName     String?            @map("admin_dong_name") @db.VarChar(50)
   latitude          Decimal            @db.Decimal(10, 7)
   longitude         Decimal            @db.Decimal(10, 7)
+  isDataActive      Boolean            @default(true) @map("is_data_active")
+  lastSyncedAt      DateTime?          @map("last_synced_at") @db.DateTime(3)
   createdAt         DateTime           @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt         DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
   estimateResponses EstimateResponse[]
   smsMessages       SmsMessage[]
 
+  @@unique([dataSource, externalStoreId])
+  @@index([provinceCode, districtCode, adminDongCode])
   @@map("shops")
 }
 
@@ -97,52 +109,52 @@ model SmsMessage {
 // ─── Estimate Request 도메인 ──────────────────────────────────────────────────
 
 enum NailType {
-  HAND      // 손 네일
-  PEDICURE  // 발 네일
-  BOTH      // 손 + 발
+  HAND // 손 네일
+  PEDICURE // 발 네일
+  BOTH // 손 + 발
 }
 
 enum RemovalType {
   EXTENSION // 연장 제거
-  PARTS     // 부분 제거
-  BASIC     // 기본 제거
-  NONE      // 제거 없음
+  PARTS // 부분 제거
+  BASIC // 기본 제거
+  NONE // 제거 없음
 }
 
 enum PreferredTime {
-  AM      // 오전
-  PM      // 오후
+  AM // 오전
+  PM // 오후
   EVENING // 저녁
-  ANY     // 무관
+  ANY // 무관
 }
 
 enum RecommendType {
   BALANCED // 균형 추천
-  CLOSE    // 가까운 순
-  WIDE     // 넓은 범위
-  CHEAP    // 저렴한 순
+  CLOSE // 가까운 순
+  WIDE // 넓은 범위
+  CHEAP // 저렴한 순
 }
 
 enum EstimateStatus {
-  MATCHING   // 샵 매칭 중 (견적 응답 대기)
-  COMPLETED  // 견적 수락 완료
-  EXPIRED    // 요청 기간 만료
+  MATCHING // 샵 매칭 중 (견적 응답 대기)
+  COMPLETED // 견적 수락 완료
+  EXPIRED // 요청 기간 만료
 }
 
 model EstimateRequest {
-  id            Int               @id @default(autoincrement())
-  nailType      NailType          @map("nail_type")
-  removalType   RemovalType       @map("removal_type")
-  startDate     DateTime          @map("start_date") @db.Date
-  endDate       DateTime          @map("end_date") @db.Date
-  preferredTime PreferredTime     @map("preferred_time")
-  recommendType RecommendType     @map("recommend_type")
-  description   String?           @db.Text
-  status        EstimateStatus    @default(MATCHING)
+  id            Int                @id @default(autoincrement())
+  nailType      NailType           @map("nail_type")
+  removalType   RemovalType        @map("removal_type")
+  startDate     DateTime           @map("start_date") @db.Date
+  endDate       DateTime           @map("end_date") @db.Date
+  preferredTime PreferredTime      @map("preferred_time")
+  recommendType RecommendType      @map("recommend_type")
+  description   String?            @db.Text
+  status        EstimateStatus     @default(MATCHING)
   // TODO: [yej] User 모델 추가 후 @relation 연결
-  userId        Int               @map("user_id")
-  createdAt     DateTime          @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  userId        Int                @map("user_id")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
   images        RequestImage[]
   proposals     EstimateResponse[]
   smsMessages   SmsMessage[]
