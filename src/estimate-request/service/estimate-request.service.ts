@@ -30,6 +30,7 @@ class SmsService {
     }
 
     try {
+      // 10초 안에 응답 없으면 타임아웃 처리
       const response = await fetch(SMS_API_URL, {
         method: 'POST',
         headers: {
@@ -37,6 +38,7 @@ class SmsService {
           Authorization: `Bearer ${SMS_API_KEY}`,
         },
         body: JSON.stringify({ from: SMS_FROM, to, text }),
+        signal: AbortSignal.timeout(10_000),
       });
 
       // fetch는 4xx/5xx에서 reject되지 않으므로 response.ok로 명시적으로 확인한다.
