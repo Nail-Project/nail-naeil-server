@@ -5,25 +5,32 @@ import { GetEstimatesResponseDto } from '../dto/response/get-estimates-response.
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
 
 // ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
+// SMS_ENABLED=true 일 때만 실제 발송을 시도한다.
+// SMS API 확정 전까지는 .env에서 SMS_ENABLED를 설정하지 않으면 발송을 건너뛴다.
 // TODO: [yej] SMS API 확정 후 아래 항목을 실제 값으로 교체한다.
 //   - SMS_API_URL: CoolSMS / NCP 등 확정된 서비스의 엔드포인트
 //   - SMS_API_KEY: 발급받은 API 키 (환경변수로 관리)
 //   - SMS_FROM: 릴레이 기기 전화번호 (발신번호 등록 필요)
-const SMS_API_URL = 'https://api.sms-provider.com/send'; // 임시 URL
-const SMS_API_KEY = process.env.SMS_API_KEY ?? 'temp-api-key';
-const SMS_FROM = process.env.SMS_FROM ?? '07000000000';
+const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
+const SMS_API_URL = process.env.SMS_API_URL ?? '';
+const SMS_API_KEY = process.env.SMS_API_KEY ?? '';
+const SMS_FROM = process.env.SMS_FROM ?? '';
 
 class SmsService {
   // SMS API로 문자 발송
+  // SMS_ENABLED가 false면 로그만 출력하고 실제 발송은 건너뛴다.
   // TODO: [yej] SMS API 확정 후 실제 SDK / HTTP 클라이언트로 교체한다.
   //   예) import coolsms from 'coolsms-node-sdk';
   async send(to: string, text: string): Promise<void> {
-    // TODO: [yej] SMS API 확정 후 실제 발송 로직으로 교체한다. 현재는 로그만 출력한다.
-    console.log('[SmsService] SMS 발송 대상:', to);
-    console.log('[SmsService] SMS 내용:\n' + text);
+    if (!SMS_ENABLED) {
+      // SMS 미연동 상태 - 발송 내용만 로그로 확인한다.
+      console.log('[SmsService] SMS 미연동 상태 (SMS_ENABLED=false). 발송 건너뜀.');
+      console.log('[SmsService] 발송 예정 내용:\n' + text);
+      return;
+    }
 
     try {
-      await fetch(SMS_API_URL, {
+      const response = await fetch(SMS_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -31,13 +38,17 @@ class SmsService {
         },
         body: JSON.stringify({ from: SMS_FROM, to, text }),
       });
+
+      // fetch는 4xx/5xx에서 reject되지 않으므로 response.ok로 명시적으로 확인한다.
+      if (!response.ok) {
+        throw new Error(`SMS API 응답 오류: ${response.status}`);
+      }
     } catch (error) {
       // SMS 발송 실패는 견적 요청 자체를 막지 않는다.
       // 요청은 이미 DB에 저장됐으므로 로그만 남기고 계속 진행한다.
       // TODO: [yej] SMS API 확정 후 실패 정책 결정 필요
       //   - 재발송 로직 추가 여부 (예: 최대 3회 retry)
       //   - SMS 발송 실패 시 별도 에러 코드(SMS_SEND_FAILED)로 클라이언트에 알릴지 여부
-      //   현재는 견적 요청이 DB에 저장된 이후라 SMS 실패로 전체를 막지 않고 로그만 남긴다.
       console.error('[SmsService] SMS 발송 실패:', error);
     }
   }
