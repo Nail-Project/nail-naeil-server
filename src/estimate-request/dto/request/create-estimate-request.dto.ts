@@ -9,9 +9,10 @@ export const CreateEstimateRequestSchema = z.object({
   // 제거 종류: 연장(EXTENSION), 부분(PARTS), 기본(BASIC), 없음(NONE)
   removalType: z.enum(['EXTENSION', 'PARTS', 'BASIC', 'NONE']),
 
-  // 희망 시술 기간 - ISO 날짜 문자열(YYYY-MM-DD) 형식으로 전달받아 DB 저장 시 Date로 변환
-  startDate: z.string().min(1),
-  endDate: z.string().min(1),
+  // 희망 시술 기간 - YYYY-MM-DD 형식만 허용, DB 저장 시 Date로 변환
+  // endDate는 startDate 이후여야 한다 (같은 날은 허용).
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.'),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.'),
 
   // 선호 시간대: 오전(AM), 오후(PM), 저녁(EVENING), 무관(ANY)
   preferredTime: z.enum(['AM', 'PM', 'EVENING', 'ANY']),
@@ -25,6 +26,10 @@ export const CreateEstimateRequestSchema = z.object({
   // 디자인 이미지 URL 목록 - image 도메인에서 미리 업로드 후 URL을 받아 전달한다.
   // 빈 배열로 기본값을 설정해 프론트가 필드를 생략해도 정상 처리되도록 한다.
   images: z.array(z.string()).optional().default([]),
+}).refine((data) => data.endDate >= data.startDate, {
+  // endDate가 startDate보다 앞이면 400 반환
+  message: '종료일은 시작일 이후여야 합니다.',
+  path: ['endDate'],
 });
 
 export type CreateEstimateRequestDto = z.infer<typeof CreateEstimateRequestSchema>;
