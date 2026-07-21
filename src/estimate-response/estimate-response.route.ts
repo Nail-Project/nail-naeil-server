@@ -27,9 +27,24 @@ const estimateResponseRouter = Router();
  */
 /**
  * @openapi
- * /api/v1/estimate:
+ * /api/v1/estimate/sms:
  *   post:
- *     summary: 안드로이드에서 전달한 샵 견적 응답 문자 접수
+ *     summary: 안드로이드 릴레이 앱에서 전달한 샵 견적 응답 문자 접수
+ *     description: |
+ *       안드로이드 릴레이 앱이 샵으로부터 SMS를 수신하면 자동으로 이 엔드포인트를 호출한다.
+ *       사용자 앱이 직접 호출하는 API가 아니며, 릴레이 앱 설정에서 수신 문자를 이 URL로
+ *       전달하도록 세팅해두어야 한다.
+ *
+ *       [SMS 릴레이 세팅 방법]
+ *       1. 안드로이드 릴레이 앱에서 SMS 수신 권한(READ_SMS, RECEIVE_SMS) 획득
+ *       2. BroadcastReceiver로 SMS_RECEIVED 인텐트를 감지
+ *       3. 수신된 문자를 아래 형식으로 가공해 서버로 POST 요청
+ *       4. source: 기기 고유 식별자 (예: 디바이스 UUID), messageId: 문자 고유 ID로 중복 수신 방지
+ *
+ *       [rawPayload 구성]
+ *       - address: 발신자 번호 (샵 전화번호)
+ *       - body: SMS 원문 (가격, 시간 등 파싱 대상)
+ *       - receivedAt: 수신 시각 (ISO 8601)
  *     tags: [Estimate Response]
  *     requestBody:
  *       required: true
@@ -50,7 +65,7 @@ const estimateResponseRouter = Router();
  *                   receivedAt: "2026-07-18T13:20:38+09:00"
  *     responses:
  *       202:
- *         description: 견적 응답 문자 접수 성공
+ *         description: 견적 응답 문자 접수 성공 (파싱은 비동기로 처리)
  *       400:
  *         description: 견적 응답 문자 형식 오류
  */
@@ -90,7 +105,7 @@ const estimateResponseRouter = Router();
  */
 const registerRoutes = (router: Router, routeController: EstimateResponseController): Router => {
   router.get('/result/:request_id', routeController.getList);
-  router.post('/', routeController.receive);
+  router.post('/sms', routeController.receive);
   router.get('/:proposal_id/time', routeController.getProposalTimes);
   router.get('/:proposal_id/detail', routeController.getDetail);
 
