@@ -1,4 +1,4 @@
-import { prisma } from '../../infra/prisma';
+import { getPrisma } from '../../infra/prisma';
 
 export interface ExternalShopData {
   externalStoreId: string;
@@ -25,6 +25,7 @@ export class PrismaShopRepository implements ShopRepository {
       return 0;
     }
 
+    const prisma = getPrisma();
     await prisma.$transaction(
       shops.map((shop) =>
         prisma.shop.upsert({
