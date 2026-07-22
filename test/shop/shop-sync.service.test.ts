@@ -34,9 +34,11 @@ describe('ShopSyncService', () => {
           },
           {
             bizesId: 'store-3',
-            bizesNm: '좌표 없는 네일',
+            bizesNm: '빈 좌표 네일',
             indsSclsCd: 'S20703',
             rdnmAdr: '서울시 강남구 테헤란로 3',
+            lon: '',
+            lat: '',
           },
         ],
       }),
@@ -91,5 +93,6 @@ describe('ShopSyncService', () => {
     });
 
     expect(getShopsByIndustry).toHaveBeenCalledTimes(1);
+    expect(repository.upsertExternalShops).not.toHaveBeenCalled();
   });
 });

@@ -29,7 +29,9 @@ export class ShopSyncService {
         .filter((shop): shop is ExternalShopData => shop !== null);
 
       skippedCount += page.items.length - mapped.length;
-      savedCount += await this.repository.upsertExternalShops(mapped);
+      if (mapped.length > 0) {
+        savedCount += await this.repository.upsertExternalShops(mapped);
+      }
 
       if (page.items.length === 0 || pageNo * request.pageSize >= page.totalCount) {
         break;
@@ -49,8 +51,8 @@ export class ShopSyncService {
     const externalStoreId = item.bizesId?.trim();
     const name = item.bizesNm?.trim();
     const address = item.rdnmAdr?.trim() || item.lnoAdr?.trim();
-    const latitude = Number(item.lat);
-    const longitude = Number(item.lon);
+    const latitude = Number.parseFloat(String(item.lat ?? ''));
+    const longitude = Number.parseFloat(String(item.lon ?? ''));
 
     if (
       !externalStoreId ||

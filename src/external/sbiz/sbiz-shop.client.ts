@@ -1,6 +1,7 @@
 import { ShopDataProviderError } from '../../shop/errors/shop.error';
 
 const DEFAULT_BASE_URL = 'https://apis.data.go.kr/B553077/api/open/sdsc2';
+const DEFAULT_TIMEOUT_MS = 10_000;
 
 interface SbizHeader {
   resultCode?: string;
@@ -20,8 +21,8 @@ export interface SbizShopItem {
   adongNm?: string;
   lnoAdr?: string;
   rdnmAdr?: string;
-  lon?: string;
-  lat?: string;
+  lon?: string | number | null;
+  lat?: string | number | null;
 }
 
 interface SbizResponseBody {
@@ -48,14 +49,20 @@ export interface SbizShopClient {
 export class HttpSbizShopClient implements SbizShopClient {
   private readonly serviceKey: string;
   private readonly baseUrl: string;
+  private readonly timeoutMs: number;
 
-  constructor(serviceKey = process.env.SBIZ_SERVICE_KEY, baseUrl = process.env.SBIZ_API_BASE_URL) {
+  constructor(
+    serviceKey = process.env.SBIZ_SERVICE_KEY,
+    baseUrl = process.env.SBIZ_API_BASE_URL,
+    timeoutMs = Number(process.env.SBIZ_API_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS),
+  ) {
     if (!serviceKey) {
       throw new ShopDataProviderError({ reason: 'SBIZ_SERVICE_KEY is not set' });
     }
 
     this.serviceKey = serviceKey;
     this.baseUrl = baseUrl ?? DEFAULT_BASE_URL;
+    this.timeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
   }
 
   async getShopsByIndustry(
@@ -71,11 +78,18 @@ export class HttpSbizShopClient implements SbizShopClient {
     url.searchParams.set('numOfRows', String(pageSize));
     url.searchParams.set('type', 'json');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
     let response: Response;
     try {
-      response = await fetch(url);
+      response = await fetch(url, { signal: controller.signal });
     } catch (error) {
-      throw new ShopDataProviderError({ reason: 'network_error', cause: String(error) });
+      throw new ShopDataProviderError({
+        reason: controller.signal.aborted ? 'timeout' : 'network_error',
+        cause: String(error),
+      });
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
