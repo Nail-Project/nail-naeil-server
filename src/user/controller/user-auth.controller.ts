@@ -44,18 +44,28 @@ export class UserAuthController {
    *             schema:
    *               type: object
    *               properties:
-   *                 userId:
-   *                   type: integer
-   *                   example: 1
-   *                 loginId:
+   *                 resultType:
    *                   type: string
-   *                   example: test01
-   *                 email:
-   *                   type: string
-   *                   example: test@test.com
-   *                 role:
-   *                   type: string
-   *                   example: CUSTOMER
+   *                   example: SUCCESS
+   *                 error:
+   *                   type: object
+   *                   nullable: true
+   *                   example: null
+   *                 success:
+   *                   type: object
+   *                   properties:
+   *                     userId:
+   *                       type: integer
+   *                       example: 1
+   *                     loginId:
+   *                       type: string
+   *                       example: test01
+   *                     email:
+   *                       type: string
+   *                       example: test@test.com
+   *                     role:
+   *                       type: string
+   *                       example: CUSTOMER
    *       409:
    *         description: 아이디 또는 이메일 중복
    */
@@ -103,10 +113,20 @@ export class UserAuthController {
    *             schema:
    *               type: object
    *               properties:
-   *                 accessToken:
+   *                 resultType:
    *                   type: string
-   *                 refreshToken:
-   *                   type: string
+   *                   example: SUCCESS
+   *                 error:
+   *                   type: object
+   *                   nullable: true
+   *                   example: null
+   *                 success:
+   *                   type: object
+   *                   properties:
+   *                     accessToken:
+   *                       type: string
+   *                     refreshToken:
+   *                       type: string
    *       401:
    *         description: 아이디 또는 비밀번호 불일치
    */
@@ -149,10 +169,20 @@ export class UserAuthController {
    *             schema:
    *               type: object
    *               properties:
-   *                 accessToken:
+   *                 resultType:
    *                   type: string
-   *                 refreshToken:
-   *                   type: string
+   *                   example: SUCCESS
+   *                 error:
+   *                   type: object
+   *                   nullable: true
+   *                   example: null
+   *                 success:
+   *                   type: object
+   *                   properties:
+   *                     accessToken:
+   *                       type: string
+   *                     refreshToken:
+   *                       type: string
    *       401:
    *         description: 유효하지 않은 토큰
    */

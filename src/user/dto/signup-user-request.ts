@@ -6,7 +6,9 @@ export const SignupUserRequestSchema = z.object({
   loginId: z
     .string()
     .min(4, '아이디는 4자 이상이어야 합니다.')
-    .max(50, '아이디는 50자 이하여야 합니다.'),
+    .max(50, '아이디는 50자 이하여야 합니다.')
+    // 이메일 형식(@ 포함) loginId를 막아 login 시 loginId와 email이 교차 매칭되는 것을 방지한다.
+    .regex(/^[a-zA-Z0-9_]+$/, '아이디는 영문, 숫자, 밑줄(_)만 사용할 수 있습니다.'),
   password: z
     .string()
     .min(8, '비밀번호는 8자 이상이어야 합니다.')
