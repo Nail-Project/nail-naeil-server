@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserAuthService } from '../service/user-auth.service';
-import { SignupUserRequest } from '../dto/signup-user-request';
-import { LoginUserRequest } from '../dto/login-user-request';
+import { SignupUserRequestSchema } from '../dto/signup-user-request';
+import { LoginUserRequestSchema } from '../dto/login-user-request';
+import { TokenRequestSchema } from '../dto/token-request';
+import { UserValidationError } from '../error/user.error';
+import { success } from '../../common/responses/api-response';
 
 export class UserAuthController {
   private readonly userAuthService = new UserAuthService();
@@ -58,8 +61,13 @@ export class UserAuthController {
    */
   signup = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await this.userAuthService.signup(req.body as SignupUserRequest);
-      res.status(201).json(result);
+      const parsed = SignupUserRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new UserValidationError(parsed.error.flatten());
+      }
+
+      const result = await this.userAuthService.signup(parsed.data);
+      res.status(201).json(success(result));
     } catch (error) {
       next(error);
     }
@@ -104,8 +112,13 @@ export class UserAuthController {
    */
   login = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await this.userAuthService.login(req.body as LoginUserRequest);
-      res.status(200).json(result);
+      const parsed = LoginUserRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new UserValidationError(parsed.error.flatten());
+      }
+
+      const result = await this.userAuthService.login(parsed.data);
+      res.status(200).json(success(result));
     } catch (error) {
       next(error);
     }
@@ -145,9 +158,13 @@ export class UserAuthController {
    */
   refresh = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { refreshToken } = req.body as { refreshToken: string };
-      const result = await this.userAuthService.refresh(refreshToken);
-      res.status(200).json(result);
+      const parsed = TokenRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new UserValidationError(parsed.error.flatten());
+      }
+
+      const result = await this.userAuthService.refresh(parsed.data.refreshToken);
+      res.status(200).json(success(result));
     } catch (error) {
       next(error);
     }
@@ -176,8 +193,12 @@ export class UserAuthController {
    */
   logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { refreshToken } = req.body as { refreshToken: string };
-      await this.userAuthService.logout(refreshToken);
+      const parsed = TokenRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new UserValidationError(parsed.error.flatten());
+      }
+
+      await this.userAuthService.logout(parsed.data.refreshToken);
       res.status(204).send();
     } catch (error) {
       next(error);

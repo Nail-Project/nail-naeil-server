@@ -1,42 +1,32 @@
-import { prisma } from '../../config/prisma';
+import { getPrisma } from '../../infra/prisma';
 
 export class UserRepository {
   findByLoginId(loginId: string) {
-    return prisma.user.findUnique({ where: { loginId } });
+    return getPrisma().user.findUnique({ where: { loginId } });
   }
 
   findByEmail(email: string) {
-    return prisma.user.findUnique({ where: { email } });
+    return getPrisma().user.findUnique({ where: { email } });
   }
 
   // 로그인: loginId 또는 email 중 하나로 조회
   findByLoginIdOrEmail(identifier: string) {
-    return prisma.user.findFirst({
+    return getPrisma().user.findFirst({
       where: { OR: [{ loginId: identifier }, { email: identifier }] },
     });
   }
 
-  
-
-  create(data: {
-    loginId: string;
-    password: string;
-    email: string;
-    phoneNumber: string;
-  }) {
-    return prisma.user.create({ data });
+  create(data: { loginId: string; password: string; email: string; phoneNumber: string }) {
+    return getPrisma().user.create({ data });
   }
 
-  saveRefreshToken(userId: number, token: string, expiresAt: Date) {
-    return prisma.refreshToken.create({ data: { userId, token, expiresAt } });
+  // token 컬럼에는 원문이 아닌 SHA-256 해시만 저장한다.
+  saveRefreshToken(userId: number, tokenHash: string, expiresAt: Date) {
+    return getPrisma().refreshToken.create({ data: { userId, token: tokenHash, expiresAt } });
   }
 
-  findRefreshToken(token: string) {
-    return prisma.refreshToken.findUnique({ where: { token } });
-  }
-
-  deleteRefreshToken(token: string) {
-    return prisma.refreshToken.deleteMany({ where: { token } });
+  // deleteMany의 count로 원자적 consume 판정 (rotation 중복 발급 방지)
+  deleteRefreshToken(tokenHash: string) {
+    return getPrisma().refreshToken.deleteMany({ where: { token: tokenHash } });
   }
 }
-

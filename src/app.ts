@@ -3,7 +3,9 @@ import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { adminSwaggerSpec, userSwaggerSpec } from './config/swagger';
 import userAuthRoute from './user/route/user-auth.route';
-import { errorHandler } from './common/middleware/error-handler';
+import { errorHandler } from './common/middlewares/error-handler.middleware';
+import { RouteNotFoundError } from './common/errors/common.error';
+import v1Router from './routes/v1.router';
 
 export const app = express();
 
@@ -55,6 +57,11 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/users', userAuthRoute);
+app.use('/api/v1', v1Router);
+
+app.use((req, _res, next) => {
+  next(new RouteNotFoundError({ path: req.originalUrl }));
+});
 
 // ⚠️ 반드시 모든 라우트 등록 "뒤"에 위치해야 함
 app.use(errorHandler);
