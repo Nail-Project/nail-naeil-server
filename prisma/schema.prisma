@@ -59,6 +59,7 @@ model EstimateResponse {
   shop          Shop                   @relation(fields: [shopId], references: [id])
   proposalTimes ShopProposalTime[]
   smsMessages   SmsMessage[]
+  reservation   Reservation?
 
   @@map("estimate_responses")
 }
@@ -92,4 +93,27 @@ model SmsMessage {
 
   @@unique([source, direction, messageId])
   @@map("sms_messages")
+}
+
+// ─── Reservation 도메인 ────────────────────────────────────────────────────
+
+enum ReservationStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model Reservation {
+  id         BigInt            @id @default(autoincrement())
+  // TODO: [malibu] EstimateResponse.id가 Int라 타입을 맞춤. ERD상 proposal_id는 bigint로 정의돼 있어 팀 논의 후 정합 필요.
+  proposalId Int               @unique @map("proposal_id")
+  // TODO: [malibu] User 모델(feat/auth) 병합 후 relation을 연결한다.
+  userId     BigInt            @map("user_id")
+  reservedAt DateTime          @map("reserved_at") @db.DateTime(3)
+  status     ReservationStatus @default(CONFIRMED)
+  createdAt  DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt  DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  proposal   EstimateResponse  @relation(fields: [proposalId], references: [id])
+
+  @@map("reservations")
 }
