@@ -1,6 +1,7 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
@@ -35,6 +36,39 @@ model Shop {
   @@unique([dataSource, externalStoreId])
   @@index([provinceCode, districtCode, adminDongCode])
   @@map("shops")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  loginId     String   @unique @map("login_id") @db.VarChar(50)
+  password    String   @db.VarChar(255)
+  email       String   @unique @db.VarChar(100)
+  phoneNumber String   @map("phone_number") @db.VarChar(20)
+  kakaoId     String?  @unique @map("kakao_id") @db.VarChar(100)
+  role        UserRole @default(CUSTOMER)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  // 원문 JWT가 아닌 SHA-256 해시(hex, 64자)만 저장한다 (DB 유출 시 재사용 방지)
+  token     String   @unique @db.VarChar(512)
+  userId    Int      @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("refresh_tokens")
 }
 
 enum EstimateResponseStatus {
