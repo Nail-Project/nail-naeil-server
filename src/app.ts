@@ -6,6 +6,7 @@ import userAuthRoute from './user/route/user-auth.route';
 import { errorHandler } from './common/middlewares/error-handler.middleware';
 import { RouteNotFoundError } from './common/errors/common.error';
 import v1Router from './routes/v1.router';
+import adminV1Router from './routes/admin-v1.router';
 
 export const app = express();
 
@@ -58,6 +59,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/users', userAuthRoute);
 app.use('/api/v1', v1Router);
+app.use('/admin/api/v1', adminV1Router);
 
 app.use((req, _res, next) => {
   next(new RouteNotFoundError({ path: req.originalUrl }));
