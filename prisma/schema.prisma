@@ -1,6 +1,7 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
@@ -9,20 +10,65 @@ datasource db {
 
 model Shop {
   id                Int                @id @default(autoincrement())
+  dataSource        String?            @map("data_source") @db.VarChar(30)
+  externalStoreId   String?            @map("external_store_id") @db.VarChar(50)
   name              String             @db.VarChar(100)
   phoneNumber       String?            @map("phone_number") @db.VarChar(20)
   address           String             @db.VarChar(255)
   addressDetail     String?            @map("address_detail") @db.VarChar(255)
-  locationGuide     String?            @map("location_guide") @db.VarChar(255)
-  parkingInfo       String?            @map("parking_info") @db.VarChar(255)
+  provinceCode      String?            @map("province_code") @db.VarChar(10)
+  provinceName      String?            @map("province_name") @db.VarChar(50)
+  districtCode      String?            @map("district_code") @db.VarChar(10)
+  districtName      String?            @map("district_name") @db.VarChar(50)
+  adminDongCode     String?            @map("admin_dong_code") @db.VarChar(20)
+  adminDongName     String?            @map("admin_dong_name") @db.VarChar(50)
   latitude          Decimal            @db.Decimal(10, 7)
   longitude         Decimal            @db.Decimal(10, 7)
+  locationGuide     String?            @map("location_guide") @db.VarChar(255)
+  parkingInfo       String?            @map("parking_info") @db.VarChar(255)
+  isDataActive      Boolean            @default(true) @map("is_data_active")
+  lastSyncedAt      DateTime?          @map("last_synced_at") @db.DateTime(3)
   createdAt         DateTime           @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt         DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
   estimateResponses EstimateResponse[]
   smsMessages       SmsMessage[]
 
+  @@unique([dataSource, externalStoreId])
+  @@index([provinceCode, districtCode, adminDongCode])
   @@map("shops")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  loginId     String   @unique @map("login_id") @db.VarChar(50)
+  password    String   @db.VarChar(255)
+  email       String   @unique @db.VarChar(100)
+  phoneNumber String   @map("phone_number") @db.VarChar(20)
+  kakaoId     String?  @unique @map("kakao_id") @db.VarChar(100)
+  role        UserRole @default(CUSTOMER)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  // 원문 JWT가 아닌 SHA-256 해시(hex, 64자)만 저장한다 (DB 유출 시 재사용 방지)
+  token     String   @unique @db.VarChar(512)
+  userId    Int      @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("refresh_tokens")
 }
 
 enum EstimateResponseStatus {
@@ -45,7 +91,6 @@ enum SmsStatus {
 
 model EstimateResponse {
   id            Int                    @id @default(autoincrement())
-  // TODO: [eun] 견적 요청 도메인 모델 병합 후 relation을 연결한다.
   requestId     Int                    @map("request_id")
   shopId        Int                    @map("shop_id")
   totalPrice    Int                    @map("total_price")
@@ -56,6 +101,7 @@ model EstimateResponse {
   status        EstimateResponseStatus @default(SUBMITTED)
   createdAt     DateTime               @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime               @updatedAt @map("updated_at") @db.DateTime(3)
+  request       EstimateRequest        @relation(fields: [requestId], references: [id])
   shop          Shop                   @relation(fields: [shopId], references: [id])
   proposalTimes ShopProposalTime[]
   smsMessages   SmsMessage[]
@@ -82,17 +128,83 @@ model SmsMessage {
   rawPayload         Json              @map("raw_payload")
   status             SmsStatus         @default(PENDING)
   errorMessage       String?           @map("error_message") @db.Text
-  // TODO: [eun] 견적 요청 도메인 모델 병합 후 relation을 연결한다.
   requestId          Int?              @map("request_id")
   shopId             Int?              @map("shop_id")
   estimateResponseId Int?              @map("estimate_response_id")
   createdAt          DateTime          @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  request            EstimateRequest?  @relation(fields: [requestId], references: [id], onDelete: SetNull)
   shop               Shop?             @relation(fields: [shopId], references: [id], onDelete: SetNull)
   estimateResponse   EstimateResponse? @relation(fields: [estimateResponseId], references: [id], onDelete: SetNull)
 
   @@unique([source, direction, messageId])
   @@map("sms_messages")
+}
+
+// ─── Estimate Request 도메인 ──────────────────────────────────────────────────
+
+enum NailType {
+  HAND // 손 네일
+  PEDICURE // 발 네일
+  BOTH // 손 + 발
+}
+
+enum RemovalType {
+  EXTENSION // 연장 제거
+  PARTS // 부분 제거
+  BASIC // 기본 제거
+  NONE // 제거 없음
+}
+
+enum PreferredTime {
+  AM // 오전
+  PM // 오후
+  EVENING // 저녁
+  ANY // 무관
+}
+
+enum RecommendType {
+  BALANCED // 균형 추천
+  CLOSE // 가까운 순
+  WIDE // 넓은 범위
+  CHEAP // 저렴한 순
+}
+
+enum EstimateStatus {
+  MATCHING // 샵 매칭 중 (견적 응답 대기)
+  COMPLETED // 견적 수락 완료
+  EXPIRED // 요청 기간 만료
+}
+
+model EstimateRequest {
+  id            Int                @id @default(autoincrement())
+  nailType      NailType           @map("nail_type")
+  removalType   RemovalType        @map("removal_type")
+  startDate     DateTime           @map("start_date") @db.Date
+  endDate       DateTime           @map("end_date") @db.Date
+  preferredTime PreferredTime      @map("preferred_time")
+  recommendType RecommendType      @map("recommend_type")
+  description   String?            @db.Text
+  status        EstimateStatus     @default(MATCHING)
+  // TODO: [yej] User 모델 추가 후 @relation 연결
+  userId        Int                @map("user_id")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
+  images        RequestImage[]
+  proposals     EstimateResponse[]
+  smsMessages   SmsMessage[]
+
+  @@map("estimate_requests")
+}
+
+model RequestImage {
+  id        Int             @id @default(autoincrement())
+  imageUrl  String          @map("image_url") @db.VarChar(255)
+  requestId Int             @map("request_id")
+  createdAt DateTime        @default(now()) @map("created_at") @db.DateTime(3)
+  request   EstimateRequest @relation(fields: [requestId], references: [id])
+
+  @@map("request_images")
 }
 
 // ─── Reservation 도메인 ────────────────────────────────────────────────────
