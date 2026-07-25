@@ -51,3 +51,14 @@ export class UnsupportedShopRecommendTypeError extends AppError {
     });
   }
 }
+
+export class InvalidShopMatchRequestError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'INVALID_SHOP_MATCH_REQUEST',
+      statusCode: 400,
+      message: '샵 탐색 요청을 확인해주세요.',
+      data,
+    });
+  }
+}
