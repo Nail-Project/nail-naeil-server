@@ -62,3 +62,25 @@ export class InvalidShopMatchRequestError extends AppError {
     });
   }
 }
+
+export class InvalidShopQueryRequestError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'INVALID_SHOP_QUERY_REQUEST',
+      statusCode: 400,
+      message: '샵 조회 요청을 확인해주세요.',
+      data,
+    });
+  }
+}
+
+export class ShopNotFoundError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'SHOP_NOT_FOUND',
+      statusCode: 404,
+      message: '샵을 찾을 수 없습니다.',
+      data,
+    });
+  }
+}
