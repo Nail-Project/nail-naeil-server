@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { ReservationController } from './controller/reservation.controller';
 
+// TODO: [malibu] Notion API 스펙 문서의 예약 섹션이 실제 응답 형식과 다름
+// (isSuccess/code(숫자)/data → resultType/error/success 등, B6/A3/B7 관련).
+// 코드 변경 아님 — Notion 문서만 수정하면 됨. 완성된 교체 텍스트는 메모리
+// project_reservation_notion_envelope_update.md 참고("응답 통일").
 const reservationController = new ReservationController();
 const router = Router();
 
@@ -19,12 +23,12 @@ const router = Router();
  *             type: object
  *             required:
  *               - proposalId
- *               - proposalTimeId
+ *               - timeId
  *             properties:
  *               proposalId:
  *                 type: integer
  *                 example: 5
- *               proposalTimeId:
+ *               timeId:
  *                 type: integer
  *                 example: 12
  *     responses:

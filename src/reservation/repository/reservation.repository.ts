@@ -1,15 +1,36 @@
 import { getPrisma } from '../../infra/prisma';
 import type { ReservationStatus } from '../../generated/prisma/enums';
 
-const reservationListSelect = {
+// 예약 생성 응답 전용 select - CreateReservationResponse가 쓰는 필드만
+const createReservationSelect = {
   id: true,
   reservedAt: true,
   status: true,
   proposal: { select: { totalPrice: true, shop: { select: { name: true } } } },
 } as const;
 
-export interface ReservationListRecord {
+export interface CreatedReservationRecord {
   id: bigint;
+  reservedAt: Date;
+  status: ReservationStatus;
+  proposal: {
+    totalPrice: number;
+    shop: { name: string };
+  };
+}
+
+// 예약 목록 조회 전용 select - proposalId까지 포함 (생성 응답엔 불필요)
+const reservationListSelect = {
+  id: true,
+  proposalId: true,
+  reservedAt: true,
+  status: true,
+  proposal: { select: { totalPrice: true, shop: { select: { name: true } } } },
+} as const;
+
+export interface ReservationRecord {
+  id: bigint;
+  proposalId: number;
   reservedAt: Date;
   status: ReservationStatus;
   proposal: {
@@ -38,9 +59,9 @@ export class ReservationRepository {
   }
 
   // 예약 생성용 예약 가능 시간 조회
-  async findProposalTimeById(proposalTimeId: number) {
+  async findProposalTimeById(timeId: number) {
     return await getPrisma().shopProposalTime.findUnique({
-      where: { id: proposalTimeId },
+      where: { id: timeId },
     });
   }
 
@@ -53,10 +74,10 @@ export class ReservationRepository {
   // 예약 생성 - 선택된 시간 슬롯을 isSelected=true로 함께 반영 (견적 응답 도메인의 예약 가능 시간 조회 API가 참조하는 값)
   async create(data: {
     proposalId: number;
-    proposalTimeId: number;
+    timeId: number;
     userId: bigint;
     reservedAt: Date;
-  }): Promise<ReservationListRecord> {
+  }): Promise<CreatedReservationRecord> {
     const prisma = getPrisma();
 
     const [reservation] = await prisma.$transaction([
@@ -67,10 +88,10 @@ export class ReservationRepository {
           reservedAt: data.reservedAt,
           status: 'CONFIRMED',
         },
-        select: reservationListSelect,
+        select: createReservationSelect,
       }),
       prisma.shopProposalTime.update({
-        where: { id: data.proposalTimeId },
+        where: { id: data.timeId },
         data: { isSelected: true },
       }),
     ]);
@@ -84,10 +105,13 @@ export class ReservationRepository {
     statuses: ReservationStatus[],
     page: number,
     size: number,
-  ): Promise<{ reservations: ReservationListRecord[]; totalElements: number }> {
+  ): Promise<{ reservations: ReservationRecord[]; totalElements: number }> {
     const where = { userId, status: { in: statuses } };
 
-    const [reservations, totalElements] = await Promise.all([
+    // count와 findMany가 같은 스냅샷을 보도록 트랜잭션으로 묶는다
+    // (Promise.all로 병렬 실행 시, 두 쿼리 사이에 다른 예약이 생기거나 취소되면
+    // totalElements와 실제 목록이 어긋날 수 있음)
+    const [reservations, totalElements] = await getPrisma().$transaction([
       getPrisma().reservation.findMany({
         where,
         select: reservationListSelect,

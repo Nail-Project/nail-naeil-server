@@ -12,7 +12,7 @@ export class ReservationValidationError extends AppError {
   }
 }
 
-// GET /detail - 유효하지 않은 status/page/size 쿼리 값
+// GET /detail - 유효하지 않은 status/page/size 쿼리 값, GET /:reservationId - 유효하지 않은 예약 id
 export class InvalidReservationRequestError extends AppError {
   constructor(data?: unknown) {
     super({
@@ -30,7 +30,7 @@ export class ProposalNotFoundError extends AppError {
     super({
       code: 'PROPOSAL_NOT_FOUND',
       statusCode: 404,
-      message: '존재하지 않는 견적입니다.',
+      message: '해당 견적 또는 예약 시간을 찾을 수 없습니다.',
       data,
     });
   }
@@ -42,7 +42,7 @@ export class ProposalTimeNotFoundError extends AppError {
     super({
       code: 'PROPOSAL_TIME_NOT_FOUND',
       statusCode: 404,
-      message: '존재하지 않는 예약 시간입니다.',
+      message: '해당 견적 또는 예약 시간을 찾을 수 없습니다.',
       data,
     });
   }
@@ -54,7 +54,7 @@ export class AlreadyReservedError extends AppError {
     super({
       code: 'ALREADY_RESERVED',
       statusCode: 409,
-      message: '이미 예약된 견적입니다.',
+      message: '이미 예약된 시간입니다.',
       data,
     });
   }
