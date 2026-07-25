@@ -43,19 +43,45 @@ enum UserRole {
   ADMIN
 }
 
+enum AuthProvider {
+  LOCAL
+  KAKAO
+  NAVER
+}
+
 model User {
-  id          Int      @id @default(autoincrement())
-  loginId     String   @unique @map("login_id") @db.VarChar(50)
-  password    String   @db.VarChar(255)
-  email       String   @unique @db.VarChar(100)
-  phoneNumber String   @map("phone_number") @db.VarChar(20)
-  kakaoId     String?  @unique @map("kakao_id") @db.VarChar(100)
-  role        UserRole @default(CUSTOMER)
-  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  id            Int                @id @default(autoincrement())
+  // 이메일은 이제 로그인 식별자가 아니라 프로필 정보다.
+  // 소셜(연락처 이메일)은 유니크 보장이 안 되고 미제공될 수 있어 nullable + non-unique로 둔다.
+  email         String?            @db.VarChar(100)
+  phoneNumber   String?            @map("phone_number") @db.VarChar(20)
+  nickname      String?            @db.VarChar(100)
+  role          UserRole           @default(CUSTOMER)
+  createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
+  authProviders UserAuthProvider[]
   refreshTokens RefreshToken[]
 
   @@map("users")
+}
+
+// 로컬/소셜 인증 수단을 User와 분리해 관리한다.
+// 한 User가 여러 provider(로컬+카카오+네이버)를 연결할 수 있다.
+model UserAuthProvider {
+  id           Int          @id @default(autoincrement())
+  userId       Int          @map("user_id")
+  provider     AuthProvider
+  // LOCAL: loginId, KAKAO/NAVER: 각 소셜의 고유 회원 id
+  providerId   String       @map("provider_id") @db.VarChar(255)
+  // LOCAL만 사용(bcrypt 해시), 소셜은 null
+  passwordHash String?      @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.DateTime(3)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("user_auth_providers")
 }
 
 model RefreshToken {

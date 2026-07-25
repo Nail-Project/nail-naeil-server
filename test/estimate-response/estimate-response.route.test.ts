@@ -72,7 +72,7 @@ describe('estimate response routes', () => {
     const { app, service } = createApp();
 
     const response = await request(app)
-      .post('/api/v1/estimate')
+      .post('/api/v1/estimate/sms')
       .send({
         source: 'android-device-a1b2c3',
         messageId: 'android-sms-1042',
