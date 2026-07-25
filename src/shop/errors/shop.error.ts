@@ -31,3 +31,23 @@ export class UnauthorizedShopSyncError extends AppError {
     });
   }
 }
+
+export class InvalidShopLocationError extends AppError {
+  constructor() {
+    super({
+      code: 'INVALID_SHOP_LOCATION',
+      statusCode: 400,
+      message: '샵을 탐색할 위치를 확인해주세요.',
+    });
+  }
+}
+
+export class UnsupportedShopRecommendTypeError extends AppError {
+  constructor() {
+    super({
+      code: 'UNSUPPORTED_SHOP_RECOMMEND_TYPE',
+      statusCode: 400,
+      message: '아직 지원하지 않는 샵 탐색 방식입니다.',
+    });
+  }
+}
