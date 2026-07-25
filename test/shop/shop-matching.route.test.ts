@@ -64,4 +64,22 @@ describe('shop matching route', () => {
     });
     expect(service.match).not.toHaveBeenCalled();
   });
+
+  it.each([
+    'latitude=&longitude=126.953',
+    'latitude=%20%20&longitude=126.953',
+    'latitude=37.499&longitude=',
+    'latitude=37.499&longitude=%20%20',
+  ])('빈 좌표 쿼리를 0으로 변환하지 않고 400으로 거절한다: %s', async (query) => {
+    const { app, service } = createApp();
+
+    const response = await request(app).get(`/api/v1/shops/matches?${query}&recommendType=CLOSE`);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      resultType: 'FAIL',
+      error: { code: 'INVALID_SHOP_MATCH_REQUEST' },
+    });
+    expect(service.match).not.toHaveBeenCalled();
+  });
 });
