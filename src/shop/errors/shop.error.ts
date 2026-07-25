@@ -31,3 +31,56 @@ export class UnauthorizedShopSyncError extends AppError {
     });
   }
 }
+
+export class InvalidShopLocationError extends AppError {
+  constructor() {
+    super({
+      code: 'INVALID_SHOP_LOCATION',
+      statusCode: 400,
+      message: '샵을 탐색할 위치를 확인해주세요.',
+    });
+  }
+}
+
+export class UnsupportedShopRecommendTypeError extends AppError {
+  constructor() {
+    super({
+      code: 'UNSUPPORTED_SHOP_RECOMMEND_TYPE',
+      statusCode: 400,
+      message: '아직 지원하지 않는 샵 탐색 방식입니다.',
+    });
+  }
+}
+
+export class InvalidShopMatchRequestError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'INVALID_SHOP_MATCH_REQUEST',
+      statusCode: 400,
+      message: '샵 탐색 요청을 확인해주세요.',
+      data,
+    });
+  }
+}
+
+export class InvalidShopQueryRequestError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'INVALID_SHOP_QUERY_REQUEST',
+      statusCode: 400,
+      message: '샵 조회 요청을 확인해주세요.',
+      data,
+    });
+  }
+}
+
+export class ShopNotFoundError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'SHOP_NOT_FOUND',
+      statusCode: 404,
+      message: '샵을 찾을 수 없습니다.',
+      data,
+    });
+  }
+}

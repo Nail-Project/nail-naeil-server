@@ -1,8 +1,8 @@
-import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { Prisma } from '../../generated/prisma/client';
 import { UserRepository } from '../repository/user.repository';
+import { TokenService } from './token.service';
 import { SignupUserRequest } from '../dto/signup-user-request';
 import { LoginUserRequest } from '../dto/login-user-request';
 import { SignupUserResponse } from '../dto/signup-user-response';
@@ -22,33 +22,31 @@ const DUMMY_PASSWORD_HASH = bcrypt.hashSync('timing-attack-mitigation', SALT_ROU
 
 export class UserAuthService {
   private readonly userRepository = new UserRepository();
+  private readonly tokenService = new TokenService(this.userRepository);
 
   async signup(request: SignupUserRequest): Promise<SignupUserResponse> {
-    if (await this.userRepository.findByLoginId(request.loginId)) {
+    if (await this.userRepository.findLocalByLoginId(request.loginId)) {
       throw new DuplicatedLoginIdError();
     }
-    if (await this.userRepository.findByEmail(request.email)) {
+    // email은 유니크 제약이 없으므로 best-effort 사전 검사만 수행한다.
+    if (await this.userRepository.findUserByEmail(request.email)) {
       throw new DuplicatedEmailError();
     }
 
     const hashedPassword = await bcrypt.hash(request.password, SALT_ROUNDS);
 
-    // 사전 중복 검사 후에도 동시 요청 레이스로 유니크 제약(P2002) 위반이
-    // 발생할 수 있으므로 도메인 에러로 매핑한다 (500 대신 409 응답).
+    // 사전 검사 후에도 동시 요청 레이스로 (provider, providerId) 유니크 제약(P2002)
+    // 위반이 발생할 수 있으므로 loginId 중복 에러로 매핑한다 (500 대신 409 응답).
     let user;
     try {
-      user = await this.userRepository.create({
+      user = await this.userRepository.createLocalUser({
         loginId: request.loginId,
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         email: request.email,
         phoneNumber: request.phoneNumber,
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        const target = (error.meta?.target ?? '') as string;
-        if (target.includes('email')) {
-          throw new DuplicatedEmailError();
-        }
         throw new DuplicatedLoginIdError();
       }
       throw error;
@@ -56,29 +54,27 @@ export class UserAuthService {
 
     return {
       userId: user.id,
-      loginId: user.loginId,
-      email: user.email,
+      loginId: request.loginId,
+      email: user.email ?? request.email,
       role: user.role,
     };
   }
 
   async login(request: LoginUserRequest): Promise<LoginUserResponse> {
-    const user = await this.userRepository.findByLoginIdOrEmail(request.identifier);
+    const auth = await this.userRepository.findLocalAuthByIdentifier(request.identifier);
 
-    // 유저가 없어도 더미 해시와 비교해 응답 시간을 균등화한다.
-    const passwordHash = user?.password ?? DUMMY_PASSWORD_HASH;
+    // 인증수단이 없어도 더미 해시와 비교해 응답 시간을 균등화한다(계정 열거 방지).
+    const passwordHash = auth?.passwordHash ?? DUMMY_PASSWORD_HASH;
     const isValid = await bcrypt.compare(request.password, passwordHash);
-    if (!user || !isValid) {
+    if (!auth || !auth.passwordHash || !isValid) {
       throw new InvalidCredentialsError();
     }
 
-    const accessToken = this.issueAccessToken(user.id, user.role);
-    const refreshToken = await this.issueAndStoreRefreshToken(user.id, user.role);
-    return { accessToken, refreshToken };
+    return this.tokenService.issueTokens(auth.user.id, auth.user.role);
   }
 
   async refresh(refreshToken: string): Promise<LoginUserResponse> {
-    const tokenHash = this.hashToken(refreshToken);
+    const tokenHash = this.tokenService.hashToken(refreshToken);
 
     let payload: { sub: number; role: string };
     try {
@@ -99,46 +95,10 @@ export class UserAuthService {
       throw new InvalidTokenError();
     }
 
-    const accessToken = this.issueAccessToken(payload.sub, payload.role);
-    const newRefreshToken = await this.issueAndStoreRefreshToken(payload.sub, payload.role);
-    return { accessToken, refreshToken: newRefreshToken };
+    return this.tokenService.issueTokens(payload.sub, payload.role);
   }
 
   async logout(refreshToken: string): Promise<void> {
-    await this.userRepository.deleteRefreshToken(this.hashToken(refreshToken));
-  }
-
-  // refresh token은 DB 유출 시 그대로 재사용 가능한 credential이므로
-  // 원문 대신 SHA-256 해시만 저장/조회한다.
-  private hashToken(token: string): string {
-    return crypto.createHash('sha256').update(token).digest('hex');
-  }
-
-  private issueAccessToken(userId: number, role: string): string {
-    const secret = process.env.JWT_ACCESS_SECRET;
-    if (!secret) {
-      throw new Error('JWT_ACCESS_SECRET is not defined');
-    }
-
-    const options: jwt.SignOptions = {
-      expiresIn: (process.env.JWT_EXPIRES_IN ?? '1h') as jwt.SignOptions['expiresIn'],
-    };
-    return jwt.sign({ sub: userId, role }, secret, options);
-  }
-
-  private async issueAndStoreRefreshToken(userId: number, role: string): Promise<string> {
-    const secret = process.env.JWT_REFRESH_SECRET;
-    if (!secret) {
-      throw new Error('JWT_REFRESH_SECRET is not defined');
-    }
-
-    const options: jwt.SignOptions = {
-      expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN ?? '14d') as jwt.SignOptions['expiresIn'],
-    };
-    const token = jwt.sign({ sub: userId, role }, secret, options);
-
-    const { exp } = jwt.decode(token) as { exp: number };
-    await this.userRepository.saveRefreshToken(userId, this.hashToken(token), new Date(exp * 1000));
-    return token;
+    await this.userRepository.deleteRefreshToken(this.tokenService.hashToken(refreshToken));
   }
 }
