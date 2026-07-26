@@ -1,0 +1,12 @@
+.git
+.github
+.env
+.env.*
+.DS_Store
+AGENTS.md
+dist
+node_modules
+src/generated
+coverage
+uploads
+npm-debug.log*

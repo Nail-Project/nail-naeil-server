@@ -1,0 +1,163 @@
+name: Deploy production
+
+on:
+  push:
+    branches:
+      - prod
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      ENV_PARAMETER_NAME: /nail-naeil/prod/env
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test -- --run --passWithNoTests
+
+      - name: Build application
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          docker build --tag "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "IMAGE_URI=$IMAGE_URI" >> "$GITHUB_ENV"
+          echo "ECR_REGISTRY=$ECR_REGISTRY" >> "$GITHUB_ENV"
+
+      - name: Validate production environment
+        env:
+          PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+        run: |
+          ENV_SIZE="$(printf '%s' "$PROD_ENV_FILE" | wc -c | tr -d ' ')"
+
+          if [ "$ENV_SIZE" -eq 0 ]; then
+            echo "PROD_ENV_FILE is empty."
+            exit 1
+          fi
+
+          if [ "$ENV_SIZE" -gt 4096 ]; then
+            echo "PROD_ENV_FILE exceeds the 4 KB standard Parameter Store limit."
+            exit 1
+          fi
+
+      - name: Sync production environment
+        env:
+          PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+        run: |
+          jq -n \
+            --arg name "$ENV_PARAMETER_NAME" \
+            --arg value "$PROD_ENV_FILE" \
+            '{
+              Name: $name,
+              Value: $value,
+              Type: "SecureString",
+              Tier: "Standard",
+              Overwrite: true
+            }' > "$RUNNER_TEMP/production-parameter.json"
+
+          aws ssm put-parameter \
+            --region "$AWS_REGION" \
+            --cli-input-json "file://$RUNNER_TEMP/production-parameter.json"
+
+          rm -f "$RUNNER_TEMP/production-parameter.json"
+
+      - name: Deploy to EC2
+        run: |
+          DEPLOY_SCRIPT_BASE64="$(base64 < scripts/deploy-prod.sh | tr -d '\n')"
+          REMOTE_COMMAND="printf '%s' '${DEPLOY_SCRIPT_BASE64}' | base64 -d > /tmp/nail-naeil-deploy-prod.sh && chmod 700 /tmp/nail-naeil-deploy-prod.sh && /tmp/nail-naeil-deploy-prod.sh '${AWS_REGION}' '${ECR_REGISTRY}' '${IMAGE_URI}' '${ENV_PARAMETER_NAME}'"
+
+          jq -n \
+            --arg command "$REMOTE_COMMAND" \
+            '{commands: [$command]}' > "$RUNNER_TEMP/ssm-parameters.json"
+
+          COMMAND_ID="$(
+            aws ssm send-command \
+              --region "$AWS_REGION" \
+              --instance-ids "$EC2_INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --comment "Deploy nail-naeil-server ${GITHUB_SHA}" \
+              --parameters "file://$RUNNER_TEMP/ssm-parameters.json" \
+              --query "Command.CommandId" \
+              --output text
+          )"
+
+          STATUS="Pending"
+
+          for _ in $(seq 1 120); do
+            STATUS="$(
+              aws ssm get-command-invocation \
+                --region "$AWS_REGION" \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$EC2_INSTANCE_ID" \
+                --query "Status" \
+                --output text 2>/dev/null || echo "Pending"
+            )"
+
+            case "$STATUS" in
+              Success)
+                break
+                ;;
+              Failed|Cancelled|TimedOut|Cancelling)
+                break
+                ;;
+            esac
+
+            sleep 5
+          done
+
+          aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$EC2_INSTANCE_ID" \
+            --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
+
+          rm -f "$RUNNER_TEMP/ssm-parameters.json"
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "Deployment command did not succeed. Final status: $STATUS"
+            exit 1
+          fi
