@@ -1,0 +1,137 @@
+import { Prisma } from '../../generated/prisma/client';
+import type { ReservationStatus } from '../../generated/prisma/enums';
+import type { ReservationRepository } from '../repository/reservation.repository';
+import { CreateReservationRequestType } from '../dto/create-reservation-request';
+import { CreateReservationResponse } from '../dto/create-reservation-response';
+import { GetReservationsResponse } from '../dto/get-reservations-response';
+import { GetReservationDetailResponse } from '../dto/get-reservation-detail-response';
+import type { ReservationListStatus } from '../reservation.constants';
+import { ReservationFailedError } from '../../common/errors/common.error';
+import {
+  AlreadyReservedError,
+  ProposalNotFoundError,
+  ProposalTimeNotFoundError,
+  ReservationNotFoundError,
+} from '../error/reservation.error';
+
+const isUniqueConstraintError = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+
+// 사전 검증과 트랜잭션 사이의 경쟁 상태로 예약 시간 slot이 사라진 경우
+// (ReservationRepository.create()의 트랜잭션에 새 작업이 추가되면 이 매핑도 함께 검토한다)
+const isRecordNotFoundError = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+
+export class ReservationService {
+  constructor(private readonly reservationRepository: ReservationRepository) {}
+
+  // 예약 생성
+  async createReservation(
+    dto: CreateReservationRequestType,
+    userId: bigint,
+  ): Promise<CreateReservationResponse> {
+    const { proposalId, timeId } = dto;
+
+    // 존재하지 않는 견적 id인 경우 404
+    const proposal = await this.reservationRepository.findProposalById(proposalId);
+    if (!proposal) throw new ProposalNotFoundError();
+
+    // [malibu][A4] 별도의 "견적 확정(ACCEPTED)" 상태 체크는 두지 않는다.
+    // 위 findProposalById()의 존재 여부 체크(404)가 이미 "샵이 응답했는지"를 걸러준다 —
+    // 샵이 응답(SMS)하기 전에는 EstimateResponse 자체가 생성되지 않으므로 proposalId가 없고,
+    // 응답 대기중인 견적으로는 애초에 예약을 시도할 방법이 없다.
+    // SUBMITTED/ACCEPTED/REJECTED 세부 상태를 추가로 구분해서 막는 별도 확정 단계는
+    // 스펙/Figma 어디에도 없어 불필요하다고 판단, 2026-07-24 확정.
+
+    // 존재하지 않거나 해당 견적 소속이 아닌 시간 id인 경우 404
+    const proposalTime = await this.reservationRepository.findProposalTimeById(timeId);
+    if (!proposalTime || proposalTime.proposalId !== proposalId) {
+      throw new ProposalTimeNotFoundError();
+    }
+
+    // 이미 지난 시간은 예약 불가 (404 - 더 이상 유효하지 않은 시간 slot)
+    if (proposalTime.proposalDatetime < new Date()) {
+      throw new ProposalTimeNotFoundError();
+    }
+
+    // 동일 견적에 대한 중복 예약인 경우 409 (사전 체크 - 일반적인 경우 빠르게 차단)
+    const alreadyReserved = await this.reservationRepository.existsByProposalId(proposalId);
+    if (alreadyReserved) throw new AlreadyReservedError();
+
+    try {
+      const result = await this.reservationRepository.create({
+        proposalId,
+        timeId,
+        userId,
+        reservedAt: proposalTime.proposalDatetime,
+      });
+
+      return {
+        reservationId: Number(result.id),
+        shopName: result.proposal.shop.name,
+        reservedAt: result.reservedAt,
+        totalPrice: result.proposal.totalPrice,
+        status: result.status,
+      };
+    } catch (error) {
+      // DB unique 제약조건 위반 - 사전 체크와 생성 사이의 경쟁 상태로 중복 예약된 경우
+      if (isUniqueConstraintError(error)) throw new AlreadyReservedError();
+      // 사전 체크 이후 예약 시간 slot이 동시에 삭제/변경된 경쟁 상태
+      if (isRecordNotFoundError(error)) throw new ProposalTimeNotFoundError();
+      // 그 외 실패 - 원본 에러는 공통 에러 핸들러가 500 로그로 남기므로 여기서 중복 로깅하지 않는다.
+      // 대신 원본 에러를 data로 실어 보내 핸들러 로그에서 원인을 확인할 수 있게 한다.
+      throw new ReservationFailedError({ originalError: error });
+    }
+  }
+
+  // 확정(CONFIRMED)/지난(PAST=COMPLETED+CANCELLED) 예약 목록 조회
+  async getReservations(
+    status: ReservationListStatus,
+    userId: bigint,
+    page: number,
+    size: number,
+  ): Promise<GetReservationsResponse> {
+    const statuses: ReservationStatus[] =
+      status === 'CONFIRMED' ? ['CONFIRMED'] : ['COMPLETED', 'CANCELLED'];
+
+    const { reservations, totalElements } =
+      await this.reservationRepository.findByUserIdAndStatuses(userId, statuses, page, size);
+
+    return {
+      reservations: reservations.map((r) => ({
+        reservationId: Number(r.id),
+        proposalId: r.proposalId,
+        reservedAt: r.reservedAt,
+        status: r.status,
+        shopName: r.proposal.shop.name,
+        // TODO: [malibu] Shop 도메인(B8) 개발 후 실제 컬럼으로 연결 예정
+        shopThumbnailUrl: null,
+        totalPrice: r.proposal.totalPrice,
+      })),
+      page,
+      totalElements,
+    };
+  }
+
+  // 예약 상세 조회
+  async getReservationDetail(
+    reservationId: bigint,
+    userId: bigint,
+  ): Promise<GetReservationDetailResponse> {
+    const reservation = await this.reservationRepository.findByIdAndUserId(reservationId, userId);
+    if (!reservation) throw new ReservationNotFoundError();
+
+    const { shop } = reservation.proposal;
+
+    return {
+      reservationId: Number(reservation.id),
+      shopName: shop.name,
+      address: shop.addressDetail ? `${shop.address} ${shop.addressDetail}` : shop.address,
+      reservedAt: reservation.reservedAt,
+      totalPrice: reservation.proposal.totalPrice,
+      status: reservation.status,
+      // TODO: [malibu] Design 모델 추가 후 연결 예정
+      designName: null,
+    };
+  }
+}

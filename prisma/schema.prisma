@@ -131,6 +131,7 @@ model EstimateResponse {
   shop          Shop                   @relation(fields: [shopId], references: [id])
   proposalTimes ShopProposalTime[]
   smsMessages   SmsMessage[]
+  reservation   Reservation?
 
   @@map("estimate_responses")
 }
@@ -230,4 +231,29 @@ model RequestImage {
   request   EstimateRequest @relation(fields: [requestId], references: [id])
 
   @@map("request_images")
+}
+
+// ─── Reservation 도메인 ────────────────────────────────────────────────────
+
+enum ReservationStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model Reservation {
+  id         BigInt            @id @default(autoincrement())
+  // EstimateResponse.id가 Int라 FK 타입을 맞춤 (Prisma 제약상 불가피). Int 유지로 확정(2026-07-25).
+  // ERD는 한때 proposal_id를 bigint로 그렸으나 실제 구현(Int)과 안 맞아 ERD 쪽을 수정 요청, 2026-07-25 반영 완료.
+  proposalId Int               @unique @map("proposal_id")
+  // TODO: [malibu] User 모델(feat/auth) 병합 후 relation을 연결한다.
+  userId     BigInt            @map("user_id")
+  reservedAt DateTime          @map("reserved_at") @db.DateTime(3)
+  status     ReservationStatus @default(CONFIRMED)
+  createdAt  DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt  DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  proposal   EstimateResponse  @relation(fields: [proposalId], references: [id])
+
+  @@index([userId, status, reservedAt])
+  @@map("reservations")
 }
