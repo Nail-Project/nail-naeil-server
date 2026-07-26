@@ -9,23 +9,13 @@ export const getPrisma = (): PrismaClient => {
     return prisma;
   }
 
-  if (
-    !process.env.DB_HOST ||
-    !process.env.DB_USER ||
-    !process.env.DB_PASSWORD ||
-    !process.env.DB_NAME
-  ) {
-    throw new Error('DB 환경변수가 설정되지 않았습니다.');
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL이 설정되지 않았습니다.');
   }
 
-  const adapter = new PrismaMariaDb({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 3306,
-    connectionLimit: 10,
-  });
+  const adapter = new PrismaMariaDb(databaseUrl);
 
   prisma = new PrismaClient({
     adapter,
