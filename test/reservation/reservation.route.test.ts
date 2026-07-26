@@ -128,12 +128,13 @@ describe('GET /api/v1/reserve/:reservationId', () => {
     expect(service.getReservationDetail).toHaveBeenCalledWith(1n, TEMP_USER_ID);
   });
 
-  it('숫자가 아닌 id는 400으로 응답한다', async () => {
+  it('숫자가 아닌 id는 400으로 응답하고, 쿼리 검증과 구분되는 전용 에러 코드를 반환한다', async () => {
     const { app, service } = createApp();
 
     const response = await request(app).get('/api/v1/reserve/not-a-number');
 
     expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_RESERVATION_ID');
     expect(service.getReservationDetail).not.toHaveBeenCalled();
   });
 

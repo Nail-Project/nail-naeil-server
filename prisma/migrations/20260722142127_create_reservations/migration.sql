@@ -1,9 +1,3 @@
--- DropIndex
-DROP INDEX `estimate_responses_request_id_fkey` ON `estimate_responses`;
-
--- DropIndex
-DROP INDEX `sms_messages_request_id_fkey` ON `sms_messages`;
-
 -- CreateTable
 CREATE TABLE `reservations` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,

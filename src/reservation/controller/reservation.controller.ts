@@ -4,6 +4,7 @@ import { CreateReservationRequest } from '../dto/create-reservation-request';
 import { GetReservationsRequest } from '../dto/get-reservations-request';
 import { GetReservationDetailRequest } from '../dto/get-reservation-detail-request';
 import {
+  InvalidReservationIdError,
   InvalidReservationRequestError,
   ReservationValidationError,
 } from '../error/reservation.error';
@@ -60,7 +61,7 @@ export class ReservationController {
       const parsed = GetReservationDetailRequest.safeParse(req.params);
 
       if (!parsed.success) {
-        throw new InvalidReservationRequestError(parsed.error.flatten());
+        throw new InvalidReservationIdError(parsed.error.flatten());
       }
 
       const result = await this.reservationService.getReservationDetail(

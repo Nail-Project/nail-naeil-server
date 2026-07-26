@@ -12,13 +12,25 @@ export class ReservationValidationError extends AppError {
   }
 }
 
-// GET /detail - 유효하지 않은 status/page/size 쿼리 값, GET /:reservationId - 유효하지 않은 예약 id
+// GET /detail - 유효하지 않은 status/page/size 쿼리 값
 export class InvalidReservationRequestError extends AppError {
   constructor(data?: unknown) {
     super({
       code: 'INVALID_RESERVATION_REQUEST',
       statusCode: 400,
       message: '유효하지 않은 요청입니다.',
+      data,
+    });
+  }
+}
+
+// GET /:reservationId - 유효하지 않은 예약 id (path variable)
+export class InvalidReservationIdError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'INVALID_RESERVATION_ID',
+      statusCode: 400,
+      message: '유효하지 않은 예약 id입니다.',
       data,
     });
   }
