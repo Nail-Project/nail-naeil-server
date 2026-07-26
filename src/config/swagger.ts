@@ -1,3 +1,4 @@
+import path from 'node:path';
 import swaggerJsdoc from 'swagger-jsdoc';
 
 type SwaggerDocument = Record<string, unknown> & {
@@ -20,7 +21,7 @@ const swaggerSpec = swaggerJsdoc({
       },
     ],
   },
-  apis: ['src/**/*.ts'],
+  apis: [path.resolve(__dirname, '../**/*.{ts,js}')],
 }) as SwaggerDocument;
 
 const paths = swaggerSpec.paths ?? {};
