@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { ReservationService } from '../service/reservation.service';
+import type { ReservationService } from '../service/reservation.service';
 import { CreateReservationRequest } from '../dto/create-reservation-request';
 import { GetReservationsRequest } from '../dto/get-reservations-request';
 import { GetReservationDetailRequest } from '../dto/get-reservation-detail-request';
@@ -13,7 +13,7 @@ import { success } from '../../common/responses/api-response';
 const TEMP_USER_ID = BigInt(1);
 
 export class ReservationController {
-  private readonly reservationService = new ReservationService();
+  constructor(private readonly reservationService: ReservationService) {}
 
   // POST /api/v1/reserve
   createReservation = async (req: Request, res: Response, next: NextFunction) => {

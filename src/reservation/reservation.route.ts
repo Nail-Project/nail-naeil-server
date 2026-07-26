@@ -1,12 +1,16 @@
 import { Router } from 'express';
 import { ReservationController } from './controller/reservation.controller';
+import { PrismaReservationRepository } from './repository/reservation.repository';
+import { ReservationService } from './service/reservation.service';
 
 // TODO: [malibu] Notion API 스펙 문서의 예약 섹션이 실제 응답 형식과 다름
 // (isSuccess/code(숫자)/data → resultType/error/success 등, B6/A3/B7 관련).
 // 코드 변경 아님 — Notion 문서만 수정하면 됨. 완성된 교체 텍스트는 메모리
 // project_reservation_notion_envelope_update.md 참고("응답 통일").
-const reservationController = new ReservationController();
-const router = Router();
+const repository = new PrismaReservationRepository();
+const service = new ReservationService(repository);
+const controller = new ReservationController(service);
+const reservationRouter = Router();
 
 /**
  * @openapi
@@ -43,8 +47,6 @@ const router = Router();
  *       500:
  *         description: 서버 오류
  */
-router.post('/', reservationController.createReservation);
-
 /**
  * @openapi
  * /api/v1/reserve/detail:
@@ -78,8 +80,6 @@ router.post('/', reservationController.createReservation);
  *       500:
  *         description: 서버 오류
  */
-router.get('/detail', reservationController.getReservations);
-
 /**
  * @openapi
  * /api/v1/reserve/{reservationId}:
@@ -103,6 +103,20 @@ router.get('/detail', reservationController.getReservations);
  *       500:
  *         description: 서버 오류
  */
-router.get('/:reservationId', reservationController.getReservationDetail);
+const registerRoutes = (router: Router, routeController: ReservationController): Router => {
+  router.post('/', routeController.createReservation);
+  router.get('/detail', routeController.getReservations);
+  router.get('/:reservationId', routeController.getReservationDetail);
 
-export default router;
+  return router;
+};
+
+registerRoutes(reservationRouter, controller);
+
+export default reservationRouter;
+
+export const createReservationRouter = (reservationService: ReservationService): Router => {
+  const injectedController = new ReservationController(reservationService);
+
+  return registerRoutes(Router(), injectedController);
+};

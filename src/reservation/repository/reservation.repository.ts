@@ -49,9 +49,44 @@ export interface ReservationDetailRecord {
   };
 }
 
-export class ReservationRepository {
+export interface ProposalRecord {
+  id: number;
+  totalPrice: number;
+  shop: { name: string };
+}
+
+export interface ProposalTimeRecord {
+  id: number;
+  proposalId: number;
+  proposalDatetime: Date;
+  isSelected: boolean;
+}
+
+export interface ReservationRepository {
+  findProposalById(proposalId: number): Promise<ProposalRecord | null>;
+  findProposalTimeById(timeId: number): Promise<ProposalTimeRecord | null>;
+  existsByProposalId(proposalId: number): Promise<boolean>;
+  create(data: {
+    proposalId: number;
+    timeId: number;
+    userId: bigint;
+    reservedAt: Date;
+  }): Promise<CreatedReservationRecord>;
+  findByUserIdAndStatuses(
+    userId: bigint,
+    statuses: ReservationStatus[],
+    page: number,
+    size: number,
+  ): Promise<{ reservations: ReservationRecord[]; totalElements: number }>;
+  findByIdAndUserId(
+    reservationId: bigint,
+    userId: bigint,
+  ): Promise<ReservationDetailRecord | null>;
+}
+
+export class PrismaReservationRepository implements ReservationRepository {
   // 예약 생성용 견적(제안) 조회 - Shop 정보 포함
-  async findProposalById(proposalId: number) {
+  async findProposalById(proposalId: number): Promise<ProposalRecord | null> {
     return await getPrisma().estimateResponse.findUnique({
       where: { id: proposalId },
       select: { id: true, totalPrice: true, shop: { select: { name: true } } },
@@ -59,14 +94,14 @@ export class ReservationRepository {
   }
 
   // 예약 생성용 예약 가능 시간 조회
-  async findProposalTimeById(timeId: number) {
+  async findProposalTimeById(timeId: number): Promise<ProposalTimeRecord | null> {
     return await getPrisma().shopProposalTime.findUnique({
       where: { id: timeId },
     });
   }
 
   // 동일 견적에 대한 중복 예약 여부 확인
-  async existsByProposalId(proposalId: number) {
+  async existsByProposalId(proposalId: number): Promise<boolean> {
     const count = await getPrisma().reservation.count({ where: { proposalId } });
     return count > 0;
   }

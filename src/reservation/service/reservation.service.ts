@@ -1,6 +1,6 @@
 import { Prisma } from '../../generated/prisma/client';
 import type { ReservationStatus } from '../../generated/prisma/enums';
-import { ReservationRepository } from '../repository/reservation.repository';
+import type { ReservationRepository } from '../repository/reservation.repository';
 import { CreateReservationRequestType } from '../dto/create-reservation-request';
 import { CreateReservationResponse } from '../dto/create-reservation-response';
 import { GetReservationsResponse } from '../dto/get-reservations-response';
@@ -23,7 +23,7 @@ const isRecordNotFoundError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 
 export class ReservationService {
-  private readonly reservationRepository = new ReservationRepository();
+  constructor(private readonly reservationRepository: ReservationRepository) {}
 
   // 예약 생성
   async createReservation(
