@@ -3,7 +3,7 @@ import type { CreateSmsMessageResponse } from '../dto/response/create-sms-messag
 import type { EstimateResponseDetailResponse } from '../dto/response/estimate-response-detail-response';
 import type { EstimateResponseListResponse } from '../dto/response/estimate-response-list-response';
 import type { ProposalTimeListResponse } from '../dto/response/proposal-time-list-response';
-import { EstimateResponseNotFoundError } from '../errors/estimate-response.error';
+import { EstimateResponseNotFoundError, EstimateResponseForbiddenError } from '../errors/estimate-response.error';
 import type { EstimateResponseRepository } from '../repository/estimate-response.repository';
 
 export class EstimateResponseService {
@@ -26,11 +26,17 @@ export class EstimateResponseService {
     };
   }
 
-  async getDetail(responseId: number): Promise<EstimateResponseDetailResponse> {
+  async getDetail(responseId: number, userId: number): Promise<EstimateResponseDetailResponse> {
     const response = await this.repository.findDetail(responseId);
 
     if (!response) {
       throw new EstimateResponseNotFoundError({ responseId });
+    }
+
+    // 해당 견적 응답이 속한 견적 요청의 소유자인지 확인
+    const owner = await this.repository.findRequestOwner(response.requestId);
+    if (!owner || owner.userId !== userId) {
+      throw new EstimateResponseForbiddenError();
     }
 
     return {
@@ -52,7 +58,18 @@ export class EstimateResponseService {
     };
   }
 
-  async getList(requestId: number): Promise<EstimateResponseListResponse> {
+  async getList(requestId: number, userId: number): Promise<EstimateResponseListResponse> {
+    // 견적 요청 존재 여부 확인
+    const request = await this.repository.findRequestOwner(requestId);
+    if (!request) {
+      throw new EstimateResponseNotFoundError({ requestId });
+    }
+
+    // 본인 견적인지 확인 - 다른 사람의 견적 결과는 조회 불가
+    if (request.userId !== userId) {
+      throw new EstimateResponseForbiddenError();
+    }
+
     const responses = await this.repository.findList(requestId);
 
     return {
@@ -70,11 +87,21 @@ export class EstimateResponseService {
     };
   }
 
-  async getProposalTimes(responseId: number): Promise<ProposalTimeListResponse> {
+  async getProposalTimes(responseId: number, userId: number): Promise<ProposalTimeListResponse> {
     const proposalTimes = await this.repository.findProposalTimes(responseId);
 
     if (!proposalTimes) {
       throw new EstimateResponseNotFoundError({ responseId });
+    }
+
+    // 해당 견적 응답이 속한 견적 요청의 소유자인지 확인
+    const detail = await this.repository.findDetail(responseId);
+    if (!detail) {
+      throw new EstimateResponseNotFoundError({ responseId });
+    }
+    const owner = await this.repository.findRequestOwner(detail.requestId);
+    if (!owner || owner.userId !== userId) {
+      throw new EstimateResponseForbiddenError();
     }
 
     return {

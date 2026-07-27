@@ -53,6 +53,7 @@ export interface ProposalTimeRecord {
 
 export interface EstimateResponseRepository {
   createSmsMessage(request: CreateSmsMessageRequest): Promise<CreatedSmsMessage>;
+  findRequestOwner(requestId: number): Promise<{ userId: number } | null>;
   findDetail(responseId: number): Promise<EstimateResponseDetail | null>;
   findList(requestId: number): Promise<EstimateResponseListRecord[]>;
   findProposalTimes(responseId: number): Promise<ProposalTimeRecord[] | null>;
@@ -83,6 +84,14 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
         status: true,
         createdAt: true,
       },
+    });
+  }
+
+  // 견적 요청의 소유자 userId 조회 - 403 접근 권한 확인용
+  async findRequestOwner(requestId: number): Promise<{ userId: number } | null> {
+    return getPrisma().estimateRequest.findUnique({
+      where: { id: requestId },
+      select: { userId: true },
     });
   }
 

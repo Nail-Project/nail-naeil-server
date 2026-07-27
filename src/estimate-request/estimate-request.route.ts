@@ -15,6 +15,8 @@ const estimateRequestRouter = Router();
  *     description: |
  *       사용자가 네일 견적 요청을 생성한다.
  *       이미지는 image 도메인에서 미리 업로드 후 URL을 받아 함께 전달한다.
+ *     security:
+ *       - bearerAuth: []
  *     tags:
  *       - Estimate Request
  *     requestBody:
@@ -71,6 +73,8 @@ const estimateRequestRouter = Router();
  *     description: |
  *       사용자의 견적 요청을 상태별로 조회한다.
  *       status=ALL이면 상태 필터 없이 전체를 조회한다.
+ *     security:
+ *       - bearerAuth: []
  *     tags:
  *       - Estimate Request
  *     parameters:

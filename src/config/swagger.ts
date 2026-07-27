@@ -19,6 +19,15 @@ const swaggerSpec = swaggerJsdoc({
         description: 'Local server',
       },
     ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
   },
   apis: ['src/**/*.ts'],
 }) as SwaggerDocument;
