@@ -18,6 +18,19 @@ interface JwtPayload {
   exp: number;
 }
 
+// jwt.verify 반환값의 클레임을 런타임에 검증한다.
+// TypeScript 타입 단언만으로는 실제 페이로드 구조를 보장할 수 없다.
+function assertJwtPayload(payload: unknown): asserts payload is JwtPayload {
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    !Number.isInteger((payload as Record<string, unknown>).sub) ||
+    typeof (payload as Record<string, unknown>).role !== 'string'
+  ) {
+    throw new TokenInvalidError();
+  }
+}
+
 // JWT_ACCESS_SECRET 누락은 서버 설정 오류 → try/catch 밖에서 확인해 500으로 처리
 const secret = process.env.JWT_ACCESS_SECRET;
 if (!secret) {
@@ -37,7 +50,10 @@ export const authMiddleware = (req: Request, _res: Response, next: NextFunction)
     const token = authHeader.slice(7); // "Bearer " 이후 토큰 문자열
 
     // 만료, 서명 불일치 등은 jwt.verify가 에러를 throw한다.
-    const payload = jwt.verify(token, secret) as unknown as JwtPayload;
+    const payload: unknown = jwt.verify(token, secret);
+
+    // 서명은 통과했어도 클레임 구조가 올바른지 런타임에 검증한다.
+    assertJwtPayload(payload);
 
     req.userId = payload.sub;
     req.role = payload.role;
