@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { EstimateRequestController } from './controller/estimate-request.controller';
 import { EstimateRequestService } from './service/estimate-request.service';
+import { authMiddleware } from '../common/middlewares/auth.middleware';
 
 const service = new EstimateRequestService();
 const controller = new EstimateRequestController(service);
@@ -86,7 +87,9 @@ const estimateRequestRouter = Router();
  *         description: 유효하지 않은 status 값
  */
 
-estimateRequestRouter.post('/', controller.createEstimateRequest);
-estimateRequestRouter.get('/:status', controller.getEstimatesByStatus);
+// 두 엔드포인트 모두 로그인한 사용자만 접근 가능하다.
+// authMiddleware가 Authorization: Bearer 헤더를 검증하고 req.userId를 주입한다.
+estimateRequestRouter.post('/', authMiddleware, controller.createEstimateRequest);
+estimateRequestRouter.get('/:status', authMiddleware, controller.getEstimatesByStatus);
 
 export default estimateRequestRouter;

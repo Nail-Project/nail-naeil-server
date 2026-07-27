@@ -11,12 +11,13 @@ export class EstimateRequestController {
   constructor(private readonly service: EstimateRequestService) {}
 
   /**
-   * POST /api/v1/estimate-request
+   * POST /api/v1/estimate
    * 견적 요청 생성
    *
-   * 1. zod 스키마로 request body 검증
-   * 2. 검증 실패 시 EstimateRequestValidationError (400) throw
-   * 3. 성공 시 생성된 견적 요청 + 이미지 목록 반환 (201)
+   * 1. auth 미들웨어가 JWT를 검증하고 req.userId를 주입한다.
+   * 2. zod 스키마로 request body 검증
+   * 3. 검증 실패 시 EstimateRequestValidationError (400) throw
+   * 4. 성공 시 생성된 견적 요청 + 이미지 목록 반환 (201)
    */
   createEstimateRequest = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -27,7 +28,8 @@ export class EstimateRequestController {
         throw new EstimateRequestValidationError(parsed.error.flatten());
       }
 
-      const result = await this.service.createEstimateRequest(parsed.data);
+      // auth 미들웨어가 JWT payload에서 추출해 req.userId에 주입한 값을 사용한다.
+      const result = await this.service.createEstimateRequest(parsed.data, req.userId);
       res.status(201).json(success(result));
     } catch (error) {
       next(error);
@@ -54,6 +56,7 @@ export class EstimateRequestController {
 
       const result = await this.service.getEstimatesByStatus(
         status as (typeof validStatuses)[number],
+        req.userId,
       );
       res.status(200).json(success(result));
     } catch (error) {
