@@ -25,7 +25,7 @@ export class UserAuthService {
   private readonly tokenService = new TokenService(this.userRepository);
 
   async signup(request: SignupUserRequest): Promise<SignupUserResponse> {
-    if (await this.userRepository.findLocalByLoginId(request.loginId)) {
+    if (await this.userRepository.findLocalAuthByLoginId(request.loginId)) {
       throw new DuplicatedLoginIdError();
     }
     // email은 유니크 제약이 없으므로 best-effort 사전 검사만 수행한다.
@@ -61,7 +61,7 @@ export class UserAuthService {
   }
 
   async login(request: LoginUserRequest): Promise<LoginUserResponse> {
-    const auth = await this.userRepository.findLocalAuthByIdentifier(request.identifier);
+    const auth = await this.userRepository.findLocalAuthByLoginId(request.loginId);
 
     // 인증수단이 없어도 더미 해시와 비교해 응답 시간을 균등화한다(계정 열거 방지).
     const passwordHash = auth?.passwordHash ?? DUMMY_PASSWORD_HASH;

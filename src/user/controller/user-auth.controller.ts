@@ -96,11 +96,11 @@ export class UserAuthController {
    *         application/json:
    *           schema:
    *             type: object
-   *             required: [identifier, password]
+   *             required: [loginId, password]
    *             properties:
-   *               identifier:
+   *               loginId:
    *                 type: string
-   *                 description: 아이디 또는 이메일
+   *                 description: 아이디
    *                 example: test01
    *               password:
    *                 type: string

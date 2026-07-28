@@ -2,22 +2,11 @@ import { getPrisma } from '../../infra/prisma';
 import { AuthProvider } from '../../generated/prisma/client';
 
 export class UserRepository {
-  // 로컬 회원가입 중복 검사: LOCAL provider의 loginId(providerId)로 조회
-  findLocalByLoginId(loginId: string) {
+  // LOCAL 인증수단을 loginId(providerId)로 조회한다 (user, passwordHash 포함).
+  // 회원가입 중복검사와 로그인이 공유한다. 소셜 전용 유저는 LOCAL 수단이 없어 null.
+  findLocalAuthByLoginId(loginId: string) {
     return getPrisma().userAuthProvider.findUnique({
       where: { provider_providerId: { provider: AuthProvider.LOCAL, providerId: loginId } },
-      include: { user: true },
-    });
-  }
-
-  // 로그인: loginId 또는 email 중 하나로 LOCAL 인증수단을 조회한다 (passwordHash 포함).
-  // 소셜 전용 유저는 LOCAL 인증수단이 없어 여기서 null이 반환된다.
-  findLocalAuthByIdentifier(identifier: string) {
-    return getPrisma().userAuthProvider.findFirst({
-      where: {
-        provider: AuthProvider.LOCAL,
-        OR: [{ providerId: identifier }, { user: { email: identifier } }],
-      },
       include: { user: true },
     });
   }
