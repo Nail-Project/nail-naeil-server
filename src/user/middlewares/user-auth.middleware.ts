@@ -18,7 +18,10 @@ export const authenticate: RequestHandler = (req, _res, next) => {
       throw new Error('JWT_ACCESS_SECRET is not defined');
     }
 
-    const payload = jwt.verify(token, secret) as unknown as { sub: number; role: string };
+    const payload = jwt.verify(token, secret, { algorithms: ['HS256'] }) as unknown as {
+      sub: number;
+      role: string;
+    };
     req.userId = payload.sub;
     req.role = payload.role;
     next();
