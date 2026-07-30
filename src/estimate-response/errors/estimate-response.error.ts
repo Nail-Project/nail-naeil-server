@@ -21,3 +21,14 @@ export class EstimateResponseNotFoundError extends AppError {
     });
   }
 }
+
+export class EstimateResponseForbiddenError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'ESTIMATE_RESPONSE_FORBIDDEN',
+      statusCode: 403,
+      message: '접근 권한이 없습니다.',
+      data,
+    });
+  }
+}

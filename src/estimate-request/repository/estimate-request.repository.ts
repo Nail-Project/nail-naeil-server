@@ -4,7 +4,8 @@ import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request
 export class EstimateRequestRepository {
   // 견적 요청 생성
   // 이미지 URL 목록을 RequestImage 레코드로 함께 생성(nested create)한다.
-  async create(dto: CreateEstimateRequestDto) {
+  // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller → service → repository로 전달받는다.
+  async create(dto: CreateEstimateRequestDto, userId: number) {
     const { images, ...estimateData } = dto;
 
     return getPrisma().estimateRequest.create({
@@ -13,8 +14,7 @@ export class EstimateRequestRepository {
         // 프론트에서 문자열로 전달받은 날짜를 Date 객체로 변환한다.
         startDate: new Date(estimateData.startDate),
         endDate: new Date(estimateData.endDate),
-        // TODO: [yej] 로그인 구현 후 토큰에서 추출한 userId로 교체
-        userId: 1,
+        userId,
         images: {
           create: images.map((url) => ({ imageUrl: url })),
         },
@@ -27,11 +27,11 @@ export class EstimateRequestRepository {
   }
 
   // 상태별 견적 요청 목록 조회
-  // status가 'ALL'이면 where 조건 없이 전체를 조회한다.
+  // userId로 본인 견적만 필터링하고, status가 'ALL'이 아닌 경우 추가로 상태 필터를 건다.
   // 목록 카드에 필요한 썸네일(첫 번째 이미지), 견적 수, 최저가 계산용 proposals만 select한다.
-  async findByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL') {
+  async findByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL', userId: number) {
     return getPrisma().estimateRequest.findMany({
-      where: status !== 'ALL' ? { status } : undefined,
+      where: status !== 'ALL' ? { status, userId } : { userId },
       include: {
         // 썸네일은 가장 먼저 등록된 이미지 1장만 가져온다.
         images: {

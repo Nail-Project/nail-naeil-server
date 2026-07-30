@@ -27,7 +27,7 @@ export class EstimateResponseController {
   getDetail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const proposalId = this.parsePositiveInteger(req.params.proposal_id, 'proposal_id');
-      res.status(200).json(success(await this.service.getDetail(proposalId)));
+      res.status(200).json(success(await this.service.getDetail(proposalId, req.userId)));
     } catch (error) {
       next(error);
     }
@@ -36,7 +36,8 @@ export class EstimateResponseController {
   getList = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const requestId = this.parsePositiveInteger(req.params.request_id, 'request_id');
-      res.status(200).json(success(await this.service.getList(requestId)));
+      // auth 미들웨어가 JWT에서 추출한 userId로 본인 견적인지 확인한다.
+      res.status(200).json(success(await this.service.getList(requestId, req.userId)));
     } catch (error) {
       next(error);
     }
@@ -45,7 +46,7 @@ export class EstimateResponseController {
   getProposalTimes = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const proposalId = this.parsePositiveInteger(req.params.proposal_id, 'proposal_id');
-      res.status(200).json(success(await this.service.getProposalTimes(proposalId)));
+      res.status(200).json(success(await this.service.getProposalTimes(proposalId, req.userId)));
     } catch (error) {
       next(error);
     }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ReservationController } from './controller/reservation.controller';
 import { PrismaReservationRepository } from './repository/reservation.repository';
 import { ReservationService } from './service/reservation.service';
+import { authMiddleware } from '../common/middlewares/auth.middleware';
 
 // TODO: [malibu] Notion API 스펙 문서의 예약 섹션이 실제 응답 형식과 다름
 // (isSuccess/code(숫자)/data → resultType/error/success 등, B6/A3/B7 관련).
@@ -17,6 +18,8 @@ const reservationRouter = Router();
  * /api/v1/reserve:
  *   post:
  *     summary: 예약 생성
+ *     security:
+ *       - bearerAuth: []
  *     tags:
  *       - Reservation
  *     requestBody:
@@ -52,6 +55,8 @@ const reservationRouter = Router();
  * /api/v1/reserve/detail:
  *   get:
  *     summary: 예약 목록 조회
+ *     security:
+ *       - bearerAuth: []
  *     tags:
  *       - Reservation
  *     parameters:
@@ -85,6 +90,8 @@ const reservationRouter = Router();
  * /api/v1/reserve/{reservationId}:
  *   get:
  *     summary: 예약 상세 조회
+ *     security:
+ *       - bearerAuth: []
  *     tags:
  *       - Reservation
  *     parameters:
@@ -104,9 +111,9 @@ const reservationRouter = Router();
  *         description: 서버 오류
  */
 const registerRoutes = (router: Router, routeController: ReservationController): Router => {
-  router.post('/', routeController.createReservation);
-  router.get('/detail', routeController.getReservations);
-  router.get('/:reservationId', routeController.getReservationDetail);
+  router.post('/', authMiddleware, routeController.createReservation);
+  router.get('/detail', authMiddleware, routeController.getReservations);
+  router.get('/:reservationId', authMiddleware, routeController.getReservationDetail);
 
   return router;
 };

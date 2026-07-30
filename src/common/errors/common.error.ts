@@ -81,6 +81,39 @@ export class InvalidRequestError extends AppError {
   }
 }
 
+export class UnauthorizedError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'UNAUTHORIZED',
+      statusCode: 401,
+      message: '로그인이 필요합니다.',
+      data,
+    });
+  }
+}
+
+export class TokenExpiredError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'TOKEN_EXPIRED',
+      statusCode: 401,
+      message: '토큰이 만료됐습니다.',
+      data,
+    });
+  }
+}
+
+export class TokenInvalidError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'TOKEN_INVALID',
+      statusCode: 401,
+      message: '유효하지 않은 토큰입니다.',
+      data,
+    });
+  }
+}
+
 export class RouteNotFoundError extends AppError {
   constructor(data?: unknown) {
     super({

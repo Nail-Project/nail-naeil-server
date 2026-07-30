@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { EstimateResponseController } from './controller/estimate-response.controller';
 import { PrismaEstimateResponseRepository } from './repository/estimate-response.repository';
 import { EstimateResponseService } from './service/estimate-response.service';
+import { authMiddleware } from '../common/middlewares/auth.middleware';
 
 const repository = new PrismaEstimateResponseRepository();
 const service = new EstimateResponseService(repository);
@@ -13,6 +14,8 @@ const estimateResponseRouter = Router();
  * /api/v1/estimate/result/{request_id}:
  *   get:
  *     summary: 견적 요청에 도착한 견적 결과 목록 조회
+ *     security:
+ *       - bearerAuth: []
  *     tags: [Estimate Response]
  *     parameters:
  *       - in: path
@@ -74,6 +77,8 @@ const estimateResponseRouter = Router();
  * /api/v1/estimate/{proposal_id}/time:
  *   get:
  *     summary: 샵 견적의 예약 가능 시간 조회
+ *     security:
+ *       - bearerAuth: []
  *     tags: [Estimate Response]
  *     parameters:
  *       - in: path
@@ -91,6 +96,8 @@ const estimateResponseRouter = Router();
  * /api/v1/estimate/{proposal_id}/detail:
  *   get:
  *     summary: 샵 견적 상세 조회
+ *     security:
+ *       - bearerAuth: []
  *     tags: [Estimate Response]
  *     parameters:
  *       - in: path
@@ -104,10 +111,10 @@ const estimateResponseRouter = Router();
  *         description: 견적 응답을 찾을 수 없음
  */
 const registerRoutes = (router: Router, routeController: EstimateResponseController): Router => {
-  router.get('/result/:request_id', routeController.getList);
+  router.get('/result/:request_id', authMiddleware, routeController.getList);
   router.post('/sms', routeController.receive);
-  router.get('/:proposal_id/time', routeController.getProposalTimes);
-  router.get('/:proposal_id/detail', routeController.getDetail);
+  router.get('/:proposal_id/time', authMiddleware, routeController.getProposalTimes);
+  router.get('/:proposal_id/detail', authMiddleware, routeController.getDetail);
 
   return router;
 };

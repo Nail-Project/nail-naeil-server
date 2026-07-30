@@ -121,12 +121,13 @@ export class EstimateRequestService {
   // 1. DB에 견적 요청 저장
   // 2. DTO를 문자 내용으로 변환
   // 3. SMS API로 샵에 문자 발송
+  // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller가 전달한다.
   // TODO: [yej] 샵 전화번호를 어디서 가져올지 확정 후 실제 번호로 교체한다.
   //   현재는 임시 번호로 발송하며, 추후 매칭된 샵 목록의 phoneNumber를 사용한다.
-  async createEstimateRequest(dto: CreateEstimateRequestDto): Promise<CreateEstimateResponseDto> {
+  async createEstimateRequest(dto: CreateEstimateRequestDto, userId: number): Promise<CreateEstimateResponseDto> {
     try {
       // ① DB 저장
-      const result = await this.repository.create(dto);
+      const result = await this.repository.create(dto, userId);
 
       // ② DTO → 문자 문자열 변환
       const smsText = formatSmsText(dto);
@@ -161,9 +162,10 @@ export class EstimateRequestService {
   // 각 요청에 달린 proposals를 집계해 카드에 필요한 통계값을 계산한다.
   async getEstimatesByStatus(
     status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL',
+    userId: number,
   ): Promise<GetEstimatesResponseDto[]> {
     try {
-      const estimates = await this.repository.findByStatus(status);
+      const estimates = await this.repository.findByStatus(status, userId);
 
       return estimates.map((estimate) => {
         const proposals = estimate.proposals;

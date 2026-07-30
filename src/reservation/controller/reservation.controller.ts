@@ -10,8 +10,6 @@ import {
 } from '../error/reservation.error';
 import { success } from '../../common/responses/api-response';
 
-// TODO: [malibu] 로그인 구현 후 토큰에서 userId 추출하는 로직으로 교체
-const TEMP_USER_ID = BigInt(1);
 
 export class ReservationController {
   constructor(private readonly reservationService: ReservationService) {}
@@ -25,7 +23,7 @@ export class ReservationController {
         throw new ReservationValidationError(parsed.error.flatten());
       }
 
-      const result = await this.reservationService.createReservation(parsed.data, TEMP_USER_ID);
+      const result = await this.reservationService.createReservation(parsed.data, BigInt(req.userId));
       res.status(201).json(success(result));
     } catch (error) {
       next(error);
@@ -45,7 +43,7 @@ export class ReservationController {
 
       const result = await this.reservationService.getReservations(
         status,
-        TEMP_USER_ID,
+        BigInt(req.userId),
         page,
         size,
       );
@@ -66,7 +64,7 @@ export class ReservationController {
 
       const result = await this.reservationService.getReservationDetail(
         BigInt(parsed.data.reservationId),
-        TEMP_USER_ID,
+        BigInt(req.userId),
       );
       res.status(200).json(success(result));
     } catch (error) {

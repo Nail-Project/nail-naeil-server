@@ -5,6 +5,15 @@ import { errorHandler } from '../../src/common/middlewares/error-handler.middlew
 import { createEstimateResponseRouter } from '../../src/estimate-response/estimate-response.route';
 import type { EstimateResponseService } from '../../src/estimate-response/service/estimate-response.service';
 
+// 라우트 테스트에서는 JWT 검증 없이 userId만 주입되면 충분하므로 미들웨어를 mock으로 대체한다.
+vi.mock('../../src/common/middlewares/auth.middleware', () => ({
+  authMiddleware: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    req.userId = 1;
+    req.role = 'USER';
+    next();
+  },
+}));
+
 const createApp = () => {
   const service = {
     createSmsMessage: vi.fn().mockResolvedValue({
@@ -37,7 +46,7 @@ describe('estimate response routes', () => {
     const response = await request(app).get('/api/v1/estimate/result/1');
 
     expect(response.status).toBe(200);
-    expect(service.getList).toHaveBeenCalledWith(1);
+    expect(service.getList).toHaveBeenCalledWith(1, 1);
   });
 
   it('샵 견적 상세 API에 proposal_id를 전달한다', async () => {
@@ -46,7 +55,7 @@ describe('estimate response routes', () => {
     const response = await request(app).get('/api/v1/estimate/10/detail');
 
     expect(response.status).toBe(200);
-    expect(service.getDetail).toHaveBeenCalledWith(10);
+    expect(service.getDetail).toHaveBeenCalledWith(10, 1);
   });
 
   it('예약 가능 시간 API에 proposal_id를 전달한다', async () => {
@@ -55,7 +64,7 @@ describe('estimate response routes', () => {
     const response = await request(app).get('/api/v1/estimate/10/time');
 
     expect(response.status).toBe(200);
-    expect(service.getProposalTimes).toHaveBeenCalledWith(10);
+    expect(service.getProposalTimes).toHaveBeenCalledWith(10, 1);
   });
 
   it('잘못된 proposal_id는 400으로 응답한다', async () => {
