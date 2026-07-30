@@ -26,6 +26,10 @@ export const CreateEstimateRequestSchema = z.object({
   // 디자인 이미지 URL 목록 - image 도메인에서 미리 업로드 후 URL을 받아 전달한다.
   // 빈 배열로 기본값을 설정해 프론트가 필드를 생략해도 정상 처리되도록 한다.
   images: z.array(z.string()).optional().default([]),
+
+  // 견적을 보낼 샵 ID 목록 - 주변 샵 조회 API에서 받은 shopId 목록을 전달한다.
+  // 빈 배열이면 NO_SHOPS_SELECTED(400) 에러를 반환한다.
+  shopIds: z.array(z.number().int().positive()).min(1, '견적 요청할 샵이 없습니다.'),
 }).refine((data) => data.endDate >= data.startDate, {
   // endDate가 startDate보다 앞이면 400 반환
   message: '종료일은 시작일 이후여야 합니다.',

@@ -2,11 +2,24 @@ import { getPrisma } from '../../infra/prisma';
 import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request.dto';
 
 export class EstimateRequestRepository {
+  // shopIds로 샵 전화번호 목록 조회
+  // SMS 발송 대상 번호를 가져오기 위해 사용한다.
+  // phoneNumber가 null인 샵은 제외한다.
+  async findPhoneNumbersByShopIds(shopIds: number[]): Promise<string[]> {
+    const shops = await getPrisma().shop.findMany({
+      where: { id: { in: shopIds } },
+      select: { phoneNumber: true },
+    });
+    return shops
+      .map((s) => s.phoneNumber)
+      .filter((phone): phone is string => phone !== null);
+  }
+
   // 견적 요청 생성
   // 이미지 URL 목록을 RequestImage 레코드로 함께 생성(nested create)한다.
   // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller → service → repository로 전달받는다.
   async create(dto: CreateEstimateRequestDto, userId: number) {
-    const { images, ...estimateData } = dto;
+    const { images, shopIds: _, ...estimateData } = dto;
 
     return getPrisma().estimateRequest.create({
       data: {
