@@ -56,3 +56,14 @@ export class InvalidTokenError extends AppError {
     });
   }
 }
+
+export class UserNotFoundError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'USER_NOT_FOUND',
+      statusCode: 404,
+      message: '사용자를 찾을 수 없습니다.',
+      data,
+    });
+  }
+}
