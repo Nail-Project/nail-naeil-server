@@ -90,6 +90,10 @@ class FakeRepository implements EstimateResponseRepository {
         ]
       : null;
   }
+
+  async findRequestOwner(requestId: number): Promise<{ userId: number } | null> {
+    return requestId === 1 ? { userId: 1 } : null;
+  }
 }
 
 describe('EstimateResponseService', () => {
@@ -108,7 +112,7 @@ describe('EstimateResponseService', () => {
   it('샵 견적 상세를 조회한다', async () => {
     const service = new EstimateResponseService(new FakeRepository());
 
-    await expect(service.getDetail(10)).resolves.toMatchObject({
+    await expect(service.getDetail(10, 1)).resolves.toMatchObject({
       id: 10,
       shop: { name: '내일네일' },
       price: { totalPrice: 55_000 },
@@ -118,7 +122,7 @@ describe('EstimateResponseService', () => {
   it('견적 결과 목록을 조회한다', async () => {
     const service = new EstimateResponseService(new FakeRepository());
 
-    await expect(service.getList(1)).resolves.toMatchObject({
+    await expect(service.getList(1, 1)).resolves.toMatchObject({
       requestId: 1,
       responses: [{ id: 10, totalPrice: 55_000 }],
     });
@@ -127,7 +131,7 @@ describe('EstimateResponseService', () => {
   it('예약 가능 시간을 조회한다', async () => {
     const service = new EstimateResponseService(new FakeRepository());
 
-    await expect(service.getProposalTimes(10)).resolves.toMatchObject({
+    await expect(service.getProposalTimes(10, 1)).resolves.toMatchObject({
       estimateResponseId: 10,
       proposalTimes: [{ id: 100, isSelected: false }],
     });
@@ -136,7 +140,7 @@ describe('EstimateResponseService', () => {
   it('존재하지 않는 견적 상세 조회는 404 예외를 던진다', async () => {
     const service = new EstimateResponseService(new FakeRepository());
 
-    await expect(service.getDetail(999)).rejects.toMatchObject({
+    await expect(service.getDetail(999, 1)).rejects.toMatchObject({
       code: 'ESTIMATE_RESPONSE_NOT_FOUND',
       statusCode: 404,
     });
