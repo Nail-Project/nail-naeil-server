@@ -31,16 +31,17 @@ function assertJwtPayload(payload: unknown): asserts payload is JwtPayload {
   }
 }
 
-// JWT_ACCESS_SECRET 누락은 서버 설정 오류 → try/catch 밖에서 확인해 500으로 처리
-const secret = process.env.JWT_ACCESS_SECRET;
-if (!secret) {
-  throw new Error('JWT_ACCESS_SECRET is not defined');
-}
-
 // Authorization: Bearer <accessToken> 헤더를 검증하는 미들웨어.
 // 토큰이 없거나 만료/변조된 경우 UnauthorizedError(401)를 던진다.
 // 검증 성공 시 req.userId, req.role에 페이로드를 주입한다.
 export const authMiddleware = (req: Request, _res: Response, next: NextFunction): void => {
+  // JWT_ACCESS_SECRET 누락은 서버 설정 오류 → try/catch 밖에서 확인해 500으로 처리
+  const secret = process.env.JWT_ACCESS_SECRET;
+  if (!secret) {
+    next(new Error('JWT_ACCESS_SECRET is not defined'));
+    return;
+  }
+
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
