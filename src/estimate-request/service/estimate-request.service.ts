@@ -7,12 +7,22 @@ import { CreateEstimateResponseDto } from '../dto/response/create-estimate-respo
 import { GetEstimatesResponseDto } from '../dto/response/get-estimates-response.dto';
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
 
-// ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
-// SMS_ENABLED=true 일 때만 실제 발송을 시도한다.
-// COOLSMS_API_KEY, COOLSMS_API_SECRET, SMS_FROM은 .env에서 관리한다.
+// ─── SMS 설정 ───────────────────────────────────────────────────────────────────
 const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
 const SMS_FROM = process.env.SMS_FROM ?? '';
+const SMS_TIMEOUT_MS = 10_000; // 1회 발송 최대 대기 시간
+const SMS_MAX_ATTEMPTS = 3;    // 실패 시 즉시 재시도 횟수
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`SMS 타임아웃: ${ms}ms 초과`)), ms)
+    ),
+  ]);
+}
+
+// ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
 class SmsService {
   private readonly client: SolapiMessageService | null;
 
@@ -28,51 +38,82 @@ class SmsService {
     }
   }
 
-  // 이미지가 없으면 LMS(텍스트), 있으면 이미지 수만큼 MMS를 순차 발송한다.
-  // 첫 번째 MMS에만 텍스트를 포함하고 이후 이미지는 추가 MMS로 발송한다.
-  // to에 배열을 넘기면 Solapi가 한 번의 API 호출로 여러 수신자에게 동시 발송한다.
-  // 발송 실패해도 견적 요청 자체를 막지 않는다. 로그만 남기고 계속 진행한다.
+  // 이미지 URL → Solapi fileId 변환 (업로드)
+  // 파일이 없거나 업로드 실패한 이미지는 건너뛴다.
+  private async uploadImages(imageUrls: string[]): Promise<string[]> {
+    if (!this.client || imageUrls.length === 0) return [];
+
+    const baseUrl = process.env.BASE_URL ?? 'http://localhost:3000';
+    const fileIds: string[] = [];
+
+    for (const imageUrl of imageUrls) {
+      const filePath = imageUrl.replace(`${baseUrl}/`, '');
+      const absolutePath = path.join(process.cwd(), filePath);
+
+      if (!fs.existsSync(absolutePath)) {
+        console.warn(`[SmsService] 이미지 파일 없음, 건너뜀: ${absolutePath}`);
+        continue;
+      }
+
+      try {
+        const { fileId } = await withTimeout(this.client.uploadFile(absolutePath, 'MMS'), SMS_TIMEOUT_MS);
+        fileIds.push(fileId);
+      } catch (error) {
+        console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${absolutePath}`, error);
+      }
+    }
+
+    return fileIds;
+  }
+
+  // 모든 샵에 SMS/MMS 발송
+  // 실패 시 최대 SMS_MAX_ATTEMPTS(3)회 즉시 재시도한다.
+  // 3회 모두 실패하면 에러를 throw → 호출부에서 견적 요청 실패로 처리한다.
+  // SMS_ENABLED=false 또는 API Key 미설정이면 발송 없이 정상 통과한다.
   async sendToShops(phoneNumbers: string[], text: string, imageUrls: string[]): Promise<void> {
     if (!SMS_ENABLED || !this.client) {
-      console.log(`[SmsService] SMS 발송 건너뜀 (SMS_ENABLED=${SMS_ENABLED}, client=${!!this.client})`);
+      console.log('[SmsService] SMS 발송 건너뜀');
       return;
     }
 
-    try {
-      if (imageUrls.length === 0) {
-        // 이미지 없음 → LMS (텍스트만 전송)
-        await this.client.send({ to: phoneNumbers, from: SMS_FROM, text, autoTypeDetect: true });
-        return;
-      }
+    const fileIds = await this.uploadImages(imageUrls);
 
-      const baseUrl = process.env.BASE_URL ?? 'http://localhost:3000';
+    // 이미지 없으면 LMS 1건, 있으면 이미지 수만큼 MMS 발송
+    // 첫 번째 MMS에만 본문 텍스트 포함
+    const sendTasks: Array<{ text: string; imageId?: string }> =
+      fileIds.length === 0
+        ? [{ text }]
+        : fileIds.map((fileId, i) => ({ text: i === 0 ? text : ' ', imageId: fileId }));
 
-      // 이미지마다 Solapi에 업로드 후 MMS 발송
-      // 첫 번째 이미지에만 텍스트 포함, 이후 이미지는 본문 없이 이미지만 발송
-      let isFirst = true;
-      for (const imageUrl of imageUrls) {
-        const filePath = imageUrl.replace(`${baseUrl}/`, '');
-        const absolutePath = path.join(process.cwd(), filePath);
+    for (const task of sendTasks) {
+      let lastError: unknown;
 
-        console.log(`[SmsService] 이미지 경로 확인: ${absolutePath}`);
-        if (!fs.existsSync(absolutePath)) {
-          console.warn(`[SmsService] 이미지 파일 없음, 건너뜀: ${absolutePath}`);
-          continue;
+      for (let attempt = 1; attempt <= SMS_MAX_ATTEMPTS; attempt++) {
+        try {
+          await withTimeout(
+            this.client.send({
+              to: phoneNumbers,
+              from: SMS_FROM,
+              text: task.text,
+              ...(task.imageId ? { imageId: task.imageId } : { autoTypeDetect: true }),
+            }),
+            SMS_TIMEOUT_MS,
+          );
+          lastError = undefined;
+          break; // 성공
+        } catch (error) {
+          lastError = error;
+          console.warn(
+            `[SmsService] 발송 실패 (${attempt}/${SMS_MAX_ATTEMPTS}):`,
+            error instanceof Error ? error.message : error,
+          );
         }
-
-        const { fileId } = await this.client.uploadFile(absolutePath, 'MMS');
-
-        await this.client.send({
-          to: phoneNumbers,
-          from: SMS_FROM,
-          text: isFirst ? text : ' ', // 첫 번째 MMS에만 견적 내용 포함
-          imageId: fileId,
-        });
-
-        isFirst = false;
       }
-    } catch (error) {
-      console.error('[SmsService] MMS 발송 실패:', error);
+
+      if (lastError !== undefined) {
+        // SMS_MAX_ATTEMPTS 회 모두 실패 → 에러 throw
+        throw lastError;
+      }
     }
   }
 }
@@ -147,19 +188,18 @@ export class EstimateRequestService {
   // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller가 전달한다.
   // TODO: [yej] 샵 전화번호를 어디서 가져올지 확정 후 실제 번호로 교체한다.
   //   현재는 임시 번호로 발송하며, 추후 매칭된 샵 목록의 phoneNumber를 사용한다.
+  // 견적 요청 생성
+  // ① DB에 견적 저장
+  // ② 주변 샵에 SMS/MMS 발송 (최대 3회 즉시 재시도)
+  // ③ SMS가 3회 모두 실패하면 EstimateRequestFailedError 반환
   async createEstimateRequest(dto: CreateEstimateRequestDto, userId: number): Promise<CreateEstimateResponseDto> {
     try {
-      // ① DB 저장
       const result = await this.repository.create(dto, userId);
 
-      // ② DTO → 문자 문자열 변환
       const smsText = formatSmsText(dto);
+      const shops = await this.repository.findShopsByIds(dto.shopIds);
+      const phoneNumbers = shops.map((s) => s.phoneNumber);
 
-      // ③ shopIds로 전화번호 조회 후 각 샵에 SMS 발송
-      // phoneNumber가 없는 샵은 건너뛴다.
-      // SMS 발송 실패해도 견적 요청 자체는 정상 완료 처리한다.
-      // shopIds로 전화번호 조회 후 한 번에 발송 (sendMany = API 호출 1번)
-      const phoneNumbers = await this.repository.findPhoneNumbersByShopIds(dto.shopIds);
       await this.smsService.sendToShops(
         phoneNumbers,
         smsText,

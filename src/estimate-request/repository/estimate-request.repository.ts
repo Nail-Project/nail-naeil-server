@@ -2,17 +2,15 @@ import { getPrisma } from '../../infra/prisma';
 import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request.dto';
 
 export class EstimateRequestRepository {
-  // shopIds로 샵 전화번호 목록 조회
-  // SMS 발송 대상 번호를 가져오기 위해 사용한다.
+  // shopIds로 샵 ID + 전화번호 목록 조회
+  // SMS 발송 대상 정보를 가져오기 위해 사용한다.
   // phoneNumber가 null인 샵은 제외한다.
-  async findPhoneNumbersByShopIds(shopIds: number[]): Promise<string[]> {
+  async findShopsByIds(shopIds: number[]): Promise<{ id: number; phoneNumber: string }[]> {
     const shops = await getPrisma().shop.findMany({
       where: { id: { in: shopIds } },
-      select: { phoneNumber: true },
+      select: { id: true, phoneNumber: true },
     });
-    return shops
-      .map((s) => s.phoneNumber)
-      .filter((phone): phone is string => phone !== null);
+    return shops.filter((s): s is { id: number; phoneNumber: string } => s.phoneNumber !== null);
   }
 
   // 견적 요청 생성
