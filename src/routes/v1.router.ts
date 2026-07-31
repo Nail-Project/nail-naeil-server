@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import designRouter from '../design/design.route';
 import estimateRequestRouter from '../estimate-request/estimate-request.route';
 import estimateResponseRouter from '../estimate-response/estimate-response.route';
 import reservationRouter from '../reservation/reservation.route';
@@ -11,6 +12,7 @@ import socialAuthRouter from '../user/route/social-auth.route';
 
 const v1Router = Router();
 
+v1Router.use('/designs', designRouter);
 v1Router.use('/estimate', estimateRequestRouter);
 v1Router.use('/estimate', estimateResponseRouter);
 v1Router.use('/reserve', reservationRouter);
