@@ -54,6 +54,7 @@ class SmsService {
         const filePath = imageUrl.replace(`${baseUrl}/`, '');
         const absolutePath = path.join(process.cwd(), filePath);
 
+        console.log(`[SmsService] 이미지 경로 확인: ${absolutePath}`);
         if (!fs.existsSync(absolutePath)) {
           console.warn(`[SmsService] 이미지 파일 없음, 건너뜀: ${absolutePath}`);
           continue;

@@ -58,6 +58,12 @@ const estimateRequestRouter = Router();
  *                 items:
  *                   type: string
  *                 example: ["http://localhost:3000/uploads/2026-07-20/uuid.jpg"]
+ *               shopIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [1]
+ *                 description: 견적을 보낼 샵 ID 목록 (주변 샵 조회 API에서 받은 값)
  *     responses:
  *       201:
  *         description: 견적 요청 생성 성공
