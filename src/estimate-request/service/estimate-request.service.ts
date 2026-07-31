@@ -11,7 +11,6 @@ import { EstimateRequestFailedError, InternalServerError } from '../../common/er
 const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
 const SMS_FROM = process.env.SMS_FROM ?? '';
 const SMS_TIMEOUT_MS = 10_000; // 1회 발송 최대 대기 시간
-const SMS_MAX_ATTEMPTS = 3;    // 실패 시 즉시 재시도 횟수
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -20,6 +19,22 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
       setTimeout(() => reject(new Error(`SMS 타임아웃: ${ms}ms 초과`)), ms)
     ),
   ]);
+}
+
+// Solapi 에러에서 사용자에게 전달할 실패 이유를 추출한다.
+// DefaultError / MessageNotReceivedError: errorCode + errorMessage 필드 보유
+// 그 외 에러: message 필드 사용
+function extractSmsErrorReason(error: unknown): string {
+  if (error instanceof Error) {
+    const solapiError = error as Error & { errorCode?: string; errorMessage?: string };
+    if (solapiError.errorMessage) {
+      return solapiError.errorCode
+        ? `[${solapiError.errorCode}] ${solapiError.errorMessage}`
+        : solapiError.errorMessage;
+    }
+    return error.message;
+  }
+  return '알 수 없는 오류';
 }
 
 // ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
@@ -66,9 +81,9 @@ class SmsService {
     return fileIds;
   }
 
-  // 모든 샵에 SMS/MMS 발송
-  // 실패 시 최대 SMS_MAX_ATTEMPTS(3)회 즉시 재시도한다.
-  // 3회 모두 실패하면 에러를 throw → 호출부에서 견적 요청 실패로 처리한다.
+  // 모든 샵에 SMS/MMS 발송 (1회 시도)
+  // 실패 시 에러를 throw → 호출부에서 EstimateRequestFailedError로 변환해 클라이언트에 반환한다.
+  // 재시도는 클라이언트가 견적 요청을 다시 보내는 방식으로 처리한다.
   // SMS_ENABLED=false 또는 API Key 미설정이면 발송 없이 정상 통과한다.
   async sendToShops(phoneNumbers: string[], text: string, imageUrls: string[]): Promise<void> {
     if (!SMS_ENABLED || !this.client) {
@@ -86,34 +101,15 @@ class SmsService {
         : fileIds.map((fileId, i) => ({ text: i === 0 ? text : ' ', imageId: fileId }));
 
     for (const task of sendTasks) {
-      let lastError: unknown;
-
-      for (let attempt = 1; attempt <= SMS_MAX_ATTEMPTS; attempt++) {
-        try {
-          await withTimeout(
-            this.client.send({
-              to: phoneNumbers,
-              from: SMS_FROM,
-              text: task.text,
-              ...(task.imageId ? { imageId: task.imageId } : { autoTypeDetect: true }),
-            }),
-            SMS_TIMEOUT_MS,
-          );
-          lastError = undefined;
-          break; // 성공
-        } catch (error) {
-          lastError = error;
-          console.warn(
-            `[SmsService] 발송 실패 (${attempt}/${SMS_MAX_ATTEMPTS}):`,
-            error instanceof Error ? error.message : error,
-          );
-        }
-      }
-
-      if (lastError !== undefined) {
-        // SMS_MAX_ATTEMPTS 회 모두 실패 → 에러 throw
-        throw lastError;
-      }
+      await withTimeout(
+        this.client.send({
+          to: phoneNumbers,
+          from: SMS_FROM,
+          text: task.text,
+          ...(task.imageId ? { imageId: task.imageId } : { autoTypeDetect: true }),
+        }),
+        SMS_TIMEOUT_MS,
+      );
     }
   }
 }
@@ -182,28 +178,25 @@ export class EstimateRequestService {
   private readonly smsService = new SmsService();
 
   // 견적 요청 생성
-  // 1. DB에 견적 요청 저장
-  // 2. DTO를 문자 내용으로 변환
-  // 3. SMS API로 샵에 문자 발송
+  // ① SMS 발송 — 실패 시 DB 저장 없이 EstimateRequestFailedError + 실패 이유 반환
+  // ② SMS 성공 후 DB 저장
   // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller가 전달한다.
-  // TODO: [yej] 샵 전화번호를 어디서 가져올지 확정 후 실제 번호로 교체한다.
-  //   현재는 임시 번호로 발송하며, 추후 매칭된 샵 목록의 phoneNumber를 사용한다.
-  // 견적 요청 생성
-  // ① DB에 견적 저장
-  // ② 주변 샵에 SMS/MMS 발송 (최대 3회 즉시 재시도)
-  // ③ SMS가 3회 모두 실패하면 EstimateRequestFailedError 반환
   async createEstimateRequest(dto: CreateEstimateRequestDto, userId: number): Promise<CreateEstimateResponseDto> {
+    // ① SMS 발송 (실패 시 DB 저장 없이 즉시 에러 반환)
     try {
-      // ① SMS 먼저 발송 — 실패 시 DB 저장 없이 EstimateRequestFailedError
       const smsText = formatSmsText(dto);
       const shops = await this.repository.findShopsByIds(dto.shopIds);
       const phoneNumbers = shops.map((s) => s.phoneNumber);
-
       await this.smsService.sendToShops(phoneNumbers, smsText, dto.images);
+    } catch (error) {
+      // 내부 에러 상세(IP, API 키 관련 정보 등)는 서버 로그에만 기록하고 클라이언트에 노출하지 않는다.
+      console.error('[EstimateRequestService] SMS 발송 실패:', extractSmsErrorReason(error));
+      throw new EstimateRequestFailedError();
+    }
 
-      // ② SMS 성공 후 DB 저장
+    // ② DB 저장 (SMS 성공 후)
+    try {
       const result = await this.repository.create(dto, userId);
-
       return {
         estimateId: result.id,
         nailType: result.nailType,

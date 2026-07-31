@@ -29,7 +29,8 @@ export const CreateEstimateRequestSchema = z.object({
 
   // 견적을 보낼 샵 ID 목록 - 주변 샵 조회 API에서 받은 shopId 목록을 전달한다.
   // 빈 배열이면 NO_SHOPS_SELECTED(400) 에러를 반환한다.
-  shopIds: z.array(z.number().int().positive()).min(1, '견적 요청할 샵이 없습니다.'),
+  // 최대 20개로 제한 - 대량 문자 발송 비용 남용 방지 (추후 샵 탐색 API 설계 시 재검토)
+  shopIds: z.array(z.number().int().positive()).min(1, '견적 요청할 샵이 없습니다.').max(20, '한 번에 요청할 수 있는 샵 수를 초과했습니다.'),
 }).refine((data) => data.endDate >= data.startDate, {
   // endDate가 startDate보다 앞이면 400 반환
   message: '종료일은 시작일 이후여야 합니다.',
