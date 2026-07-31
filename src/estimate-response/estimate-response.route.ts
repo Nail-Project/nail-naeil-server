@@ -25,8 +25,77 @@ const estimateResponseRouter = Router();
  *     responses:
  *       200:
  *         description: 견적 결과 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 error:
+ *                   nullable: true
+ *                   example: null
+ *                 success:
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: integer
+ *                       example: 1
+ *                     responses:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           shop:
+ *                             type: object
+ *                             properties:
+ *                               id:
+ *                                 type: integer
+ *                               name:
+ *                                 type: string
+ *                               address:
+ *                                 type: string
+ *                           totalPrice:
+ *                             type: integer
+ *                             example: 55000
+ *                           status:
+ *                             type: string
+ *                             enum: [SUBMITTED, ACCEPTED, REJECTED]
+ *                           proposalDateTimes:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                               format: date-time
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
  *       400:
  *         description: 잘못된 견적 요청 식별자
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: FAIL
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: INVALID_ESTIMATE_REQUEST
+ *                     message:
+ *                       type: string
+ *                       example: 유효하지 않은 요청입니다.
+ *                     data:
+ *                       nullable: true
+ *                 success:
+ *                   nullable: true
+ *                   example: null
  */
 /**
  * @openapi
@@ -69,8 +138,62 @@ const estimateResponseRouter = Router();
  *     responses:
  *       202:
  *         description: 견적 응답 문자 접수 성공 (파싱은 비동기로 처리)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 error:
+ *                   nullable: true
+ *                   example: null
+ *                 success:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     source:
+ *                       type: string
+ *                       example: android-device-a1b2c3
+ *                     messageId:
+ *                       type: string
+ *                       example: android-sms-1042
+ *                     direction:
+ *                       type: string
+ *                       example: INBOUND
+ *                     status:
+ *                       type: string
+ *                       enum: [PENDING, SENT, PARSED, FAILED]
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
  *       400:
  *         description: 견적 응답 문자 형식 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: FAIL
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: INVALID_ESTIMATE_RESPONSE
+ *                     message:
+ *                       type: string
+ *                       example: 견적 응답 형식이 올바르지 않아요.
+ *                     data:
+ *                       nullable: true
+ *                 success:
+ *                   nullable: true
+ *                   example: null
  */
 /**
  * @openapi
@@ -88,8 +211,59 @@ const estimateResponseRouter = Router();
  *     responses:
  *       200:
  *         description: 예약 가능 시간 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 error:
+ *                   nullable: true
+ *                   example: null
+ *                 success:
+ *                   type: object
+ *                   properties:
+ *                     estimateResponseId:
+ *                       type: integer
+ *                       example: 1
+ *                     proposalTimes:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           proposalDateTime:
+ *                             type: string
+ *                             format: date-time
+ *                           isSelected:
+ *                             type: boolean
  *       404:
  *         description: 견적 응답을 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: FAIL
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: ESTIMATE_RESPONSE_NOT_FOUND
+ *                     message:
+ *                       type: string
+ *                       example: 견적 응답을 찾을 수 없어요.
+ *                     data:
+ *                       nullable: true
+ *                 success:
+ *                   nullable: true
+ *                   example: null
  */
 /**
  * @openapi
@@ -107,8 +281,90 @@ const estimateResponseRouter = Router();
  *     responses:
  *       200:
  *         description: 샵 견적 상세 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 error:
+ *                   nullable: true
+ *                   example: null
+ *                 success:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     requestId:
+ *                       type: integer
+ *                     shop:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         name:
+ *                           type: string
+ *                         phoneNumber:
+ *                           type: string
+ *                           nullable: true
+ *                         address:
+ *                           type: string
+ *                         addressDetail:
+ *                           type: string
+ *                           nullable: true
+ *                     price:
+ *                       type: object
+ *                       properties:
+ *                         totalPrice:
+ *                           type: integer
+ *                           example: 55000
+ *                         basePrice:
+ *                           type: integer
+ *                         removalPrice:
+ *                           type: integer
+ *                         extraPrice:
+ *                           type: integer
+ *                     memo:
+ *                       type: string
+ *                       nullable: true
+ *                     status:
+ *                       type: string
+ *                       enum: [SUBMITTED, ACCEPTED, REJECTED]
+ *                     proposalDateTimes:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                         format: date-time
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
  *       404:
  *         description: 견적 응답을 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: FAIL
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: ESTIMATE_RESPONSE_NOT_FOUND
+ *                     message:
+ *                       type: string
+ *                       example: 견적 응답을 찾을 수 없어요.
+ *                     data:
+ *                       nullable: true
+ *                 success:
+ *                   nullable: true
+ *                   example: null
  */
 const registerRoutes = (router: Router, routeController: EstimateResponseController): Router => {
   router.get('/result/:request_id', authMiddleware, routeController.getList);
