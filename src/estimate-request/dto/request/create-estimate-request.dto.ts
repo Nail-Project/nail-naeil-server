@@ -24,8 +24,9 @@ export const CreateEstimateRequestSchema = z.object({
   description: z.string().optional(),
 
   // 디자인 이미지 URL 목록 - image 도메인에서 미리 업로드 후 URL을 받아 전달한다.
+  // 최대 3장까지 허용 (SMS 발송은 첫 번째 이미지 1장만 전송, 추후 기획 확정 후 조정)
   // 빈 배열로 기본값을 설정해 프론트가 필드를 생략해도 정상 처리되도록 한다.
-  images: z.array(z.string()).optional().default([]),
+  images: z.array(z.string()).max(3, '이미지는 최대 3장까지 첨부할 수 있습니다.').optional().default([]),
 
   // 견적을 보낼 샵 ID 목록 - 주변 샵 조회 API에서 받은 shopId 목록을 전달한다.
   // 빈 배열이면 NO_SHOPS_SELECTED(400) 에러를 반환한다.

@@ -187,7 +187,9 @@ export class EstimateRequestService {
       const smsText = formatSmsText(dto);
       const shops = await this.repository.findShopsByIds(dto.shopIds);
       const phoneNumbers = shops.map((s) => s.phoneNumber);
-      await this.smsService.sendToShops(phoneNumbers, smsText, dto.images);
+      // SMS MMS 발송은 첫 번째 이미지 1장만 전송 (추후 기획 확정 후 조정)
+      const smsImages = dto.images.slice(0, 1);
+      await this.smsService.sendToShops(phoneNumbers, smsText, smsImages);
     } catch (error) {
       // 내부 에러 상세(IP, API 키 관련 정보 등)는 서버 로그에만 기록하고 클라이언트에 노출하지 않는다.
       console.error('[EstimateRequestService] SMS 발송 실패:', extractSmsErrorReason(error));
