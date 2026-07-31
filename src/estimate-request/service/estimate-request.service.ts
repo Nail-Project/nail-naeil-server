@@ -194,17 +194,15 @@ export class EstimateRequestService {
   // ③ SMS가 3회 모두 실패하면 EstimateRequestFailedError 반환
   async createEstimateRequest(dto: CreateEstimateRequestDto, userId: number): Promise<CreateEstimateResponseDto> {
     try {
-      const result = await this.repository.create(dto, userId);
-
+      // ① SMS 먼저 발송 — 실패 시 DB 저장 없이 EstimateRequestFailedError
       const smsText = formatSmsText(dto);
       const shops = await this.repository.findShopsByIds(dto.shopIds);
       const phoneNumbers = shops.map((s) => s.phoneNumber);
 
-      await this.smsService.sendToShops(
-        phoneNumbers,
-        smsText,
-        result.images.map((img) => img.imageUrl),
-      );
+      await this.smsService.sendToShops(phoneNumbers, smsText, dto.images);
+
+      // ② SMS 성공 후 DB 저장
+      const result = await this.repository.create(dto, userId);
 
       return {
         estimateId: result.id,
