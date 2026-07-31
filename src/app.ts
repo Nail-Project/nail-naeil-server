@@ -3,6 +3,7 @@ import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { adminSwaggerSpec, userSwaggerSpec } from './config/swagger';
 import userAuthRoute from './user/route/user-auth.route';
+import userRoute from './user/route/user.route';
 import socialAuthRoute from './user/route/social-auth.route';
 import { errorHandler } from './common/middlewares/error-handler.middleware';
 import { RouteNotFoundError } from './common/errors/common.error';
@@ -59,6 +60,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/users', userAuthRoute);
+app.use('/api/users', userRoute);
 app.use('/api/auth', socialAuthRoute);
 app.use('/api/v1', v1Router);
 app.use('/admin/api/v1', adminV1Router);
