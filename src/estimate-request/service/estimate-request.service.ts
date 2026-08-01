@@ -51,7 +51,8 @@ function isAllowedS3ImageUrl(imageUrl: string): boolean {
     const region = process.env.AWS_REGION ?? 'ap-northeast-2';
     if (urlObj.hostname !== `${bucket}.s3.${region}.amazonaws.com`) return false;
     const key = urlObj.pathname.replace(/^\//, '');
-    return /^images\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\.[a-zA-Z]+$/.test(key);
+    // UUID 형식 엄격 검사: 8-4-4-4-12 하이픈 위치까지 확인
+    return /^images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/.test(key);
   } catch {
     return false;
   }
@@ -227,8 +228,9 @@ export class EstimateRequestService {
       const smsText = formatSmsText(dto);
       const shops = await this.repository.findShopsByIds(dto.shopIds);
       const phoneNumbers = shops.map((s) => s.phoneNumber);
-      // SMS MMS 발송은 첫 번째 이미지 1장만 전송 (추후 기획 확정 후 조정)
-      const smsImages = dto.images.slice(0, 1);
+      // 유효한 S3 URL만 필터링 후 첫 번째 1장만 MMS 발송
+      // slice(0, 1) 대신 필터링 먼저: 첫 번째 URL이 무효여도 두 번째 유효 URL이 전송될 수 있도록
+      const smsImages = dto.images.filter(isAllowedS3ImageUrl).slice(0, 1);
       await this.smsService.sendToShops(phoneNumbers, smsText, smsImages);
     } catch (error) {
       // 내부 에러 상세(IP, API 키 관련 정보 등)는 서버 로그에만 기록하고 클라이언트에 노출하지 않는다.
