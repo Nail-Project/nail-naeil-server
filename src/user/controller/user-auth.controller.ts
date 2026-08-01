@@ -212,12 +212,16 @@ export class UserAuthController {
    *                     refreshToken:
    *                       type: string
    *       401:
-   *         description: 유효하지 않은 토큰
+   *         description: 만료되었거나 유효하지 않은 토큰
    *         content:
    *           application/json:
    *             schema:
    *               $ref: '#/components/schemas/ApiErrorResponse'
-   *             example: { resultType: FAIL, error: { code: INVALID_TOKEN, message: 유효하지 않은 토큰입니다., data: null }, success: null }
+   *             examples:
+   *               tokenExpired:
+   *                 value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null }
+   *               tokenInvalid:
+   *                 value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null }
    *       400:
    *         description: 토큰 요청값 검증 실패
    *         content:
@@ -267,13 +271,6 @@ export class UserAuthController {
    *             schema:
    *               $ref: '#/components/schemas/ApiErrorResponse'
    *             example: { resultType: FAIL, error: { code: USER_VALIDATION_FAILED, message: 입력 정보를 다시 확인해주세요., data: null }, success: null }
-   *       401:
-   *         description: 유효하지 않은 토큰
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/ApiErrorResponse'
-   *             example: { resultType: FAIL, error: { code: INVALID_TOKEN, message: 유효하지 않은 토큰입니다., data: null }, success: null }
    */
   logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
