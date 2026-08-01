@@ -4,8 +4,10 @@ import type { ReservationRepository } from '../repository/reservation.repository
 import { CreateReservationRequestType } from '../dto/create-reservation-request';
 import { CreateReservationResponse } from '../dto/create-reservation-response';
 import { GetReservationsResponse } from '../dto/get-reservations-response';
+import type { ReservationCursor } from '../dto/get-reservations-request';
 import { GetReservationDetailResponse } from '../dto/get-reservation-detail-response';
 import type { ReservationListStatus } from '../reservation.constants';
+import { encodeCursor } from '../../common/pagination/cursor';
 import { ReservationFailedError } from '../../common/errors/common.error';
 import {
   AlreadyReservedError,
@@ -88,14 +90,24 @@ export class ReservationService {
   async getReservations(
     status: ReservationListStatus,
     userId: bigint,
-    page: number,
+    cursor: ReservationCursor | undefined,
     size: number,
   ): Promise<GetReservationsResponse> {
     const statuses: ReservationStatus[] =
       status === 'CONFIRMED' ? ['CONFIRMED'] : ['COMPLETED', 'CANCELLED'];
 
-    const { reservations, totalElements } =
-      await this.reservationRepository.findByUserIdAndStatuses(userId, statuses, page, size);
+    const { reservations, hasNext } = await this.reservationRepository.findByUserIdAndStatuses(
+      userId,
+      statuses,
+      cursor,
+      size,
+    );
+
+    const last = reservations[reservations.length - 1];
+    const nextCursor =
+      hasNext && last
+        ? encodeCursor({ reservedAt: last.reservedAt.toISOString(), id: last.id.toString() })
+        : null;
 
     return {
       reservations: reservations.map((r) => ({
@@ -108,8 +120,7 @@ export class ReservationService {
         shopThumbnailUrl: null,
         totalPrice: r.proposal.totalPrice,
       })),
-      page,
-      totalElements,
+      pageInfo: { nextCursor, hasNext },
     };
   }
 

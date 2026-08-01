@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { errorHandler } from '../../src/common/middlewares/error-handler.middleware';
 import { createReservationRouter } from '../../src/reservation/reservation.route';
 import type { ReservationService } from '../../src/reservation/service/reservation.service';
+import { encodeCursor } from '../../src/common/pagination/cursor';
 
 // 라우트 테스트에서는 JWT 검증 없이 userId만 주입되면 충분하므로 미들웨어를 mock으로 대체한다.
 vi.mock('../../src/common/middlewares/auth.middleware', () => ({
@@ -27,8 +28,7 @@ const createApp = () => {
     }),
     getReservations: vi.fn().mockResolvedValue({
       reservations: [],
-      page: 0,
-      totalElements: 0,
+      pageInfo: { nextCursor: null, hasNext: false },
     }),
     getReservationDetail: vi.fn().mockResolvedValue({
       reservationId: 1,
@@ -85,24 +85,33 @@ describe('POST /api/v1/reserve', () => {
 });
 
 describe('GET /api/v1/reserve/detail', () => {
-  it('status를 전달하면 200으로 응답하고 서비스에 기본 페이지 값과 함께 전달한다', async () => {
+  it('status를 전달하면 200으로 응답하고 서비스에 cursor 없이 기본 size와 함께 전달한다', async () => {
     const { app, service } = createApp();
 
     const response = await request(app).get('/api/v1/reserve/detail').query({ status: 'CONFIRMED' });
 
     expect(response.status).toBe(200);
-    expect(service.getReservations).toHaveBeenCalledWith('CONFIRMED', TEMP_USER_ID, 0, 10);
+    expect(service.getReservations).toHaveBeenCalledWith(
+      'CONFIRMED',
+      TEMP_USER_ID,
+      undefined,
+      10,
+    );
   });
 
-  it('page/size를 전달하면 그대로 서비스에 전달한다', async () => {
+  it('cursor/size를 전달하면 디코딩해서 서비스에 전달한다', async () => {
     const { app, service } = createApp();
+    const cursor = encodeCursor({ reservedAt: '2026-05-10T16:00:00.000Z', id: '7' });
 
     const response = await request(app)
       .get('/api/v1/reserve/detail')
-      .query({ status: 'PAST', page: '2', size: '20' });
+      .query({ status: 'PAST', cursor, size: '20' });
 
     expect(response.status).toBe(200);
-    expect(service.getReservations).toHaveBeenCalledWith('PAST', TEMP_USER_ID, 2, 20);
+    expect(service.getReservations).toHaveBeenCalledWith('PAST', TEMP_USER_ID, {
+      reservedAt: new Date('2026-05-10T16:00:00.000Z'),
+      id: 7n,
+    }, 20);
   });
 
   it('status가 없으면 400으로 응답한다', async () => {
@@ -115,11 +124,22 @@ describe('GET /api/v1/reserve/detail', () => {
     expect(service.getReservations).not.toHaveBeenCalled();
   });
 
+  it('형식이 깨진 cursor는 400으로 거부한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app)
+      .get('/api/v1/reserve/detail')
+      .query({ status: 'CONFIRMED', cursor: 'not-a-valid-cursor' });
+
+    expect(response.status).toBe(400);
+    expect(service.getReservations).not.toHaveBeenCalled();
+  });
+
   it('같은 쿼리 키를 반복해 배열이 되면 400으로 거부한다 (Express 기본 simple 파서 기준)', async () => {
     const { app, service } = createApp();
 
     const response = await request(app).get(
-      '/api/v1/reserve/detail?status=CONFIRMED&page=1&page=2',
+      '/api/v1/reserve/detail?status=CONFIRMED&size=1&size=2',
     );
 
     expect(response.status).toBe(400);

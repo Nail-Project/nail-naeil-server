@@ -39,12 +39,12 @@ export class ReservationController {
         throw new InvalidReservationRequestError(parsed.error.flatten());
       }
 
-      const { status, page, size } = parsed.data;
+      const { status, cursor, size } = parsed.data;
 
       const result = await this.reservationService.getReservations(
         status,
         BigInt(req.userId),
-        page,
+        cursor,
         size,
       );
       res.status(200).json(success(result));

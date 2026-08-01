@@ -105,10 +105,10 @@ const reservationRouter = Router();
  *           enum: [CONFIRMED, PAST]
  *         description: CONFIRMED(확정 예약) 또는 PAST(지난 예약 - 완료/취소)
  *       - in: query
- *         name: page
+ *         name: cursor
  *         schema:
- *           type: integer
- *           default: 0
+ *           type: string
+ *         description: 이전 응답의 pageInfo.nextCursor 값. 첫 페이지는 생략한다.
  *       - in: query
  *         name: size
  *         schema:
