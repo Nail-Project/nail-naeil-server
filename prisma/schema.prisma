@@ -279,6 +279,8 @@ model Design {
   images           DesignImage[]
   wishes           WishDesign[]
 
+  // 피드 정렬(createdAt desc)이 데이터 증가 시 풀 테이블 스캔이 되지 않도록 인덱스를 둔다.
+  @@index([createdAt])
   @@map("designs")
 }
 

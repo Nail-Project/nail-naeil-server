@@ -5,9 +5,6 @@ import { GetDesignDetailRequest } from '../dto/get-design-detail-request';
 import { InvalidDesignIdError, InvalidDesignRequestError } from '../error/design.error';
 import { success } from '../../common/responses/api-response';
 
-// TODO: [malibu] 로그인 구현 후 토큰에서 userId 추출하는 로직으로 교체
-const TEMP_USER_ID = 1;
-
 export class DesignController {
   constructor(private readonly designService: DesignService) {}
 
@@ -20,8 +17,8 @@ export class DesignController {
         throw new InvalidDesignRequestError(parsed.error.flatten());
       }
 
-      const { page, size } = parsed.data;
-      const result = await this.designService.getDesigns(page, size);
+      const { cursor, size } = parsed.data;
+      const result = await this.designService.getDesigns(cursor, size);
       res.status(200).json(success(result));
     } catch (error) {
       next(error);
@@ -37,10 +34,7 @@ export class DesignController {
         throw new InvalidDesignIdError(parsed.error.flatten());
       }
 
-      const result = await this.designService.getDesignDetail(
-        parsed.data.designId,
-        TEMP_USER_ID,
-      );
+      const result = await this.designService.getDesignDetail(parsed.data.designId, req.userId);
       res.status(200).json(success(result));
     } catch (error) {
       next(error);

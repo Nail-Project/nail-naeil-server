@@ -7,9 +7,7 @@ export interface DesignSummaryItem {
 }
 
 export interface PageInfo {
-  currentPage: number;
-  pageSize: number;
-  totalElements: number;
+  nextCursor: string | null;
   hasNext: boolean;
 }
 

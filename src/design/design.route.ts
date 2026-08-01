@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { DesignController } from './controller/design.controller';
 import { PrismaDesignRepository } from './repository/design.repository';
 import { DesignService } from './service/design.service';
+import { authMiddleware } from '../common/middlewares/auth.middleware';
 
 // TODO: [malibu] Notion API 스펙 문서의 디자인 섹션이 실제 응답 형식과 다름
 // (isSuccess/code(숫자)/data → resultType/error/success 등, 예약 도메인 B6과 동일 사안).
@@ -20,10 +21,10 @@ const designRouter = Router();
  *       - Design
  *     parameters:
  *       - in: query
- *         name: page
+ *         name: cursor
  *         schema:
- *           type: integer
- *           default: 1
+ *           type: string
+ *         description: 이전 응답의 pageInfo.nextCursor 값. 첫 페이지는 생략한다.
  *       - in: query
  *         name: size
  *         schema:
@@ -42,6 +43,8 @@ const designRouter = Router();
  * /api/v1/designs/{designId}:
  *   get:
  *     summary: 디자인 상세 조회
+ *     security:
+ *       - bearerAuth: []
  *     tags:
  *       - Design
  *     parameters:
@@ -62,7 +65,7 @@ const designRouter = Router();
  */
 const registerRoutes = (router: Router, routeController: DesignController): Router => {
   router.get('/', routeController.getDesigns);
-  router.get('/:designId', routeController.getDesignDetail);
+  router.get('/:designId', authMiddleware, routeController.getDesignDetail);
 
   return router;
 };
