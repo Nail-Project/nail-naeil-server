@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { ImageController } from './controller/image.controller';
 import { ImageService } from './service/image.service';
-import { wrapMulter } from '../common/middlewares/multer-error.middleware';
+import { wrapMulterArray } from '../common/middlewares/multer-error.middleware';
 
 const imageRouter = Router();
 const imageController = new ImageController();
@@ -29,12 +29,14 @@ const upload = imageService.getMulter();
  *           schema:
  *             type: object
  *             required:
- *               - image
+ *               - images
  *             properties:
- *               image:
- *                 type: string
- *                 format: binary
- *                 description: 업로드할 이미지 파일 (최대 10MB)
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: 업로드할 이미지 파일 (최대 3장, 장당 10MB)
  *     responses:
  *       200:
  *         description: 업로드 성공
@@ -53,9 +55,11 @@ const upload = imageService.getMulter();
  *                 success:
  *                   type: object
  *                   properties:
- *                     imageUrl:
- *                       type: string
- *                       example: http://localhost:3000/uploads/2026-07-11/uuid.jpg
+ *                     imageUrls:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       example: ["https://nail-naeil-images.s3.ap-northeast-2.amazonaws.com/images/2026-08-01/uuid.jpg"]
  *       400:
  *         description: 파일 미첨부 / 이미지 아닌 파일 / 크기 초과
  *         content:
@@ -108,6 +112,6 @@ const upload = imageService.getMulter();
  *                   example: null
  */
 // wrapMulter: multer 실행 + 에러 발생 시 커스텀 에러로 변환해 공통 핸들러로 위임
-imageRouter.post('/upload', wrapMulter(upload, 'image'), imageController.uploadImage);
+imageRouter.post('/upload', wrapMulterArray(upload, 'images', 3), imageController.uploadImage);
 
 export default imageRouter;

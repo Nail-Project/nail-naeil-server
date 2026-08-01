@@ -1,6 +1,9 @@
+import fsp from 'fs/promises';
+import os from 'os';
 import path from 'path';
-import fs from 'fs';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { SolapiMessageService } from 'solapi';
+import { createS3Client } from '../../infra/s3';
 import { EstimateRequestRepository } from '../repository/estimate-request.repository';
 import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request.dto';
 import { CreateEstimateResponseDto } from '../dto/response/create-estimate-response.dto';
@@ -37,9 +40,30 @@ function extractSmsErrorReason(error: unknown): string {
   return '알 수 없는 오류';
 }
 
+// ─── S3 URL 검증 ────────────────────────────────────────────────────────────────
+// 허용 호스트: {bucket}.s3.{region}.amazonaws.com (자체 버킷만 허용)
+// 허용 경로 형식: images/YYYY-MM-DD/<uuid>.<ext>
+// URL이 이 형식을 따르지 않으면 S3 키 추출 없이 건너뜀
+function isAllowedS3ImageUrl(imageUrl: string): boolean {
+  try {
+    const urlObj = new URL(imageUrl);
+    const bucket = process.env.S3_BUCKET_NAME ?? '';
+    const region = process.env.AWS_REGION ?? 'ap-northeast-2';
+    if (urlObj.hostname !== `${bucket}.s3.${region}.amazonaws.com`) return false;
+    const key = urlObj.pathname.replace(/^\//, '');
+    // UUID 형식 엄격 검사: 8-4-4-4-12 하이픈 위치까지 확인
+    return /^images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/.test(key);
+  } catch {
+    return false;
+  }
+}
+
 // ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
 class SmsService {
   private readonly client: SolapiMessageService | null;
+  // S3 클라이언트는 생성자에서 한 번만 생성한다 (루프마다 생성 방지)
+  private readonly s3 = createS3Client();
+  private readonly s3Bucket = process.env.S3_BUCKET_NAME ?? '';
 
   constructor() {
     const apiKey = process.env.COOLSMS_API_KEY;
@@ -53,28 +77,45 @@ class SmsService {
     }
   }
 
-  // 이미지 URL → Solapi fileId 변환 (업로드)
-  // 파일이 없거나 업로드 실패한 이미지는 건너뛴다.
+  // S3 이미지 URL → 임시 파일 다운로드 → Solapi fileId 변환
+  // 업로드 실패한 이미지는 건너뛰고, 임시 파일은 업로드 후 삭제한다.
   private async uploadImages(imageUrls: string[]): Promise<string[]> {
     if (!this.client || imageUrls.length === 0) return [];
 
-    const baseUrl = process.env.BASE_URL ?? 'http://localhost:3000';
     const fileIds: string[] = [];
 
     for (const imageUrl of imageUrls) {
-      const filePath = imageUrl.replace(`${baseUrl}/`, '');
-      const absolutePath = path.join(process.cwd(), filePath);
-
-      if (!fs.existsSync(absolutePath)) {
-        console.warn(`[SmsService] 이미지 파일 없음, 건너뜀: ${absolutePath}`);
+      // 허용된 S3 URL인지 검증 (다른 버킷·경로 접근 차단)
+      if (!isAllowedS3ImageUrl(imageUrl)) {
+        console.warn(`[SmsService] 허용되지 않은 이미지 URL, 건너뜀: ${imageUrl}`);
         continue;
       }
+      // S3 URL에서 key 추출 (예: images/2026-08-01/uuid.jpg)
+      const urlObj = new URL(imageUrl);
+      const key = urlObj.pathname.replace(/^\//, '');
+      const tmpPath = path.join(os.tmpdir(), path.basename(key));
 
       try {
-        const { fileId } = await withTimeout(this.client.uploadFile(absolutePath, 'MMS'), SMS_TIMEOUT_MS);
+        // S3에서 임시 파일로 다운로드
+        const { Body } = await withTimeout(
+          this.s3.send(new GetObjectCommand({ Bucket: this.s3Bucket, Key: key })),
+          SMS_TIMEOUT_MS,
+        );
+        if (!Body) {
+          console.warn(`[SmsService] S3 응답 바디 없음, 건너뜀: ${key}`);
+          continue;
+        }
+        const buffer = Buffer.from(await Body.transformToByteArray());
+        await fsp.writeFile(tmpPath, buffer);
+
+        // Solapi에 임시 파일 업로드
+        const { fileId } = (await withTimeout(this.client.uploadFile(tmpPath, 'MMS'), SMS_TIMEOUT_MS)) as { fileId: string };
         fileIds.push(fileId);
       } catch (error) {
-        console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${absolutePath}`, error);
+        console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${key}`, error);
+      } finally {
+        // 임시 파일 정리 (force: true → 파일 없어도 에러 없이 통과)
+        await fsp.rm(tmpPath, { force: true });
       }
     }
 
@@ -187,8 +228,9 @@ export class EstimateRequestService {
       const smsText = formatSmsText(dto);
       const shops = await this.repository.findShopsByIds(dto.shopIds);
       const phoneNumbers = shops.map((s) => s.phoneNumber);
-      // SMS MMS 발송은 첫 번째 이미지 1장만 전송 (추후 기획 확정 후 조정)
-      const smsImages = dto.images.slice(0, 1);
+      // 유효한 S3 URL만 필터링 후 첫 번째 1장만 MMS 발송
+      // slice(0, 1) 대신 필터링 먼저: 첫 번째 URL이 무효여도 두 번째 유효 URL이 전송될 수 있도록
+      const smsImages = dto.images.filter(isAllowedS3ImageUrl).slice(0, 1);
       await this.smsService.sendToShops(phoneNumbers, smsText, smsImages);
     } catch (error) {
       // 내부 에러 상세(IP, API 키 관련 정보 등)는 서버 로그에만 기록하고 클라이언트에 노출하지 않는다.

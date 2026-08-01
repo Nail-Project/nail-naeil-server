@@ -1,125 +1,58 @@
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
+import { createS3Client, S3_REGION } from '../../infra/s3';
 import { PhotoUploadFailedError } from '../../common/errors/common.error';
-import { InvalidImageTypeError } from '../error/image.error';
+import { InvalidImageFormatError, InvalidImageTypeError } from '../error/image.error';
 
-// -------------------------------------------------------------------
-// StorageService 인터페이스 - 로컬/S3 공통 계약
-// -------------------------------------------------------------------
-export interface StorageService {
-  // multer에 넘길 storage engine 반환
-  getStorage(): multer.StorageEngine;
-  // 업로드 완료된 file 객체에서 접근 URL 추출
-  getFileUrl(file: Express.Multer.File): string;
+// ─── 매직 바이트 검사 ───────────────────────────────────────────────────────────
+// 클라이언트가 Content-Type 헤더를 임의로 위조할 수 있으므로
+// MIME 타입 검사만으로는 비이미지 파일의 업로드를 막을 수 없다.
+// 파일의 첫 바이트(파일 시그니처)로 실제 이미지 여부를 검증한다.
+//
+// 지원 형식:
+// · JPEG : FF D8 FF
+// · PNG  : 89 50 4E 47 0D 0A 1A 0A
+// · GIF  : 47 49 46 38 (GIF8)
+// · WebP : 52 49 46 46 ?? ?? ?? ?? 57 45 42 50 (RIFF....WEBP)
+function hasValidImageSignature(buffer: Buffer): boolean {
+  if (buffer.length < 3) return false;
+  const b = buffer;
+
+  // JPEG
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return true;
+  // PNG
+  if (b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return true;
+  // GIF
+  if (b.length >= 4 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return true;
+  // WebP (RIFF....WEBP)
+  if (
+    b.length >= 12 &&
+    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+  ) return true;
+
+  return false;
 }
 
-// -------------------------------------------------------------------
-// LocalStorageService - 로컬 서버 디스크에 저장
-// uploads/ 폴더에 uuid 파일명으로 저장 후 서버 URL 반환
-// -------------------------------------------------------------------
-export class LocalStorageService implements StorageService {
-  private readonly baseUploadDir = 'uploads';
-  private readonly baseUrl = process.env.BASE_URL ?? 'http://localhost:3000';
-
-  // 오늘 날짜 기준 저장 폴더 경로 반환 (예: uploads/2026-07-11)
-  private getDateDir(): string {
-    const today = new Date().toISOString().split('T')[0];
-    return `${this.baseUploadDir}/${today}`;
-  }
-
-  getStorage(): multer.StorageEngine {
-    return multer.diskStorage({
-      destination: (_req, _file, cb) => {
-        // 날짜별 폴더 없으면 자동 생성 (예: uploads/2026-07-11/)
-        const dateDir = this.getDateDir();
-        if (!fs.existsSync(dateDir)) {
-          fs.mkdirSync(dateDir, { recursive: true });
-        }
-        cb(null, dateDir);
-      },
-      filename: (_req, file, cb) => {
-        // 원본 확장자 유지 + uuid로 파일명 충돌 방지
-        const ext = path.extname(file.originalname);
-        cb(null, `${uuidv4()}${ext}`);
-      },
-    });
-  }
-
-  getFileUrl(file: Express.Multer.File): string {
-    // multer가 저장 후 file.destination에 실제 저장된 경로를 담아줌
-    // getDateDir()를 재호출하지 않아 자정 경계에서 경로 불일치 방지
-    // 예: http://localhost:3000/uploads/2026-07-11/uuid.jpg
-    return `${this.baseUrl}/${file.destination}/${file.filename}`;
-  }
-}
-
-// -------------------------------------------------------------------
-// S3StorageService - AWS S3 버킷에 저장 (추후 전환용)
-// multer-s3 패키지 설치 및 AWS 환경변수 설정 후 활성화
-// npm install multer-s3 @aws-sdk/client-s3
-//
-// TODO: S3 전환 시 보안 강화 항목
-//
-// [1] 매직 바이트 검사 추가 (mimetype 위조 방지)
-//   - mimetype은 클라이언트가 헤더에 직접 설정하는 값이라 위조 가능
-//   - file-type 패키지로 파일 시그니처(매직 바이트)를 검사해 실제 이미지 여부 확인
-//   - multer-s3는 memoryStorage 방식으로 동작해 file.buffer 접근 가능 → 검사 붙이기 용이
-//   - npm install file-type
-//
-// [2] S3 버킷 private 설정 + Presigned URL 방식 적용
-//   - 버킷을 public으로 열면 URL만 알면 누구나 접근 가능 → 사적인 이미지 노출 위험
-//   - 버킷은 private으로 설정하고, 클라이언트가 이미지 요청 시 서버에서 임시 URL 발급
-//   - import { GetObjectCommand } from '@aws-sdk/client-s3';
-//   - import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-//   - const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket, Key }), { expiresIn: 3600 });
-// -------------------------------------------------------------------
-export class S3StorageService implements StorageService {
-  getStorage(): multer.StorageEngine {
-    // TODO: S3 전환 시 아래 주석 해제 후 LocalStorageService 대신 사용
-    //
-    // import multerS3 from 'multer-s3';
-    // import { S3Client } from '@aws-sdk/client-s3';
-    //
-    // const s3 = new S3Client({ region: process.env.AWS_REGION });
-    //
-    // const today = new Date().toISOString().split('T')[0];
-    // return multerS3({
-    //   s3,
-    //   bucket: process.env.S3_BUCKET_NAME!,
-    //   key: (_req, file, cb) => {
-    //     const ext = path.extname(file.originalname);
-    //     // 날짜 prefix로 저장 - 스케줄러가 날짜별 조회 가능하도록
-    //     // 예: images/2026-07-11/uuid.jpg
-    //     cb(null, `images/${today}/${uuidv4()}${ext}`);
-    //   },
-    // });
-
-    throw new Error('S3StorageService는 아직 설정되지 않았습니다.');
-  }
-
-  getFileUrl(file: Express.Multer.File): string {
-    // multer-s3는 업로드 완료 후 file.location에 S3 URL을 담아줌
-    return (file as Express.Multer.File & { location: string }).location;
-  }
-}
-
-// -------------------------------------------------------------------
-// ImageService - 컨트롤러가 직접 호출하는 서비스
-// storage 구현체만 교체하면 로컬 ↔ S3 전환 완료
-// -------------------------------------------------------------------
+// ─── ImageService ─────────────────────────────────────────────────────────────
+// multer는 memoryStorage로 파일을 버퍼에 받고,
+// uploadImages()에서 매직 바이트 검증 후 AWS SDK로 직접 S3에 업로드한다.
 export class ImageService {
-  // S3 전환 시: new LocalStorageService() → new S3StorageService()
-  private readonly storage: StorageService = new LocalStorageService();
+  private readonly s3 = createS3Client();
+  // 빈 문자열이면 uploadImages()에서 PhotoUploadFailedError를 던진다.
+  // getS3Bucket()을 필드 초기화에 쓰면 모듈 로드 시점에 throw되어 테스트 앱 기동이 실패한다.
+  private readonly bucket = process.env.S3_BUCKET_NAME ?? '';
+  private readonly region = S3_REGION;
 
   // multer 미들웨어 생성 - image.route.ts에서 호출해 라우터에 등록
   getMulter(): multer.Multer {
     return multer({
-      storage: this.storage.getStorage(),
+      storage: multer.memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 }, // 10MB 제한
       fileFilter: (_req, file, cb) => {
-        // 이미지 파일만 허용 - InvalidImageTypeError로 던져 wrapMulter에서 instanceof로 판별
+        // 1차 검사: MIME 타입 (빠른 사전 필터)
         if (!file.mimetype.startsWith('image/')) {
           return cb(new InvalidImageTypeError());
         }
@@ -128,12 +61,44 @@ export class ImageService {
     });
   }
 
-  // 업로드된 파일의 URL 반환 - 컨트롤러에서 호출
-  async uploadImage(file: Express.Multer.File): Promise<string> {
-    try {
-      return this.storage.getFileUrl(file);
-    } catch {
-      throw new PhotoUploadFailedError();
+  // 업로드된 파일의 매직 바이트를 검사하고 S3에 저장 후 URL 목록 반환
+  // 파일 순서를 보장하여 반환한다.
+  async uploadImages(files: Express.Multer.File[]): Promise<string[]> {
+    if (!this.bucket) throw new PhotoUploadFailedError();
+
+    // 1단계: 전체 파일 매직 바이트 일괄 검증
+    // 업로드 전에 먼저 걸러내 S3에 참조되지 않는 객체가 남지 않도록 한다.
+    for (const file of files) {
+      if (!hasValidImageSignature(file.buffer)) {
+        throw new InvalidImageFormatError();
+      }
     }
+
+    // 2단계: 검증 통과 후 S3 업로드
+    const today = new Date().toISOString().split('T')[0];
+    const urls: string[] = [];
+
+    for (const file of files) {
+      const ext = path.extname(file.originalname);
+      const key = `images/${today}/${uuidv4()}${ext}`;
+
+      try {
+        await this.s3.send(
+          new PutObjectCommand({
+            Bucket: this.bucket,
+            Key: key,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+          }),
+        );
+      } catch {
+        throw new PhotoUploadFailedError();
+      }
+
+      // scheduler의 URL 형식과 일치: https://{bucket}.s3.{region}.amazonaws.com/{key}
+      urls.push(`https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`);
+    }
+
+    return urls;
   }
 }
