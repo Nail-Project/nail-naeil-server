@@ -158,7 +158,7 @@ const estimateResponseRouter = Router();
  *                   receivedAt: "2026-07-18T13:20:38+09:00"
  *     responses:
  *       202:
- *         description: 견적 응답 문자 접수 성공 (파싱은 비동기로 처리)
+ *         description: 견적 응답 문자 접수 성공
  *         content:
  *           application/json:
  *             schema:

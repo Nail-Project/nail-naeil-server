@@ -133,6 +133,7 @@ model EstimateResponse {
   smsMessages   SmsMessage[]
   reservation   Reservation?
 
+  @@unique([requestId, shopId])
   @@map("estimate_responses")
 }
 
