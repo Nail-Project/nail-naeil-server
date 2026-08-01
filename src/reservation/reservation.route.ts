@@ -43,12 +43,49 @@ const reservationRouter = Router();
  *         description: 예약 생성 성공
  *       400:
  *         description: 요청 값 유효성 검사 실패
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: RESERVATION_VALIDATION_FAILED, message: 예약 요청 정보를 모두 입력해주세요., data: null }, success: null }
  *       404:
  *         description: 존재하지 않는 견적 또는 예약 시간
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             examples:
+ *               proposalNotFound:
+ *                 value: { resultType: FAIL, error: { code: PROPOSAL_NOT_FOUND, message: 해당 견적 또는 예약 시간을 찾을 수 없습니다., data: null }, success: null }
+ *               proposalTimeNotFound:
+ *                 value: { resultType: FAIL, error: { code: PROPOSAL_TIME_NOT_FOUND, message: 해당 견적 또는 예약 시간을 찾을 수 없습니다., data: null }, success: null }
  *       409:
  *         description: 이미 예약된 견적
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: ALREADY_RESERVED, message: 이미 예약된 시간입니다., data: null }, success: null }
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: RESERVATION_FAILED, message: 예약을 완료하지 못했어요. 다시 시도해주세요., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             examples:
+ *               unauthorized:
+ *                 value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null }
+ *               tokenExpired:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null }
+ *               tokenInvalid:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null }
  */
 /**
  * @openapi
@@ -82,8 +119,24 @@ const reservationRouter = Router();
  *         description: 예약 목록 조회 성공
  *       400:
  *         description: 유효하지 않은 쿼리 값
- *       500:
- *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: INVALID_RESERVATION_REQUEST, message: 유효하지 않은 요청입니다., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             examples:
+ *               unauthorized:
+ *                 value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null }
+ *               tokenExpired:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null }
+ *               tokenInvalid:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null }
  */
 /**
  * @openapi
@@ -105,10 +158,31 @@ const reservationRouter = Router();
  *         description: 예약 상세 조회 성공
  *       400:
  *         description: 유효하지 않은 예약 id
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: INVALID_RESERVATION_ID, message: 유효하지 않은 예약 id입니다., data: null }, success: null }
  *       404:
  *         description: 존재하지 않는 예약
- *       500:
- *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: RESERVATION_NOT_FOUND, message: 존재하지 않는 예약입니다., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             examples:
+ *               unauthorized:
+ *                 value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null }
+ *               tokenExpired:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null }
+ *               tokenInvalid:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null }
  */
 const registerRoutes = (router: Router, routeController: ReservationController): Router => {
   router.post('/', authMiddleware, routeController.createReservation);

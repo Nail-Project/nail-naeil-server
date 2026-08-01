@@ -11,7 +11,7 @@ export class UserAuthController {
 
   /**
    * @openapi
-   * /api/users/signup:
+   * /api/v1/users/signup:
    *   post:
    *     summary: 회원가입
    *     tags:
@@ -68,6 +68,22 @@ export class UserAuthController {
    *                       example: CUSTOMER
    *       409:
    *         description: 아이디 또는 이메일 중복
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             examples:
+   *               duplicatedLoginId:
+   *                 value: { resultType: FAIL, error: { code: DUPLICATED_LOGIN_ID, message: 이미 사용 중인 아이디입니다., data: null }, success: null }
+   *               duplicatedEmail:
+   *                 value: { resultType: FAIL, error: { code: DUPLICATED_EMAIL, message: 이미 사용 중인 이메일입니다., data: null }, success: null }
+   *       400:
+   *         description: 회원가입 입력값 검증 실패
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: USER_VALIDATION_FAILED, message: 입력 정보를 다시 확인해주세요., data: null }, success: null }
    */
   signup = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -85,7 +101,7 @@ export class UserAuthController {
 
   /**
    * @openapi
-   * /api/users/login:
+   * /api/v1/users/login:
    *   post:
    *     summary: 로그인
    *     tags:
@@ -129,6 +145,18 @@ export class UserAuthController {
    *                       type: string
    *       401:
    *         description: 아이디 또는 비밀번호 불일치
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: INVALID_CREDENTIALS, message: 아이디 또는 비밀번호가 올바르지 않습니다., data: null }, success: null }
+   *       400:
+   *         description: 로그인 입력값 검증 실패
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: USER_VALIDATION_FAILED, message: 입력 정보를 다시 확인해주세요., data: null }, success: null }
    */
   login = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -146,7 +174,7 @@ export class UserAuthController {
 
   /**
    * @openapi
-   * /api/users/auth/refresh:
+   * /api/v1/users/auth/refresh:
    *   post:
    *     summary: 액세스 토큰 재발급
    *     tags:
@@ -185,6 +213,18 @@ export class UserAuthController {
    *                       type: string
    *       401:
    *         description: 유효하지 않은 토큰
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: INVALID_TOKEN, message: 유효하지 않은 토큰입니다., data: null }, success: null }
+   *       400:
+   *         description: 토큰 요청값 검증 실패
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: USER_VALIDATION_FAILED, message: 입력 정보를 다시 확인해주세요., data: null }, success: null }
    */
   refresh = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -202,7 +242,7 @@ export class UserAuthController {
 
   /**
    * @openapi
-   * /api/users/auth/logout:
+   * /api/v1/users/auth/logout:
    *   post:
    *     summary: 로그아웃 (refresh token 폐기)
    *     tags:
@@ -220,6 +260,20 @@ export class UserAuthController {
    *     responses:
    *       204:
    *         description: 로그아웃 성공
+   *       400:
+   *         description: 토큰 요청값 검증 실패
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: USER_VALIDATION_FAILED, message: 입력 정보를 다시 확인해주세요., data: null }, success: null }
+   *       401:
+   *         description: 유효하지 않은 토큰
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: INVALID_TOKEN, message: 유효하지 않은 토큰입니다., data: null }, success: null }
    */
   logout = async (req: Request, res: Response, next: NextFunction) => {
     try {

@@ -9,7 +9,7 @@ export class UserController {
 
   /**
    * @openapi
-   * /api/users/me:
+   * /api/v1/users/me:
    *   get:
    *     summary: 마이페이지 조회
    *     tags:
@@ -54,8 +54,18 @@ export class UserController {
    *                       example: CUSTOMER
    *       401:
    *         description: 유효하지 않은 토큰
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: INVALID_TOKEN, message: 유효하지 않은 토큰입니다., data: null }, success: null }
    *       404:
    *         description: 사용자를 찾을 수 없음
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: USER_NOT_FOUND, message: 사용자를 찾을 수 없습니다., data: null }, success: null }
    */
   getMe = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -68,7 +78,7 @@ export class UserController {
 
   /**
    * @openapi
-   * /api/users/me:
+   * /api/v1/users/me:
    *   patch:
    *     summary: 회원정보 수정
    *     tags:
@@ -96,12 +106,32 @@ export class UserController {
    *         description: 수정 성공, 갱신된 내 정보 반환
    *       400:
    *         description: 입력값 검증 실패
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: USER_VALIDATION_FAILED, message: 입력 정보를 다시 확인해주세요., data: null }, success: null }
    *       401:
    *         description: 유효하지 않은 토큰
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: INVALID_TOKEN, message: 유효하지 않은 토큰입니다., data: null }, success: null }
    *       404:
    *         description: 사용자를 찾을 수 없음
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: USER_NOT_FOUND, message: 사용자를 찾을 수 없습니다., data: null }, success: null }
    *       409:
    *         description: 이미 사용 중인 이메일
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: DUPLICATED_EMAIL, message: 이미 사용 중인 이메일입니다., data: null }, success: null }
    */
   updateMe = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -119,7 +149,7 @@ export class UserController {
 
   /**
    * @openapi
-   * /api/users/me:
+   * /api/v1/users/me:
    *   delete:
    *     summary: 회원 탈퇴
    *     tags:
@@ -131,8 +161,18 @@ export class UserController {
    *         description: 탈퇴 성공
    *       401:
    *         description: 유효하지 않은 토큰
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: INVALID_TOKEN, message: 유효하지 않은 토큰입니다., data: null }, success: null }
    *       404:
    *         description: 사용자를 찾을 수 없음
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ApiErrorResponse'
+   *             example: { resultType: FAIL, error: { code: USER_NOT_FOUND, message: 사용자를 찾을 수 없습니다., data: null }, success: null }
    */
   deleteMe = async (req: Request, res: Response, next: NextFunction) => {
     try {

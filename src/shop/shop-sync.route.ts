@@ -31,8 +31,24 @@ const shopSyncRouter = Router();
  *               maxPages: { type: integer, default: 100, maximum: 100 }
  *     responses:
  *       200: { description: 동기화 완료 }
- *       400: { description: 잘못된 동기화 요청 }
- *       502: { description: 소상공인 API 호출 실패 }
+ *       400:
+ *         description: 잘못된 동기화 요청
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: INVALID_SHOP_SYNC_REQUEST, message: 네일샵 동기화 요청을 확인해주세요., data: null }, success: null }
+ *       401:
+ *         description: 동기화 권한 없음
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: UNAUTHORIZED_SHOP_SYNC, message: 네일샵 동기화 권한이 없어요., data: null }, success: null }
+ *       502:
+ *         description: 소상공인 API 호출 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: SHOP_DATA_PROVIDER_ERROR, message: 소상공인 상가 정보를 불러오지 못했어요., data: null }, success: null }
  */
 const createDefaultController = (): ShopSyncController =>
   new ShopSyncController(new ShopSyncService(new HttpSbizShopClient(), new PrismaShopRepository()));

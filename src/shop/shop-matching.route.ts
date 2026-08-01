@@ -78,25 +78,14 @@ const shopMatchingRouter = Router();
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 resultType:
- *                   type: string
- *                   example: FAIL
- *                 error:
- *                   type: object
- *                   properties:
- *                     code:
- *                       type: string
- *                       example: INVALID_SHOP_LOCATION
- *                     message:
- *                       type: string
- *                       example: 샵을 탐색할 위치를 확인해주세요.
- *                     data:
- *                       nullable: true
- *                 success:
- *                   nullable: true
- *                   example: null
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             examples:
+ *               invalidRequest:
+ *                 value: { resultType: FAIL, error: { code: INVALID_SHOP_MATCH_REQUEST, message: 샵 탐색 요청을 확인해주세요., data: null }, success: null }
+ *               invalidLocation:
+ *                 value: { resultType: FAIL, error: { code: INVALID_SHOP_LOCATION, message: 샵을 탐색할 위치를 확인해주세요., data: null }, success: null }
+ *               unsupportedRecommendType:
+ *                 value: { resultType: FAIL, error: { code: UNSUPPORTED_SHOP_RECOMMEND_TYPE, message: 아직 지원하지 않는 샵 탐색 방식입니다., data: null }, success: null }
  */
 shopMatchingRouter.get('/matches', controller.match);
 

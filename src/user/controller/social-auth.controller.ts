@@ -11,7 +11,7 @@ export class SocialAuthController {
 
   /**
    * @openapi
-   * /api/auth/{provider}:
+   * /api/v1/auth/{provider}:
    *   get:
    *     summary: 소셜 로그인 시작 (카카오/네이버 인가 페이지로 리다이렉트)
    *     tags:
@@ -26,6 +26,12 @@ export class SocialAuthController {
    *     responses:
    *       302:
    *         description: 소셜 인가 페이지로 리다이렉트
+   *       400:
+   *         description: 지원하지 않는 소셜 로그인 제공자
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+   *             example: { resultType: FAIL, error: { code: UNSUPPORTED_PROVIDER, message: 지원하지 않는 소셜 로그인입니다., data: null }, success: null }
    */
   start = (provider: SocialProviderKey) => (_req: Request, res: Response, next: NextFunction) => {
     try {
@@ -43,7 +49,7 @@ export class SocialAuthController {
 
   /**
    * @openapi
-   * /api/auth/{provider}/callback:
+   * /api/v1/auth/{provider}/callback:
    *   get:
    *     summary: 소셜 로그인 콜백 (토큰 발급 후 앱 딥링크로 리다이렉트)
    *     tags:
@@ -68,6 +74,26 @@ export class SocialAuthController {
    *     responses:
    *       302:
    *         description: 앱 딥링크(accessToken/refreshToken 포함)로 리다이렉트
+   *       400:
+   *         description: OAuth 요청 검증 실패
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+   *             examples:
+   *               invalidState:
+   *                 value: { resultType: FAIL, error: { code: INVALID_OAUTH_STATE, message: 유효하지 않은 요청입니다. 다시 시도해주세요., data: null }, success: null }
+   *               unsupportedProvider:
+   *                 value: { resultType: FAIL, error: { code: UNSUPPORTED_PROVIDER, message: 지원하지 않는 소셜 로그인입니다., data: null }, success: null }
+   *       502:
+   *         description: 소셜 로그인 제공자 연동 실패
+   *         content:
+   *           application/json:
+   *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+   *             examples:
+   *               tokenExchangeFailed:
+   *                 value: { resultType: FAIL, error: { code: SOCIAL_TOKEN_EXCHANGE_FAILED, message: 소셜 로그인 처리 중 오류가 발생했습니다., data: null }, success: null }
+   *               profileFetchFailed:
+   *                 value: { resultType: FAIL, error: { code: SOCIAL_PROFILE_FETCH_FAILED, message: 소셜 로그인 처리 중 오류가 발생했습니다., data: null }, success: null }
    */
   callback =
     (provider: SocialProviderKey) => async (req: Request, res: Response, next: NextFunction) => {
