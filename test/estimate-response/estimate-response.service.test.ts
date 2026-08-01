@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { CreateSmsMessageRequest } from '../../src/estimate-response/dto/request/create-sms-message-request';
 import type {
   CreatedSmsMessage,
@@ -27,6 +27,7 @@ const smsRequest: CreateSmsMessageRequest = {
 
 class FakeRepository implements EstimateResponseRepository {
   savedEstimateResponse: SaveParsedEstimateResponseInput | null = null;
+  updatedStatus: 'PENDING' | 'FAILED' | null = null;
 
   async createSmsMessage(): Promise<CreatedSmsMessage> {
     return {
@@ -64,6 +65,7 @@ class FakeRepository implements EstimateResponseRepository {
     _smsMessageId: number,
     status: 'PENDING' | 'FAILED',
   ): Promise<CreatedSmsMessage> {
+    this.updatedStatus = status;
     return { ...(await this.createSmsMessage()), status };
   }
 
@@ -190,16 +192,79 @@ describe('EstimateResponseService', () => {
     const service = new EstimateResponseService(repository, parser);
 
     await expect(service.createSmsMessage(smsRequest)).resolves.toMatchObject({
-      status: 'PARSED',
+      status: 'PENDING',
     });
-    expect(repository.savedEstimateResponse).toMatchObject({
-      totalPrice: 55_000,
-      basePrice: 55_000,
-      memo: '제거 포함',
+    await vi.waitFor(() => {
+      expect(repository.savedEstimateResponse).toMatchObject({
+        totalPrice: 55_000,
+        basePrice: 55_000,
+        memo: '제거 포함',
+      });
     });
     expect(repository.savedEstimateResponse?.proposalDateTimes[0]?.toISOString()).toBe(
       '2026-07-20T05:00:00.000Z',
     );
+  });
+
+  it('가격이나 가능 시간이 불완전하면 추가 문자를 기다린다', async () => {
+    const repository = new LinkedSmsRepository();
+    const parser = new FakeParser({
+      canProvideService: true,
+      totalPrice: 55_000,
+      basePrice: null,
+      removalPrice: 0,
+      extraPrice: 0,
+      memo: null,
+      proposalDateTimes: [],
+    });
+
+    await new EstimateResponseService(repository, parser).createSmsMessage(smsRequest);
+
+    await vi.waitFor(() => expect(repository.updatedStatus).toBe('PENDING'));
+    expect(repository.savedEstimateResponse).toBeNull();
+  });
+
+  it('요청 기간 밖 시간은 제외하고 중복 시간은 하나만 저장한다', async () => {
+    const repository = new LinkedSmsRepository();
+    const parser = new FakeParser({
+      canProvideService: true,
+      totalPrice: 55_000,
+      basePrice: 55_000,
+      removalPrice: 0,
+      extraPrice: 0,
+      memo: null,
+      proposalDateTimes: [
+        '2026-07-20T14:00:00+09:00',
+        '2026-07-20T14:00:00+09:00',
+        '2026-07-26T14:00:00+09:00',
+      ],
+    });
+
+    await new EstimateResponseService(repository, parser).createSmsMessage(smsRequest);
+
+    await vi.waitFor(() => expect(repository.savedEstimateResponse).not.toBeNull());
+    expect(repository.savedEstimateResponse?.proposalDateTimes).toHaveLength(1);
+  });
+
+  it('연결된 견적 요청 정보를 찾지 못하면 실패 처리한다', async () => {
+    const repository = new LinkedSmsRepository();
+    repository.findSmsParsingContext = async () => null as never;
+
+    await new EstimateResponseService(repository).createSmsMessage(smsRequest);
+
+    await vi.waitFor(() => expect(repository.updatedStatus).toBe('FAILED'));
+  });
+
+  it('AI 분석에 실패하면 문자 상태를 실패로 변경한다', async () => {
+    const repository = new LinkedSmsRepository();
+    const parser: EstimateResponseParser = {
+      parse: vi.fn().mockRejectedValue(new Error('parser failed')),
+    };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await new EstimateResponseService(repository, parser).createSmsMessage(smsRequest);
+
+    await vi.waitFor(() => expect(repository.updatedStatus).toBe('FAILED'));
   });
 
   it('샵 견적 상세를 조회한다', async () => {

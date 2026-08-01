@@ -83,7 +83,7 @@ export interface EstimateResponseRepository {
   updateSmsMessageStatus(
     smsMessageId: number,
     status: 'PENDING' | 'FAILED',
-    errorMessage: string,
+    errorMessage: string | null,
   ): Promise<CreatedSmsMessage>;
   findProposalTimes(responseId: number): Promise<ProposalTimeRecord[] | null>;
 }
@@ -91,11 +91,14 @@ export interface EstimateResponseRepository {
 const buildPhoneCandidates = (phoneNumber: string): string[] => {
   const digits = phoneNumber.replace(/\D/g, '');
   const candidates = new Set([phoneNumber, digits]);
+  const localDigits = digits.startsWith('82') ? `0${digits.slice(2)}` : digits;
 
-  if (digits.length === 11) {
-    candidates.add(`${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`);
-  } else if (digits.length === 10) {
-    candidates.add(`${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`);
+  candidates.add(localDigits);
+
+  if (localDigits.length === 11) {
+    candidates.add(`${localDigits.slice(0, 3)}-${localDigits.slice(3, 7)}-${localDigits.slice(7)}`);
+  } else if (localDigits.length === 10) {
+    candidates.add(`${localDigits.slice(0, 3)}-${localDigits.slice(3, 6)}-${localDigits.slice(6)}`);
   }
 
   return [...candidates];
@@ -126,7 +129,11 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
       }
 
       const shop = await prisma.shop.findFirst({
-        where: { phoneNumber: { in: buildPhoneCandidates(request.rawPayload.address) } },
+        where: {
+          isDataActive: true,
+          phoneNumber: { in: buildPhoneCandidates(request.rawPayload.address) },
+        },
+        orderBy: { id: 'asc' },
         select: { id: true },
       });
 
@@ -247,7 +254,8 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
         smsMessages: {
           where: { shopId, direction: 'INBOUND' },
           select: { rawPayload: true },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
         },
       },
     });
@@ -259,7 +267,7 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
     return {
       requestStartDate: request.startDate,
       requestEndDate: request.endDate,
-      messages: request.smsMessages.map(({ rawPayload }) => rawPayload),
+      messages: request.smsMessages.reverse().map(({ rawPayload }) => rawPayload),
     };
   }
 
@@ -280,9 +288,6 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           removalPrice: input.removalPrice,
           extraPrice: input.extraPrice,
           memo: input.memo,
-          proposalTimes: {
-            create: input.proposalDateTimes.map((proposalDatetime) => ({ proposalDatetime })),
-          },
         },
         update: {
           totalPrice: input.totalPrice,
@@ -290,13 +295,33 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           removalPrice: input.removalPrice,
           extraPrice: input.extraPrice,
           memo: input.memo,
-          proposalTimes: {
-            deleteMany: {},
-            create: input.proposalDateTimes.map((proposalDatetime) => ({ proposalDatetime })),
-          },
         },
         select: { id: true },
       });
+
+      const selectedProposalTimes = await prisma.shopProposalTime.findMany({
+        where: { proposalId: estimateResponse.id, isSelected: true },
+        select: { proposalDatetime: true },
+      });
+      const selectedTimestamps = new Set(
+        selectedProposalTimes.map(({ proposalDatetime }) => proposalDatetime.getTime()),
+      );
+
+      await prisma.shopProposalTime.deleteMany({
+        where: { proposalId: estimateResponse.id, isSelected: false },
+      });
+
+      const newProposalTimes = input.proposalDateTimes.filter(
+        (proposalDatetime) => !selectedTimestamps.has(proposalDatetime.getTime()),
+      );
+      if (newProposalTimes.length > 0) {
+        await prisma.shopProposalTime.createMany({
+          data: newProposalTimes.map((proposalDatetime) => ({
+            proposalId: estimateResponse.id,
+            proposalDatetime,
+          })),
+        });
+      }
 
       await prisma.smsMessage.updateMany({
         where: { requestId, shopId, direction: 'INBOUND' },
@@ -314,7 +339,7 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
   async updateSmsMessageStatus(
     smsMessageId: number,
     status: 'PENDING' | 'FAILED',
-    errorMessage: string,
+    errorMessage: string | null,
   ): Promise<CreatedSmsMessage> {
     return getPrisma().smsMessage.update({
       where: { id: smsMessageId },

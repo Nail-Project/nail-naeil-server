@@ -9,7 +9,7 @@ export const createSmsMessageRequestSchema = z.object({
       body: z.string().trim().min(1).max(10_000),
       receivedAt: z.iso.datetime({ offset: true }),
     })
-    .loose(),
+    .catchall(z.json()),
 });
 
 export type CreateSmsMessageRequest = z.infer<typeof createSmsMessageRequestSchema>;

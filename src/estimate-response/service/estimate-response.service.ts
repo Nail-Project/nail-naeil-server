@@ -14,76 +14,18 @@ import {
 import type { EstimateResponseRepository } from '../repository/estimate-response.repository';
 
 export class EstimateResponseService {
+  private readonly processingSmsMessageIds = new Set<number>();
+
   constructor(
     private readonly repository: EstimateResponseRepository,
     private readonly parser: EstimateResponseParser = new OpenAiEstimateResponseParser(),
   ) {}
 
   async createSmsMessage(request: CreateSmsMessageRequest): Promise<CreateSmsMessageResponse> {
-    let message = await this.repository.createSmsMessage(request);
+    const message = await this.repository.createSmsMessage(request);
 
-    if (message.requestId && message.shopId) {
-      try {
-        const context = await this.repository.findSmsParsingContext(
-          message.requestId,
-          message.shopId,
-        );
-
-        if (!context) {
-          message = await this.repository.updateSmsMessageStatus(
-            message.id,
-            'FAILED',
-            '견적 요청 정보를 찾을 수 없습니다.',
-          );
-        } else {
-          const parsed = await this.parser.parse({
-            messages: context.messages
-              .map((payload) => this.readSmsPayload(payload).body)
-              .filter((body) => body.length > 0),
-            receivedAt: request.rawPayload.receivedAt,
-            requestStartDate: context.requestStartDate.toISOString().slice(0, 10),
-            requestEndDate: context.requestEndDate.toISOString().slice(0, 10),
-          });
-          const proposalDateTimes = this.filterProposalDateTimes(
-            parsed.proposalDateTimes,
-            context.requestStartDate,
-            context.requestEndDate,
-          );
-
-          if (
-            !parsed.canProvideService ||
-            parsed.totalPrice === null ||
-            proposalDateTimes.length === 0
-          ) {
-            message = await this.repository.updateSmsMessageStatus(
-              message.id,
-              'PENDING',
-              '가격과 예약 가능 시간이 모두 확인될 때까지 추가 답장을 기다립니다.',
-            );
-          } else {
-            message = await this.repository.saveParsedEstimateResponse(
-              message.id,
-              message.requestId,
-              message.shopId,
-              {
-                totalPrice: parsed.totalPrice,
-                basePrice: parsed.basePrice ?? parsed.totalPrice,
-                removalPrice: parsed.removalPrice,
-                extraPrice: parsed.extraPrice,
-                memo: parsed.memo,
-                proposalDateTimes,
-              },
-            );
-          }
-        }
-      } catch (error) {
-        console.error('[EstimateResponseService] 문자 견적 분석 실패:', error);
-        message = await this.repository.updateSmsMessageStatus(
-          message.id,
-          'FAILED',
-          '문자 견적 분석에 실패했습니다.',
-        );
-      }
+    if (message.requestId && message.shopId && message.status === 'PENDING') {
+      this.dispatchSmsParsing(message, request.rawPayload.receivedAt);
     }
 
     return {
@@ -94,6 +36,102 @@ export class EstimateResponseService {
       status: message.status,
       createdAt: message.createdAt.toISOString(),
     };
+  }
+
+  private dispatchSmsParsing(
+    message: Awaited<ReturnType<EstimateResponseRepository['createSmsMessage']>>,
+    receivedAt: string,
+  ): void {
+    if (this.processingSmsMessageIds.has(message.id)) {
+      return;
+    }
+
+    this.processingSmsMessageIds.add(message.id);
+    void this.processSmsMessage(message, receivedAt)
+      .catch((error) => {
+        console.error('[EstimateResponseService] 문자 견적 상태 변경 실패', {
+          smsMessageId: message.id,
+          errorType: error instanceof Error ? error.name : typeof error,
+        });
+      })
+      .finally(() => {
+        this.processingSmsMessageIds.delete(message.id);
+      });
+  }
+
+  private async processSmsMessage(
+    message: Awaited<ReturnType<EstimateResponseRepository['createSmsMessage']>>,
+    receivedAt: string,
+  ): Promise<void> {
+    if (!message.requestId || !message.shopId) {
+      return;
+    }
+
+    try {
+      const context = await this.repository.findSmsParsingContext(
+        message.requestId,
+        message.shopId,
+      );
+
+      if (!context) {
+        await this.repository.updateSmsMessageStatus(
+          message.id,
+          'FAILED',
+          '견적 요청 정보를 찾을 수 없습니다.',
+        );
+        return;
+      }
+
+      const parsed = await this.parser.parse({
+        messages: context.messages.map((payload) => this.readSmsBody(payload)).filter(Boolean),
+        receivedAt,
+        requestStartDate: this.formatSeoulDate(context.requestStartDate),
+        requestEndDate: this.formatSeoulDate(context.requestEndDate),
+      });
+      const proposalDateTimes = this.filterProposalDateTimes(
+        parsed.proposalDateTimes,
+        context.requestStartDate,
+        context.requestEndDate,
+      );
+
+      if (
+        !parsed.canProvideService ||
+        parsed.totalPrice === null ||
+        proposalDateTimes.length === 0
+      ) {
+        await this.repository.updateSmsMessageStatus(
+          message.id,
+          'PENDING',
+          '가격과 예약 가능 시간이 모두 확인될 때까지 추가 답장을 기다립니다.',
+        );
+        return;
+      }
+
+      await this.repository.saveParsedEstimateResponse(
+        message.id,
+        message.requestId,
+        message.shopId,
+        {
+          totalPrice: parsed.totalPrice,
+          basePrice: parsed.basePrice ?? parsed.totalPrice,
+          removalPrice: parsed.removalPrice,
+          extraPrice: parsed.extraPrice,
+          memo: parsed.memo,
+          proposalDateTimes,
+        },
+      );
+    } catch (error) {
+      console.error('[EstimateResponseService] 문자 견적 분석 실패', {
+        smsMessageId: message.id,
+        errorType: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      });
+      await this.repository.updateSmsMessageStatus(
+        message.id,
+        'FAILED',
+        '문자 견적 분석에 실패했습니다.',
+      );
+    }
   }
 
   async getDetail(responseId: number, userId: number): Promise<EstimateResponseDetailResponse> {
@@ -184,17 +222,14 @@ export class EstimateResponseService {
     };
   }
 
-  private readSmsPayload(rawPayload: unknown): { body: string; receivedAt: string | null } {
+  private readSmsBody(rawPayload: unknown): string {
     if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
-      return { body: '', receivedAt: null };
+      return '';
     }
 
     const payload = rawPayload as Record<string, unknown>;
 
-    return {
-      body: typeof payload.body === 'string' ? payload.body : '',
-      receivedAt: typeof payload.receivedAt === 'string' ? payload.receivedAt : null,
-    };
+    return typeof payload.body === 'string' ? payload.body : '';
   }
 
   private filterProposalDateTimes(

@@ -25,12 +25,19 @@ describe('createSmsMessageRequestSchema', () => {
     ).toBe(false);
   });
 
-  it('발신번호 또는 본문 또는 수신시각이 없으면 거부한다', () => {
+  it.each(['address', 'body', 'receivedAt'] as const)('%s가 없으면 거부한다', (field) => {
+    const rawPayload: Partial<Record<'address' | 'body' | 'receivedAt', string>> = {
+      address: '01012345678',
+      body: '견적 문자',
+      receivedAt: '2026-07-18T13:20:38+09:00',
+    };
+    delete rawPayload[field];
+
     expect(
       createSmsMessageRequestSchema.safeParse({
         source: 'android-device-a1b2c3',
         messageId: 'android-sms-1042',
-        rawPayload: { body: '견적 문자' },
+        rawPayload,
       }).success,
     ).toBe(false);
   });
@@ -40,7 +47,12 @@ describe('createSmsMessageRequestSchema', () => {
       createSmsMessageRequestSchema.safeParse({
         source: 'android-device-a1b2c3',
         messageId: 'android-sms-1042',
-        rawPayload: { invalid: undefined },
+        rawPayload: {
+          address: '01012345678',
+          body: '견적 문자',
+          receivedAt: '2026-07-18T13:20:38+09:00',
+          invalid: undefined,
+        },
       }).success,
     ).toBe(false);
   });
