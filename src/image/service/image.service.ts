@@ -2,7 +2,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { createS3Client, getS3Bucket, S3_REGION } from '../../infra/s3';
+import { createS3Client, S3_REGION } from '../../infra/s3';
 import { PhotoUploadFailedError } from '../../common/errors/common.error';
 import { InvalidImageFormatError, InvalidImageTypeError } from '../error/image.error';
 
@@ -41,7 +41,9 @@ function hasValidImageSignature(buffer: Buffer): boolean {
 // uploadImages()에서 매직 바이트 검증 후 AWS SDK로 직접 S3에 업로드한다.
 export class ImageService {
   private readonly s3 = createS3Client();
-  private readonly bucket = getS3Bucket();
+  // 빈 문자열이면 uploadImages()에서 PhotoUploadFailedError를 던진다.
+  // getS3Bucket()을 필드 초기화에 쓰면 모듈 로드 시점에 throw되어 테스트 앱 기동이 실패한다.
+  private readonly bucket = process.env.S3_BUCKET_NAME ?? '';
   private readonly region = S3_REGION;
 
   // multer 미들웨어 생성 - image.route.ts에서 호출해 라우터에 등록
@@ -62,6 +64,8 @@ export class ImageService {
   // 업로드된 파일의 매직 바이트를 검사하고 S3에 저장 후 URL 목록 반환
   // 파일 순서를 보장하여 반환한다.
   async uploadImages(files: Express.Multer.File[]): Promise<string[]> {
+    if (!this.bucket) throw new PhotoUploadFailedError();
+
     // 1단계: 전체 파일 매직 바이트 일괄 검증
     // 업로드 전에 먼저 걸러내 S3에 참조되지 않는 객체가 남지 않도록 한다.
     for (const file of files) {
