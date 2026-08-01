@@ -12,9 +12,23 @@ export class ImageRequiredError extends AppError {
   }
 }
 
-// fileFilter에서 이미지 타입이 아닌 파일을 걸러낼 때 던지는 에러
-// wrapMulter에서 instanceof로 판별해 ImageRequiredError(400)로 변환
-// 문자열 비교 대신 클래스 타입으로 판별해 메시지 변경 시 오작동 방지
+// 이미지 형식이 유효하지 않은 경우
+// · MIME 타입이 image/*가 아닌 경우 (fileFilter에서 InvalidImageTypeError → 이 에러로 변환)
+// · 매직 바이트 검사에서 실제 이미지 파일이 아닌 경우 (uploadImages에서 직접 throw)
+export class InvalidImageFormatError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'INVALID_IMAGE_FORMAT',
+      statusCode: 400,
+      message: '이미지 파일만 업로드할 수 있습니다.',
+      data,
+    });
+  }
+}
+
+// multer fileFilter 내부에서 던지는 신호용 에러
+// multer는 fileFilter의 cb에 Error를 넣어야 전달되므로 일반 Error를 사용
+// wrapMulter에서 instanceof로 판별해 InvalidImageFormatError(400)로 변환
 export class InvalidImageTypeError extends Error {
   constructor() {
     super('이미지 파일만 업로드할 수 있습니다.');

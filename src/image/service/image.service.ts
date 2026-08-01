@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { PhotoUploadFailedError } from '../../common/errors/common.error';
-import { InvalidImageTypeError } from '../error/image.error';
+import { InvalidImageFormatError, InvalidImageTypeError } from '../error/image.error';
 
 // ─── 매직 바이트 검사 ───────────────────────────────────────────────────────────
 // 클라이언트가 Content-Type 헤더를 임의로 위조할 수 있으므로
@@ -85,7 +85,7 @@ export class ImageService {
     for (const file of files) {
       // 2차 검사: 매직 바이트 (MIME 타입 위조 방지)
       if (!hasValidImageSignature(file.buffer)) {
-        throw new InvalidImageTypeError();
+        throw new InvalidImageFormatError();
       }
 
       const ext = path.extname(file.originalname);
