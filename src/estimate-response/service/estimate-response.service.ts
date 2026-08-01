@@ -3,18 +3,88 @@ import type { CreateSmsMessageResponse } from '../dto/response/create-sms-messag
 import type { EstimateResponseDetailResponse } from '../dto/response/estimate-response-detail-response';
 import type { EstimateResponseListResponse } from '../dto/response/estimate-response-list-response';
 import type { ProposalTimeListResponse } from '../dto/response/proposal-time-list-response';
-import { EstimateResponseNotFoundError, EstimateResponseForbiddenError } from '../errors/estimate-response.error';
+import {
+  OpenAiEstimateResponseParser,
+  type EstimateResponseParser,
+} from '../../external/openai/estimate-response-parser.client';
+import {
+  EstimateResponseNotFoundError,
+  EstimateResponseForbiddenError,
+} from '../errors/estimate-response.error';
 import type { EstimateResponseRepository } from '../repository/estimate-response.repository';
 
 export class EstimateResponseService {
-  constructor(private readonly repository: EstimateResponseRepository) {}
+  constructor(
+    private readonly repository: EstimateResponseRepository,
+    private readonly parser: EstimateResponseParser = new OpenAiEstimateResponseParser(),
+  ) {}
 
   async createSmsMessage(request: CreateSmsMessageRequest): Promise<CreateSmsMessageResponse> {
-    const message = await this.repository.createSmsMessage(request);
+    let message = await this.repository.createSmsMessage(request);
 
-    // TODO: [eun] SMS 원문에서 가격, 메모, 예약 가능 시간을 파싱한다.
-    // TODO: [eun] 파싱 결과로 EstimateResponse와 ShopProposalTime을 트랜잭션으로 생성한다.
-    // TODO: [eun] 처리 결과에 따라 SmsMessage를 PARSED 또는 FAILED로 변경하고 실패 사유를 저장한다.
+    if (message.requestId && message.shopId) {
+      try {
+        const context = await this.repository.findSmsParsingContext(
+          message.requestId,
+          message.shopId,
+        );
+
+        if (!context) {
+          message = await this.repository.updateSmsMessageStatus(
+            message.id,
+            'FAILED',
+            '견적 요청 정보를 찾을 수 없습니다.',
+          );
+        } else {
+          const parsed = await this.parser.parse({
+            messages: context.messages
+              .map((payload) => this.readSmsPayload(payload).body)
+              .filter((body) => body.length > 0),
+            receivedAt: request.rawPayload.receivedAt,
+            requestStartDate: context.requestStartDate.toISOString().slice(0, 10),
+            requestEndDate: context.requestEndDate.toISOString().slice(0, 10),
+          });
+          const proposalDateTimes = this.filterProposalDateTimes(
+            parsed.proposalDateTimes,
+            context.requestStartDate,
+            context.requestEndDate,
+          );
+
+          if (
+            !parsed.canProvideService ||
+            parsed.totalPrice === null ||
+            proposalDateTimes.length === 0
+          ) {
+            message = await this.repository.updateSmsMessageStatus(
+              message.id,
+              'PENDING',
+              '가격과 예약 가능 시간이 모두 확인될 때까지 추가 답장을 기다립니다.',
+            );
+          } else {
+            message = await this.repository.saveParsedEstimateResponse(
+              message.id,
+              message.requestId,
+              message.shopId,
+              {
+                totalPrice: parsed.totalPrice,
+                basePrice: parsed.basePrice ?? parsed.totalPrice,
+                removalPrice: parsed.removalPrice,
+                extraPrice: parsed.extraPrice,
+                memo: parsed.memo,
+                proposalDateTimes,
+              },
+            );
+          }
+        }
+      } catch (error) {
+        console.error('[EstimateResponseService] 문자 견적 분석 실패:', error);
+        message = await this.repository.updateSmsMessageStatus(
+          message.id,
+          'FAILED',
+          '문자 견적 분석에 실패했습니다.',
+        );
+      }
+    }
 
     return {
       id: message.id,
@@ -112,5 +182,52 @@ export class EstimateResponseService {
         isSelected: proposalTime.isSelected,
       })),
     };
+  }
+
+  private readSmsPayload(rawPayload: unknown): { body: string; receivedAt: string | null } {
+    if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
+      return { body: '', receivedAt: null };
+    }
+
+    const payload = rawPayload as Record<string, unknown>;
+
+    return {
+      body: typeof payload.body === 'string' ? payload.body : '',
+      receivedAt: typeof payload.receivedAt === 'string' ? payload.receivedAt : null,
+    };
+  }
+
+  private filterProposalDateTimes(
+    dateTimes: string[],
+    requestStartDate: Date,
+    requestEndDate: Date,
+  ): Date[] {
+    const startDate = this.formatSeoulDate(requestStartDate);
+    const endDate = this.formatSeoulDate(requestEndDate);
+    const uniqueTimes = new Map<number, Date>();
+
+    for (const value of dateTimes) {
+      const dateTime = new Date(value);
+      if (Number.isNaN(dateTime.getTime())) {
+        continue;
+      }
+
+      const proposalDate = this.formatSeoulDate(dateTime);
+
+      if (proposalDate >= startDate && proposalDate <= endDate) {
+        uniqueTimes.set(dateTime.getTime(), dateTime);
+      }
+    }
+
+    return [...uniqueTimes.values()].sort((a, b) => a.getTime() - b.getTime());
+  }
+
+  private formatSeoulDate(date: Date): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
   }
 }

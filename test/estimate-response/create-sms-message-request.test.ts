@@ -25,6 +25,16 @@ describe('createSmsMessageRequestSchema', () => {
     ).toBe(false);
   });
 
+  it('발신번호 또는 본문 또는 수신시각이 없으면 거부한다', () => {
+    expect(
+      createSmsMessageRequestSchema.safeParse({
+        source: 'android-device-a1b2c3',
+        messageId: 'android-sms-1042',
+        rawPayload: { body: '견적 문자' },
+      }).success,
+    ).toBe(false);
+  });
+
   it('JSON으로 저장할 수 없는 값은 거부한다', () => {
     expect(
       createSmsMessageRequestSchema.safeParse({

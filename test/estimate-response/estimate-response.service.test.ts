@@ -6,8 +6,14 @@ import type {
   EstimateResponseListRecord,
   EstimateResponseRepository,
   ProposalTimeRecord,
+  SaveParsedEstimateResponseInput,
+  SmsParsingContext,
 } from '../../src/estimate-response/repository/estimate-response.repository';
 import { EstimateResponseService } from '../../src/estimate-response/service/estimate-response.service';
+import type {
+  EstimateResponseParser,
+  ParsedEstimateResponse,
+} from '../../src/external/openai/estimate-response-parser.client';
 
 const smsRequest: CreateSmsMessageRequest = {
   source: 'android-device-a1b2c3',
@@ -20,6 +26,8 @@ const smsRequest: CreateSmsMessageRequest = {
 };
 
 class FakeRepository implements EstimateResponseRepository {
+  savedEstimateResponse: SaveParsedEstimateResponseInput | null = null;
+
   async createSmsMessage(): Promise<CreatedSmsMessage> {
     return {
       id: 10,
@@ -27,8 +35,36 @@ class FakeRepository implements EstimateResponseRepository {
       messageId: 'android-sms-1042',
       direction: 'INBOUND',
       status: 'PENDING',
+      requestId: null,
+      shopId: null,
       createdAt: new Date('2026-07-18T04:21:00.000Z'),
     };
+  }
+
+  async findSmsParsingContext(): Promise<SmsParsingContext | null> {
+    return null;
+  }
+
+  async saveParsedEstimateResponse(
+    _smsMessageId: number,
+    _requestId: number,
+    _shopId: number,
+    input: SaveParsedEstimateResponseInput,
+  ): Promise<CreatedSmsMessage> {
+    this.savedEstimateResponse = input;
+    return {
+      ...(await this.createSmsMessage()),
+      requestId: 1,
+      shopId: 2,
+      status: 'PARSED',
+    };
+  }
+
+  async updateSmsMessageStatus(
+    _smsMessageId: number,
+    status: 'PENDING' | 'FAILED',
+  ): Promise<CreatedSmsMessage> {
+    return { ...(await this.createSmsMessage()), status };
   }
 
   async findDetail(responseId: number): Promise<EstimateResponseDetail | null> {
@@ -96,6 +132,37 @@ class FakeRepository implements EstimateResponseRepository {
   }
 }
 
+class LinkedSmsRepository extends FakeRepository {
+  async createSmsMessage(): Promise<CreatedSmsMessage> {
+    return {
+      id: 10,
+      source: 'android-device-a1b2c3',
+      messageId: 'android-sms-1042',
+      direction: 'INBOUND',
+      status: 'PENDING',
+      requestId: 1,
+      shopId: 2,
+      createdAt: new Date('2026-07-18T04:21:00.000Z'),
+    };
+  }
+
+  async findSmsParsingContext(): Promise<SmsParsingContext> {
+    return {
+      requestStartDate: new Date('2026-07-20T00:00:00.000Z'),
+      requestEndDate: new Date('2026-07-25T00:00:00.000Z'),
+      messages: [{ body: '제거 포함 55000원이에요.' }, { body: '7월 20일 오후 2시 가능해요.' }],
+    };
+  }
+}
+
+class FakeParser implements EstimateResponseParser {
+  constructor(private readonly result: ParsedEstimateResponse) {}
+
+  async parse(): Promise<ParsedEstimateResponse> {
+    return this.result;
+  }
+}
+
 describe('EstimateResponseService', () => {
   it('SMS 원본 저장 결과를 외부 응답 객체로 변환한다', async () => {
     const service = new EstimateResponseService(new FakeRepository());
@@ -107,6 +174,32 @@ describe('EstimateResponseService', () => {
       direction: 'INBOUND',
       status: 'PENDING',
     });
+  });
+
+  it('여러 문자에서 추출한 견적과 예약 가능 시간을 저장한다', async () => {
+    const repository = new LinkedSmsRepository();
+    const parser = new FakeParser({
+      canProvideService: true,
+      totalPrice: 55_000,
+      basePrice: null,
+      removalPrice: 0,
+      extraPrice: 0,
+      memo: '제거 포함',
+      proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
+    });
+    const service = new EstimateResponseService(repository, parser);
+
+    await expect(service.createSmsMessage(smsRequest)).resolves.toMatchObject({
+      status: 'PARSED',
+    });
+    expect(repository.savedEstimateResponse).toMatchObject({
+      totalPrice: 55_000,
+      basePrice: 55_000,
+      memo: '제거 포함',
+    });
+    expect(repository.savedEstimateResponse?.proposalDateTimes[0]?.toISOString()).toBe(
+      '2026-07-20T05:00:00.000Z',
+    );
   });
 
   it('샵 견적 상세를 조회한다', async () => {
