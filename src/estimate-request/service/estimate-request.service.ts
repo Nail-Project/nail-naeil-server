@@ -39,6 +39,23 @@ function extractSmsErrorReason(error: unknown): string {
   return '알 수 없는 오류';
 }
 
+// ─── S3 URL 검증 ────────────────────────────────────────────────────────────────
+// 허용 호스트: {bucket}.s3.{region}.amazonaws.com (자체 버킷만 허용)
+// 허용 경로 형식: images/YYYY-MM-DD/<uuid>.<ext>
+// URL이 이 형식을 따르지 않으면 S3 키 추출 없이 건너뜀
+function isAllowedS3ImageUrl(imageUrl: string): boolean {
+  try {
+    const urlObj = new URL(imageUrl);
+    const bucket = process.env.S3_BUCKET_NAME ?? '';
+    const region = process.env.AWS_REGION ?? 'ap-northeast-2';
+    if (urlObj.hostname !== `${bucket}.s3.${region}.amazonaws.com`) return false;
+    const key = urlObj.pathname.replace(/^\//, '');
+    return /^images\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\.[a-zA-Z]+$/.test(key);
+  } catch {
+    return false;
+  }
+}
+
 // ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
 class SmsService {
   private readonly client: SolapiMessageService | null;
@@ -71,6 +88,11 @@ class SmsService {
     const fileIds: string[] = [];
 
     for (const imageUrl of imageUrls) {
+      // 허용된 S3 URL인지 검증 (다른 버킷·경로 접근 차단)
+      if (!isAllowedS3ImageUrl(imageUrl)) {
+        console.warn(`[SmsService] 허용되지 않은 이미지 URL, 건너뜀: ${imageUrl}`);
+        continue;
+      }
       // S3 URL에서 key 추출 (예: images/2026-08-01/uuid.jpg)
       const urlObj = new URL(imageUrl);
       const key = urlObj.pathname.replace(/^\//, '');
