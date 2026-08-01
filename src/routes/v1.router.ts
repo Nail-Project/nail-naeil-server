@@ -5,6 +5,9 @@ import reservationRouter from '../reservation/reservation.route';
 import shopMatchingRouter from '../shop/shop-matching.route';
 import shopQueryRouter from '../shop/shop-query.route';
 import imageRouter from '../image/image.route';
+import userAuthRouter from '../user/route/user-auth.route';
+import userRouter from '../user/route/user.route';
+import socialAuthRouter from '../user/route/social-auth.route';
 
 const v1Router = Router();
 
@@ -14,5 +17,8 @@ v1Router.use('/reserve', reservationRouter);
 v1Router.use('/shops', shopMatchingRouter);
 v1Router.use('/shops', shopQueryRouter);
 v1Router.use('/image', imageRouter);
+v1Router.use('/users', userAuthRouter);
+v1Router.use('/users', userRouter);
+v1Router.use('/auth', socialAuthRouter);
 
 export default v1Router;

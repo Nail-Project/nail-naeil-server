@@ -87,15 +87,36 @@ const estimateResponseRouter = Router();
  *                   properties:
  *                     code:
  *                       type: string
- *                       example: INVALID_ESTIMATE_REQUEST
+ *                       example: INVALID_ESTIMATE_RESPONSE
  *                     message:
  *                       type: string
- *                       example: 유효하지 않은 요청입니다.
+ *                       example: 견적 응답 형식이 올바르지 않아요.
  *                     data:
  *                       nullable: true
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       403:
+ *         description: 본인의 견적 요청이 아님
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: ESTIMATE_RESPONSE_FORBIDDEN, message: 접근 권한이 없습니다., data: null }, success: null }
+ *       404:
+ *         description: 견적 응답을 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: ESTIMATE_RESPONSE_NOT_FOUND, message: 견적 응답을 찾을 수 없어요., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             examples:
+ *               unauthorized: { value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null } }
+ *               tokenExpired: { value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null } }
+ *               tokenInvalid: { value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null } }
  */
 /**
  * @openapi
@@ -264,6 +285,27 @@ const estimateResponseRouter = Router();
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       400:
+ *         description: 잘못된 견적 응답 식별자
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: INVALID_ESTIMATE_RESPONSE, message: 견적 응답 형식이 올바르지 않아요., data: null }, success: null }
+ *       403:
+ *         description: 본인의 견적 요청이 아님
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: ESTIMATE_RESPONSE_FORBIDDEN, message: 접근 권한이 없습니다., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             examples:
+ *               unauthorized: { value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null } }
+ *               tokenExpired: { value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null } }
+ *               tokenInvalid: { value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null } }
  */
 /**
  * @openapi
@@ -365,6 +407,27 @@ const estimateResponseRouter = Router();
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       400:
+ *         description: 잘못된 견적 응답 식별자
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: INVALID_ESTIMATE_RESPONSE, message: 견적 응답 형식이 올바르지 않아요., data: null }, success: null }
+ *       403:
+ *         description: 본인의 견적 요청이 아님
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: ESTIMATE_RESPONSE_FORBIDDEN, message: 접근 권한이 없습니다., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             examples:
+ *               unauthorized: { value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null } }
+ *               tokenExpired: { value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null } }
+ *               tokenInvalid: { value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null } }
  */
 const registerRoutes = (router: Router, routeController: EstimateResponseController): Router => {
   router.get('/result/:request_id', authMiddleware, routeController.getList);

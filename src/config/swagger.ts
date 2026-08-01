@@ -27,6 +27,41 @@ const swaggerSpec = swaggerJsdoc({
           bearerFormat: 'JWT',
         },
       },
+      schemas: {
+        ApiErrorResponse: {
+          type: 'object',
+          required: ['resultType', 'error', 'success'],
+          properties: {
+            resultType: {
+              type: 'string',
+              enum: ['FAIL'],
+              example: 'FAIL',
+            },
+            error: {
+              type: 'object',
+              required: ['code', 'message', 'data'],
+              properties: {
+                code: {
+                  type: 'string',
+                  description: '클라이언트가 오류 원인을 구분할 때 사용하는 서버 에러 코드',
+                },
+                message: {
+                  type: 'string',
+                  description: '사용자에게 전달 가능한 오류 메시지',
+                },
+                data: {
+                  nullable: true,
+                  description: '검증 오류 등 에러별 추가 정보',
+                },
+              },
+            },
+            success: {
+              nullable: true,
+              example: null,
+            },
+          },
+        },
+      },
     },
   },
   apis: ['src/**/*.ts'],

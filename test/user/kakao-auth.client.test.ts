@@ -5,7 +5,7 @@ const client = () =>
   new KakaoAuthClient(
     'rest-api-key',
     'client-secret',
-    'http://localhost:3000/api/auth/kakao/callback',
+    'http://localhost:3000/api/v1/auth/kakao/callback',
   );
 
 describe('KakaoAuthClient', () => {
@@ -19,7 +19,7 @@ describe('KakaoAuthClient', () => {
     expect(url.origin + url.pathname).toBe('https://kauth.kakao.com/oauth/authorize');
     expect(url.searchParams.get('client_id')).toBe('rest-api-key');
     expect(url.searchParams.get('redirect_uri')).toBe(
-      'http://localhost:3000/api/auth/kakao/callback',
+      'http://localhost:3000/api/v1/auth/kakao/callback',
     );
     expect(url.searchParams.get('response_type')).toBe('code');
     expect(url.searchParams.get('state')).toBe('state-123');

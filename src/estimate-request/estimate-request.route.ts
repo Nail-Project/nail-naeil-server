@@ -168,6 +168,15 @@ const estimateRequestRouter = Router();
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             examples:
+ *               unauthorized: { value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null } }
+ *               tokenExpired: { value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null } }
+ *               tokenInvalid: { value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null } }
  */
 
 /**
@@ -258,6 +267,21 @@ const estimateRequestRouter = Router();
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       500:
+ *         description: 견적 목록 조회 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: ESTIMATE_REQUEST_FAILED, message: 견적 요청을 보내지 못했어요. 다시 시도해주세요., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             examples:
+ *               unauthorized: { value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null } }
+ *               tokenExpired: { value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null } }
+ *               tokenInvalid: { value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null } }
  */
 
 // 두 엔드포인트 모두 로그인한 사용자만 접근 가능하다.

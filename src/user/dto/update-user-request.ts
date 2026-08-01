@@ -1,4 +1,4 @@
-// PATCH /api/users/me - 회원정보 수정 Request Body 검증 스키마
+// PATCH /api/v1/users/me - 회원정보 수정 Request Body 검증 스키마
 // 수정 가능한 필드만 정의하며, 부분 수정을 위해 모든 필드를 optional로 둔다.
 import { z } from 'zod';
 

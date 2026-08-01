@@ -11,8 +11,8 @@ import {
   DuplicatedLoginIdError,
   DuplicatedEmailError,
   InvalidCredentialsError,
-  InvalidTokenError,
 } from '../error/user.error';
+import { TokenExpiredError, TokenInvalidError } from '../../common/errors/common.error';
 
 const SALT_ROUNDS = 10;
 
@@ -21,8 +21,10 @@ const SALT_ROUNDS = 10;
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('timing-attack-mitigation', SALT_ROUNDS);
 
 export class UserAuthService {
-  private readonly userRepository = new UserRepository();
-  private readonly tokenService = new TokenService(this.userRepository);
+  constructor(
+    private readonly userRepository = new UserRepository(),
+    private readonly tokenService = new TokenService(userRepository),
+  ) {}
 
   async signup(request: SignupUserRequest): Promise<SignupUserResponse> {
     if (await this.userRepository.findLocalByLoginId(request.loginId)) {
@@ -82,17 +84,20 @@ export class UserAuthService {
         sub: number;
         role: string;
       };
-    } catch {
+    } catch (error) {
       // 서명이 깨졌거나 만료된 토큰이 DB에 남아 있으면 정리
       await this.userRepository.deleteRefreshToken(tokenHash);
-      throw new InvalidTokenError();
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new TokenExpiredError();
+      }
+      throw new TokenInvalidError();
     }
 
     // rotation: 조회-삭제를 분리하지 않고 삭제(consume)를 원자적으로 수행,
     // 정확히 1건 삭제된 경우에만 재발급한다 (동시 요청 중복 발급 방지).
     const { count } = await this.userRepository.deleteRefreshToken(tokenHash);
     if (count !== 1) {
-      throw new InvalidTokenError();
+      throw new TokenInvalidError();
     }
 
     return this.tokenService.issueTokens(payload.sub, payload.role);
