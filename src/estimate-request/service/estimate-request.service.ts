@@ -1,55 +1,115 @@
+import path from 'path';
+import fs from 'fs';
+import { SolapiMessageService } from 'solapi';
 import { EstimateRequestRepository } from '../repository/estimate-request.repository';
 import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request.dto';
 import { CreateEstimateResponseDto } from '../dto/response/create-estimate-response.dto';
 import { GetEstimatesResponseDto } from '../dto/response/get-estimates-response.dto';
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
 
-// ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
-// SMS_ENABLED=true 일 때만 실제 발송을 시도한다.
-// SMS API 확정 전까지는 .env에서 SMS_ENABLED를 설정하지 않으면 발송을 건너뛴다.
-// TODO: [yej] SMS API 확정 후 아래 항목을 실제 값으로 교체한다.
-//   - SMS_API_URL: CoolSMS / NCP 등 확정된 서비스의 엔드포인트
-//   - SMS_API_KEY: 발급받은 API 키 (환경변수로 관리)
-//   - SMS_FROM: 릴레이 기기 전화번호 (발신번호 등록 필요)
+// ─── SMS 설정 ───────────────────────────────────────────────────────────────────
 const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
-const SMS_API_URL = process.env.SMS_API_URL ?? '';
-const SMS_API_KEY = process.env.SMS_API_KEY ?? '';
 const SMS_FROM = process.env.SMS_FROM ?? '';
+const SMS_TIMEOUT_MS = 10_000; // 1회 발송 최대 대기 시간
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`SMS 타임아웃: ${ms}ms 초과`)), ms)
+    ),
+  ]);
+}
+
+// Solapi 에러에서 사용자에게 전달할 실패 이유를 추출한다.
+// DefaultError / MessageNotReceivedError: errorCode + errorMessage 필드 보유
+// 그 외 에러: message 필드 사용
+function extractSmsErrorReason(error: unknown): string {
+  if (error instanceof Error) {
+    const solapiError = error as Error & { errorCode?: string; errorMessage?: string };
+    if (solapiError.errorMessage) {
+      return solapiError.errorCode
+        ? `[${solapiError.errorCode}] ${solapiError.errorMessage}`
+        : solapiError.errorMessage;
+    }
+    return error.message;
+  }
+  return '알 수 없는 오류';
+}
+
+// ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
 class SmsService {
-  // SMS API로 문자 발송
-  // SMS_ENABLED가 false면 로그만 출력하고 실제 발송은 건너뛴다.
-  // TODO: [yej] SMS API 확정 후 실제 SDK / HTTP 클라이언트로 교체한다.
-  //   예) import coolsms from 'coolsms-node-sdk';
-  async send(to: string, text: string): Promise<void> {
-    if (!SMS_ENABLED) {
-      console.log('[SmsService] SMS 미연동 상태 (SMS_ENABLED=false). 발송 건너뜀.');
+  private readonly client: SolapiMessageService | null;
+
+  constructor() {
+    const apiKey = process.env.COOLSMS_API_KEY;
+    const apiSecret = process.env.COOLSMS_API_SECRET;
+
+    if (apiKey && apiSecret) {
+      this.client = new SolapiMessageService(apiKey, apiSecret);
+    } else {
+      this.client = null;
+      console.warn('[SmsService] COOLSMS_API_KEY 또는 COOLSMS_API_SECRET이 설정되지 않았습니다.');
+    }
+  }
+
+  // 이미지 URL → Solapi fileId 변환 (업로드)
+  // 파일이 없거나 업로드 실패한 이미지는 건너뛴다.
+  private async uploadImages(imageUrls: string[]): Promise<string[]> {
+    if (!this.client || imageUrls.length === 0) return [];
+
+    const baseUrl = process.env.BASE_URL ?? 'http://localhost:3000';
+    const fileIds: string[] = [];
+
+    for (const imageUrl of imageUrls) {
+      const filePath = imageUrl.replace(`${baseUrl}/`, '');
+      const absolutePath = path.join(process.cwd(), filePath);
+
+      if (!fs.existsSync(absolutePath)) {
+        console.warn(`[SmsService] 이미지 파일 없음, 건너뜀: ${absolutePath}`);
+        continue;
+      }
+
+      try {
+        const { fileId } = await withTimeout(this.client.uploadFile(absolutePath, 'MMS'), SMS_TIMEOUT_MS);
+        fileIds.push(fileId);
+      } catch (error) {
+        console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${absolutePath}`, error);
+      }
+    }
+
+    return fileIds;
+  }
+
+  // 모든 샵에 SMS/MMS 발송 (1회 시도)
+  // 실패 시 에러를 throw → 호출부에서 EstimateRequestFailedError로 변환해 클라이언트에 반환한다.
+  // 재시도는 클라이언트가 견적 요청을 다시 보내는 방식으로 처리한다.
+  // SMS_ENABLED=false 또는 API Key 미설정이면 발송 없이 정상 통과한다.
+  async sendToShops(phoneNumbers: string[], text: string, imageUrls: string[]): Promise<void> {
+    if (!SMS_ENABLED || !this.client) {
+      console.log('[SmsService] SMS 발송 건너뜀');
       return;
     }
 
-    try {
-      // 10초 안에 응답 없으면 타임아웃 처리
-      const response = await fetch(SMS_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${SMS_API_KEY}`,
-        },
-        body: JSON.stringify({ from: SMS_FROM, to, text }),
-        signal: AbortSignal.timeout(10_000),
-      });
+    const fileIds = await this.uploadImages(imageUrls);
 
-      // fetch는 4xx/5xx에서 reject되지 않으므로 response.ok로 명시적으로 확인한다.
-      if (!response.ok) {
-        throw new Error(`SMS API 응답 오류: ${response.status}`);
-      }
-    } catch (error) {
-      // SMS 발송 실패는 견적 요청 자체를 막지 않는다.
-      // 요청은 이미 DB에 저장됐으므로 로그만 남기고 계속 진행한다.
-      // TODO: [yej] SMS API 확정 후 실패 정책 결정 필요
-      //   - 재발송 로직 추가 여부 (예: 최대 3회 retry)
-      //   - SMS 발송 실패 시 별도 에러 코드(SMS_SEND_FAILED)로 클라이언트에 알릴지 여부
-      console.error('[SmsService] SMS 발송 실패:', error);
+    // 이미지 없으면 LMS 1건, 있으면 이미지 수만큼 MMS 발송
+    // 첫 번째 MMS에만 본문 텍스트 포함
+    const sendTasks: Array<{ text: string; imageId?: string }> =
+      fileIds.length === 0
+        ? [{ text }]
+        : fileIds.map((fileId, i) => ({ text: i === 0 ? text : ' ', imageId: fileId }));
+
+    for (const task of sendTasks) {
+      await withTimeout(
+        this.client.send({
+          to: phoneNumbers,
+          from: SMS_FROM,
+          text: task.text,
+          ...(task.imageId ? { imageId: task.imageId } : { autoTypeDetect: true }),
+        }),
+        SMS_TIMEOUT_MS,
+      );
     }
   }
 }
@@ -118,25 +178,27 @@ export class EstimateRequestService {
   private readonly smsService = new SmsService();
 
   // 견적 요청 생성
-  // 1. DB에 견적 요청 저장
-  // 2. DTO를 문자 내용으로 변환
-  // 3. SMS API로 샵에 문자 발송
+  // ① SMS 발송 — 실패 시 DB 저장 없이 EstimateRequestFailedError + 실패 이유 반환
+  // ② SMS 성공 후 DB 저장
   // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller가 전달한다.
-  // TODO: [yej] 샵 전화번호를 어디서 가져올지 확정 후 실제 번호로 교체한다.
-  //   현재는 임시 번호로 발송하며, 추후 매칭된 샵 목록의 phoneNumber를 사용한다.
   async createEstimateRequest(dto: CreateEstimateRequestDto, userId: number): Promise<CreateEstimateResponseDto> {
+    // ① SMS 발송 (실패 시 DB 저장 없이 즉시 에러 반환)
     try {
-      // ① DB 저장
-      const result = await this.repository.create(dto, userId);
-
-      // ② DTO → 문자 문자열 변환
       const smsText = formatSmsText(dto);
+      const shops = await this.repository.findShopsByIds(dto.shopIds);
+      const phoneNumbers = shops.map((s) => s.phoneNumber);
+      // SMS MMS 발송은 첫 번째 이미지 1장만 전송 (추후 기획 확정 후 조정)
+      const smsImages = dto.images.slice(0, 1);
+      await this.smsService.sendToShops(phoneNumbers, smsText, smsImages);
+    } catch (error) {
+      // 내부 에러 상세(IP, API 키 관련 정보 등)는 서버 로그에만 기록하고 클라이언트에 노출하지 않는다.
+      console.error('[EstimateRequestService] SMS 발송 실패:', extractSmsErrorReason(error));
+      throw new EstimateRequestFailedError();
+    }
 
-      // ③ SMS 발송 (실패해도 견적 요청은 정상 완료 처리)
-      // TODO: [yej] 매칭된 샵 목록의 phoneNumber로 교체
-      const tempShopPhone = '01000000000';
-      await this.smsService.send(tempShopPhone, smsText);
-
+    // ② DB 저장 (SMS 성공 후)
+    try {
+      const result = await this.repository.create(dto, userId);
       return {
         estimateId: result.id,
         nailType: result.nailType,

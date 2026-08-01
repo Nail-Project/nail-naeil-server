@@ -58,11 +58,125 @@ const estimateRequestRouter = Router();
  *                 items:
  *                   type: string
  *                 example: ["http://localhost:3000/uploads/2026-07-20/uuid.jpg"]
+ *               shopIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [1]
+ *                 description: 견적을 보낼 샵 ID 목록 (최대 20개, 주변 샵 조회 API에서 받은 값)
  *     responses:
  *       201:
  *         description: 견적 요청 생성 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 error:
+ *                   nullable: true
+ *                   example: null
+ *                 success:
+ *                   type: object
+ *                   properties:
+ *                     estimateId:
+ *                       type: integer
+ *                       example: 1
+ *                     nailType:
+ *                       type: string
+ *                       enum: [HAND, PEDICURE, BOTH]
+ *                     removalType:
+ *                       type: string
+ *                       enum: [EXTENSION, PARTS, BASIC, NONE]
+ *                     startDate:
+ *                       type: string
+ *                       format: date-time
+ *                     endDate:
+ *                       type: string
+ *                       format: date-time
+ *                     preferredTime:
+ *                       type: string
+ *                       enum: [AM, PM, EVENING, ANY]
+ *                     recommendType:
+ *                       type: string
+ *                       enum: [BALANCED, CLOSE, WIDE, CHEAP]
+ *                     description:
+ *                       type: string
+ *                       nullable: true
+ *                     status:
+ *                       type: string
+ *                       enum: [MATCHING, COMPLETED, EXPIRED]
+ *                     images:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           imageId:
+ *                             type: integer
+ *                           imageUrl:
+ *                             type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
  *       400:
- *         description: 필수 필드 누락 또는 타입 불일치
+ *         description: 필수 필드 누락, 타입 불일치, 또는 shopIds 초과
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: FAIL
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: ESTIMATE_VALIDATION_FAILED
+ *                     message:
+ *                       type: string
+ *                       example: 견적 요청 정보를 모두 입력해주세요.
+ *                     data:
+ *                       nullable: true
+ *                 success:
+ *                   nullable: true
+ *                   example: null
+ *       500:
+ *         description: SMS 발송 실패 또는 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: FAIL
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: ESTIMATE_REQUEST_FAILED
+ *                     message:
+ *                       type: string
+ *                       example: 견적 요청을 보내지 못했어요. 다시 시도해주세요.
+ *                     data:
+ *                       nullable: true
+ *                 success:
+ *                   nullable: true
+ *                   example: null
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             examples:
+ *               unauthorized: { value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null } }
+ *               tokenExpired: { value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null } }
+ *               tokenInvalid: { value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null } }
  */
 
 /**
@@ -87,8 +201,87 @@ const estimateRequestRouter = Router();
  *     responses:
  *       200:
  *         description: 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 error:
+ *                   nullable: true
+ *                   example: null
+ *                 success:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       estimateId:
+ *                         type: integer
+ *                         example: 1
+ *                       thumbnailUrl:
+ *                         type: string
+ *                         nullable: true
+ *                         example: "http://localhost:3000/uploads/2026-07-20/uuid.jpg"
+ *                       nailType:
+ *                         type: string
+ *                         enum: [HAND, PEDICURE, BOTH]
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       status:
+ *                         type: string
+ *                         enum: [MATCHING, COMPLETED, EXPIRED]
+ *                       proposalCount:
+ *                         type: integer
+ *                         example: 3
+ *                       submittedShopCount:
+ *                         type: integer
+ *                         example: 2
+ *                       minPrice:
+ *                         type: integer
+ *                         nullable: true
+ *                         example: 30000
  *       400:
  *         description: 유효하지 않은 status 값
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: FAIL
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: INVALID_ESTIMATE_REQUEST
+ *                     message:
+ *                       type: string
+ *                       example: 유효하지 않은 요청입니다.
+ *                     data:
+ *                       nullable: true
+ *                 success:
+ *                   nullable: true
+ *                   example: null
+ *       500:
+ *         description: 견적 목록 조회 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: ESTIMATE_REQUEST_FAILED, message: 견적 요청을 보내지 못했어요. 다시 시도해주세요., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             examples:
+ *               unauthorized: { value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null } }
+ *               tokenExpired: { value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null } }
+ *               tokenInvalid: { value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null } }
  */
 
 // 두 엔드포인트 모두 로그인한 사용자만 접근 가능하다.

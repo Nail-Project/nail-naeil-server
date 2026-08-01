@@ -84,4 +84,24 @@ export class UserRepository {
   deleteRefreshToken(tokenHash: string) {
     return getPrisma().refreshToken.deleteMany({ where: { token: tokenHash } });
   }
+
+  // 마이페이지 조회: id로 User 단건 조회 (없으면 null)
+  findById(userId: number) {
+    return getPrisma().user.findUnique({ where: { id: userId } });
+  }
+
+  // 회원정보 수정: 전달된 필드만 부분 갱신
+  updateUser(userId: number, data: { nickname?: string; phoneNumber?: string; email?: string }) {
+    return getPrisma().user.update({ where: { id: userId }, data });
+  }
+
+  // 회원 탈퇴: RefreshToken은 onDelete Cascade가 없어 User 삭제 전에 먼저 지워야
+  // FK 제약 위반을 피할 수 있다. UserAuthProvider는 Cascade라 자동 삭제된다.
+  // 두 삭제를 한 트랜잭션으로 묶어 원자적으로 처리한다.
+  deleteUserWithTokens(userId: number) {
+    return getPrisma().$transaction([
+      getPrisma().refreshToken.deleteMany({ where: { userId } }),
+      getPrisma().user.delete({ where: { id: userId } }),
+    ]);
+  }
 }

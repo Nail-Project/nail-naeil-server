@@ -25,12 +25,34 @@ describe('createSmsMessageRequestSchema', () => {
     ).toBe(false);
   });
 
+  it.each(['address', 'body', 'receivedAt'] as const)('%s가 없으면 거부한다', (field) => {
+    const rawPayload: Partial<Record<'address' | 'body' | 'receivedAt', string>> = {
+      address: '01012345678',
+      body: '견적 문자',
+      receivedAt: '2026-07-18T13:20:38+09:00',
+    };
+    delete rawPayload[field];
+
+    expect(
+      createSmsMessageRequestSchema.safeParse({
+        source: 'android-device-a1b2c3',
+        messageId: 'android-sms-1042',
+        rawPayload,
+      }).success,
+    ).toBe(false);
+  });
+
   it('JSON으로 저장할 수 없는 값은 거부한다', () => {
     expect(
       createSmsMessageRequestSchema.safeParse({
         source: 'android-device-a1b2c3',
         messageId: 'android-sms-1042',
-        rawPayload: { invalid: undefined },
+        rawPayload: {
+          address: '01012345678',
+          body: '견적 문자',
+          receivedAt: '2026-07-18T13:20:38+09:00',
+          invalid: undefined,
+        },
       }).success,
     ).toBe(false);
   });

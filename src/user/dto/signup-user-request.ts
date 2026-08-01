@@ -1,4 +1,4 @@
-// POST /api/users/signup - 회원가입 Request Body 검증 스키마
+// POST /api/v1/users/signup - 회원가입 Request Body 검증 스키마
 // zod로 런타임 검증 후 타입을 추론해 controller → service에서 그대로 사용한다.
 import { z } from 'zod';
 
