@@ -1,7 +1,8 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { createS3Client, getS3Bucket, S3_REGION } from '../../infra/s3';
 import { PhotoUploadFailedError } from '../../common/errors/common.error';
 import { InvalidImageFormatError, InvalidImageTypeError } from '../error/image.error';
 
@@ -38,30 +39,12 @@ function hasValidImageSignature(buffer: Buffer): boolean {
 // ─── ImageService ─────────────────────────────────────────────────────────────
 // multer는 memoryStorage로 파일을 버퍼에 받고,
 // uploadImages()에서 매직 바이트 검증 후 AWS SDK로 직접 S3에 업로드한다.
-//
-// multer-s3 스트리밍 방식에서 변경한 이유:
-// 스트리밍 중에는 파일 전체 버퍼가 확보되기 전에 S3로 전송이 시작되므로
-// 매직 바이트를 검사하고 업로드를 취소하는 것이 안전하지 않다.
-// memoryStorage로 먼저 버퍼에 받으면 검증 후 S3 업로드 여부를 결정할 수 있다.
 export class ImageService {
-  private readonly s3: S3Client;
-  private readonly bucket: string;
-  private readonly region: string;
-
-  constructor() {
-    this.region = process.env.AWS_REGION ?? 'ap-northeast-2';
-    this.bucket = process.env.S3_BUCKET_NAME ?? '';
-    this.s3 = new S3Client({
-      region: this.region,
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
-      },
-    });
-  }
+  private readonly s3 = createS3Client();
+  private readonly bucket = getS3Bucket();
+  private readonly region = S3_REGION;
 
   // multer 미들웨어 생성 - image.route.ts에서 호출해 라우터에 등록
-  // memoryStorage: 버퍼로 받아 uploadImages()에서 매직 바이트 검사 후 S3에 업로드
   getMulter(): multer.Multer {
     return multer({
       storage: multer.memoryStorage(),
@@ -79,15 +62,19 @@ export class ImageService {
   // 업로드된 파일의 매직 바이트를 검사하고 S3에 저장 후 URL 목록 반환
   // 파일 순서를 보장하여 반환한다.
   async uploadImages(files: Express.Multer.File[]): Promise<string[]> {
+    // 1단계: 전체 파일 매직 바이트 일괄 검증
+    // 업로드 전에 먼저 걸러내 S3에 참조되지 않는 객체가 남지 않도록 한다.
+    for (const file of files) {
+      if (!hasValidImageSignature(file.buffer)) {
+        throw new InvalidImageFormatError();
+      }
+    }
+
+    // 2단계: 검증 통과 후 S3 업로드
     const today = new Date().toISOString().split('T')[0];
     const urls: string[] = [];
 
     for (const file of files) {
-      // 2차 검사: 매직 바이트 (MIME 타입 위조 방지)
-      if (!hasValidImageSignature(file.buffer)) {
-        throw new InvalidImageFormatError();
-      }
-
       const ext = path.extname(file.originalname);
       const key = `images/${today}/${uuidv4()}${ext}`;
 

@@ -1,8 +1,9 @@
-import fs from 'fs';
+import fsp from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { SolapiMessageService } from 'solapi';
+import { createS3Client } from '../../infra/s3';
 import { EstimateRequestRepository } from '../repository/estimate-request.repository';
 import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request.dto';
 import { CreateEstimateResponseDto } from '../dto/response/create-estimate-response.dto';
@@ -59,6 +60,9 @@ function isAllowedS3ImageUrl(imageUrl: string): boolean {
 // ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
 class SmsService {
   private readonly client: SolapiMessageService | null;
+  // S3 클라이언트는 생성자에서 한 번만 생성한다 (루프마다 생성 방지)
+  private readonly s3 = createS3Client();
+  private readonly s3Bucket = process.env.S3_BUCKET_NAME ?? '';
 
   constructor() {
     const apiKey = process.env.COOLSMS_API_KEY;
@@ -77,14 +81,6 @@ class SmsService {
   private async uploadImages(imageUrls: string[]): Promise<string[]> {
     if (!this.client || imageUrls.length === 0) return [];
 
-    const s3 = new S3Client({
-      region: process.env.AWS_REGION ?? 'ap-northeast-2',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
-      },
-    });
-    const bucket = process.env.S3_BUCKET_NAME ?? '';
     const fileIds: string[] = [];
 
     for (const imageUrl of imageUrls) {
@@ -101,7 +97,7 @@ class SmsService {
       try {
         // S3에서 임시 파일로 다운로드
         const { Body } = await withTimeout(
-          s3.send(new GetObjectCommand({ Bucket: bucket, Key: key })),
+          this.s3.send(new GetObjectCommand({ Bucket: this.s3Bucket, Key: key })),
           SMS_TIMEOUT_MS,
         );
         if (!Body) {
@@ -109,7 +105,7 @@ class SmsService {
           continue;
         }
         const buffer = Buffer.from(await Body.transformToByteArray());
-        fs.writeFileSync(tmpPath, buffer);
+        await fsp.writeFile(tmpPath, buffer);
 
         // Solapi에 임시 파일 업로드
         const { fileId } = (await withTimeout(this.client.uploadFile(tmpPath, 'MMS'), SMS_TIMEOUT_MS)) as { fileId: string };
@@ -117,8 +113,8 @@ class SmsService {
       } catch (error) {
         console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${key}`, error);
       } finally {
-        // 임시 파일 정리
-        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+        // 임시 파일 정리 (force: true → 파일 없어도 에러 없이 통과)
+        await fsp.rm(tmpPath, { force: true });
       }
     }
 
