@@ -1,5 +1,6 @@
 import { getPrisma } from '../../infra/prisma';
 import type { ReservationStatus } from '../../generated/prisma/enums';
+import type { ReservationCursor } from '../dto/get-reservations-request';
 
 // 예약 생성 응답 전용 select - CreateReservationResponse가 쓰는 필드만
 const createReservationSelect = {
@@ -75,9 +76,9 @@ export interface ReservationRepository {
   findByUserIdAndStatuses(
     userId: bigint,
     statuses: ReservationStatus[],
-    page: number,
+    cursor: ReservationCursor | undefined,
     size: number,
-  ): Promise<{ reservations: ReservationRecord[]; totalElements: number }>;
+  ): Promise<{ reservations: ReservationRecord[]; hasNext: boolean }>;
   findByIdAndUserId(
     reservationId: bigint,
     userId: bigint,
@@ -135,29 +136,37 @@ export class PrismaReservationRepository implements ReservationRepository {
   }
 
   // 상태별 예약 목록 조회 (CONFIRMED 단건 상태 또는 PAST용 COMPLETED+CANCELLED 복수 상태)
+  // 커서 기반(keyset) 페이지네이션: offset 없이 "마지막으로 본 항목 이후" 조건으로 다음 페이지를 가져온다.
+  // count 쿼리가 필요 없어져 트랜잭션도 더 이상 필요 없다.
   async findByUserIdAndStatuses(
     userId: bigint,
     statuses: ReservationStatus[],
-    page: number,
+    cursor: ReservationCursor | undefined,
     size: number,
-  ): Promise<{ reservations: ReservationRecord[]; totalElements: number }> {
-    const where = { userId, status: { in: statuses } };
-
-    // count와 findMany가 같은 스냅샷을 보도록 트랜잭션으로 묶는다
-    // (Promise.all로 병렬 실행 시, 두 쿼리 사이에 다른 예약이 생기거나 취소되면
-    // totalElements와 실제 목록이 어긋날 수 있음)
-    const [reservations, totalElements] = await getPrisma().$transaction([
-      getPrisma().reservation.findMany({
-        where,
-        select: reservationListSelect,
-        orderBy: { reservedAt: 'desc' },
-        skip: page * size,
-        take: size,
+  ): Promise<{ reservations: ReservationRecord[]; hasNext: boolean }> {
+    const where = {
+      userId,
+      status: { in: statuses },
+      // (reservedAt, id) 둘 다 내림차순 정렬 기준과 같은 방향으로 비교해야 커서 이후 항목만 걸러진다.
+      ...(cursor && {
+        OR: [
+          { reservedAt: { lt: cursor.reservedAt } },
+          { reservedAt: cursor.reservedAt, id: { lt: cursor.id } },
+        ],
       }),
-      getPrisma().reservation.count({ where }),
-    ]);
+    };
 
-    return { reservations, totalElements };
+    // size보다 1개 더 가져와서, 그 1개가 존재하면 다음 페이지가 있다는 뜻으로 사용한다(count 쿼리 대체).
+    const rows = await getPrisma().reservation.findMany({
+      where,
+      select: reservationListSelect,
+      orderBy: [{ reservedAt: 'desc' }, { id: 'desc' }],
+      take: size + 1,
+    });
+
+    const hasNext = rows.length > size;
+
+    return { reservations: hasNext ? rows.slice(0, size) : rows, hasNext };
   }
 
   // 예약 상세 조회 - 본인 예약만 조회 가능하도록 userId로 소유권 검증

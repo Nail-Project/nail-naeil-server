@@ -12,8 +12,12 @@ export interface ReservationListItem {
   totalPrice: number;
 }
 
+export interface ReservationPageInfo {
+  nextCursor: string | null;
+  hasNext: boolean;
+}
+
 export interface GetReservationsResponse {
   reservations: ReservationListItem[];
-  page: number;
-  totalElements: number;
+  pageInfo: ReservationPageInfo;
 }

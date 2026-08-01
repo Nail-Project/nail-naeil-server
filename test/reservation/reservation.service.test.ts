@@ -11,6 +11,8 @@ import type {
 } from '../../src/reservation/repository/reservation.repository';
 import { ReservationService } from '../../src/reservation/service/reservation.service';
 import type { CreateReservationRequestType } from '../../src/reservation/dto/create-reservation-request';
+import type { ReservationCursor } from '../../src/reservation/dto/get-reservations-request';
+import { encodeCursor } from '../../src/common/pagination/cursor';
 
 const TOMORROW = new Date(Date.now() + 1000 * 60 * 60 * 24);
 const YESTERDAY = new Date(Date.now() - 1000 * 60 * 60 * 24);
@@ -38,13 +40,14 @@ class FakeRepository implements ReservationRepository {
     proposal: { totalPrice: 55_000, shop: { name: '영찬 네일 강남점' } },
   };
 
-  reservationsResult: { reservations: ReservationRecord[]; totalElements: number } = {
+  reservationsResult: { reservations: ReservationRecord[]; hasNext: boolean } = {
     reservations: [],
-    totalElements: 0,
+    hasNext: false,
   };
   detailResult: ReservationDetailRecord | null = null;
 
   lastStatuses: ReservationStatus[] | null = null;
+  lastCursor: ReservationCursor | undefined = undefined;
 
   async findProposalById(): Promise<ProposalRecord | null> {
     return this.proposal;
@@ -66,8 +69,10 @@ class FakeRepository implements ReservationRepository {
   async findByUserIdAndStatuses(
     _userId: bigint,
     statuses: ReservationStatus[],
-  ): Promise<{ reservations: ReservationRecord[]; totalElements: number }> {
+    cursor: ReservationCursor | undefined,
+  ): Promise<{ reservations: ReservationRecord[]; hasNext: boolean }> {
     this.lastStatuses = statuses;
+    this.lastCursor = cursor;
     return this.reservationsResult;
   }
 
@@ -185,15 +190,23 @@ describe('ReservationService.getReservations', () => {
   });
 
   it('CONFIRMED 상태는 CONFIRMED만 조회한다', async () => {
-    await service.getReservations('CONFIRMED', userId, 0, 10);
+    await service.getReservations('CONFIRMED', userId, undefined, 10);
 
     expect(repository.lastStatuses).toEqual(['CONFIRMED']);
   });
 
   it('PAST 상태는 COMPLETED와 CANCELLED를 함께 조회한다', async () => {
-    await service.getReservations('PAST', userId, 0, 10);
+    await service.getReservations('PAST', userId, undefined, 10);
 
     expect(repository.lastStatuses).toEqual(['COMPLETED', 'CANCELLED']);
+  });
+
+  it('요청한 cursor를 그대로 repository에 전달한다', async () => {
+    const cursor: ReservationCursor = { reservedAt: TOMORROW, id: 5n };
+
+    await service.getReservations('CONFIRMED', userId, cursor, 10);
+
+    expect(repository.lastCursor).toEqual(cursor);
   });
 
   it('예약 목록을 응답 형식에 맞게 매핑한다', async () => {
@@ -207,10 +220,10 @@ describe('ReservationService.getReservations', () => {
           proposal: { totalPrice: 55_000, shop: { name: '영찬 네일 강남점' } },
         },
       ],
-      totalElements: 1,
+      hasNext: false,
     };
 
-    const result = await service.getReservations('CONFIRMED', userId, 0, 10);
+    const result = await service.getReservations('CONFIRMED', userId, undefined, 10);
 
     expect(result).toMatchObject({
       reservations: [
@@ -223,9 +236,30 @@ describe('ReservationService.getReservations', () => {
           totalPrice: 55_000,
         },
       ],
-      page: 0,
-      totalElements: 1,
+      pageInfo: { nextCursor: null, hasNext: false },
     });
+  });
+
+  it('다음 페이지가 있으면 마지막 항목 기준으로 nextCursor를 만든다', async () => {
+    repository.reservationsResult = {
+      reservations: [
+        {
+          id: 100n,
+          proposalId: 1,
+          reservedAt: TOMORROW,
+          status: 'CONFIRMED',
+          proposal: { totalPrice: 55_000, shop: { name: '영찬 네일 강남점' } },
+        },
+      ],
+      hasNext: true,
+    };
+
+    const result = await service.getReservations('CONFIRMED', userId, undefined, 10);
+
+    expect(result.pageInfo.hasNext).toBe(true);
+    expect(result.pageInfo.nextCursor).toBe(
+      encodeCursor({ reservedAt: TOMORROW.toISOString(), id: '100' }),
+    );
   });
 });
 
