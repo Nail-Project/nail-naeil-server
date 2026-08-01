@@ -1,4 +1,6 @@
 import multer from 'multer';
+import multerS3 from 'multer-s3';
+import { S3Client } from '@aws-sdk/client-s3';
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
@@ -56,51 +58,57 @@ export class LocalStorageService implements StorageService {
 }
 
 // -------------------------------------------------------------------
-// S3StorageService - AWS S3 버킷에 저장 (추후 전환용)
-// multer-s3 패키지 설치 및 AWS 환경변수 설정 후 활성화
-// npm install multer-s3 @aws-sdk/client-s3
+// S3StorageService - AWS S3 버킷에 저장
+// 환경변수: AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME
 //
-// TODO: S3 전환 시 보안 강화 항목
+// TODO: 보안 강화 항목 (추후 적용)
 //
 // [1] 매직 바이트 검사 추가 (mimetype 위조 방지)
 //   - mimetype은 클라이언트가 헤더에 직접 설정하는 값이라 위조 가능
 //   - file-type 패키지로 파일 시그니처(매직 바이트)를 검사해 실제 이미지 여부 확인
-//   - multer-s3는 memoryStorage 방식으로 동작해 file.buffer 접근 가능 → 검사 붙이기 용이
 //   - npm install file-type
 //
-// [2] S3 버킷 private 설정 + Presigned URL 방식 적용
-//   - 버킷을 public으로 열면 URL만 알면 누구나 접근 가능 → 사적인 이미지 노출 위험
-//   - 버킷은 private으로 설정하고, 클라이언트가 이미지 요청 시 서버에서 임시 URL 발급
+// [2] Presigned URL 방식 적용
+//   - 버킷은 private이므로 클라이언트가 이미지 요청 시 서버에서 임시 URL 발급 필요
 //   - import { GetObjectCommand } from '@aws-sdk/client-s3';
 //   - import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 //   - const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket, Key }), { expiresIn: 3600 });
 // -------------------------------------------------------------------
 export class S3StorageService implements StorageService {
-  getStorage(): multer.StorageEngine {
-    // TODO: S3 전환 시 아래 주석 해제 후 LocalStorageService 대신 사용
-    //
-    // import multerS3 from 'multer-s3';
-    // import { S3Client } from '@aws-sdk/client-s3';
-    //
-    // const s3 = new S3Client({ region: process.env.AWS_REGION });
-    //
-    // const today = new Date().toISOString().split('T')[0];
-    // return multerS3({
-    //   s3,
-    //   bucket: process.env.S3_BUCKET_NAME!,
-    //   key: (_req, file, cb) => {
-    //     const ext = path.extname(file.originalname);
-    //     // 날짜 prefix로 저장 - 스케줄러가 날짜별 조회 가능하도록
-    //     // 예: images/2026-07-11/uuid.jpg
-    //     cb(null, `images/${today}/${uuidv4()}${ext}`);
-    //   },
-    // });
+  private readonly s3: S3Client;
+  private readonly bucket: string;
 
-    throw new Error('S3StorageService는 아직 설정되지 않았습니다.');
+  constructor() {
+    this.s3 = new S3Client({
+      region: process.env.AWS_REGION ?? 'ap-northeast-2',
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+      },
+    });
+    this.bucket = process.env.S3_BUCKET_NAME ?? '';
+  }
+
+  getStorage(): multer.StorageEngine {
+    const today = new Date().toISOString().split('T')[0];
+
+    return multerS3({
+      s3: this.s3,
+      bucket: this.bucket,
+      // contentType은 클라이언트가 보낸 mimetype을 그대로 사용
+      contentType: multerS3.AUTO_CONTENT_TYPE,
+      key: (_req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        // 날짜 prefix로 저장 (예: images/2026-08-01/uuid.jpg)
+        // 이미지 정리 스케줄러가 날짜별로 조회할 수 있도록 구조화
+        cb(null, `images/${today}/${uuidv4()}${ext}`);
+      },
+    });
   }
 
   getFileUrl(file: Express.Multer.File): string {
     // multer-s3는 업로드 완료 후 file.location에 S3 URL을 담아줌
+    // 예: https://nail-naeil-images.s3.ap-northeast-2.amazonaws.com/images/2026-08-01/uuid.jpg
     return (file as Express.Multer.File & { location: string }).location;
   }
 }
@@ -110,8 +118,7 @@ export class S3StorageService implements StorageService {
 // storage 구현체만 교체하면 로컬 ↔ S3 전환 완료
 // -------------------------------------------------------------------
 export class ImageService {
-  // S3 전환 시: new LocalStorageService() → new S3StorageService()
-  private readonly storage: StorageService = new LocalStorageService();
+  private readonly storage: StorageService = new S3StorageService();
 
   // multer 미들웨어 생성 - image.route.ts에서 호출해 라우터에 등록
   getMulter(): multer.Multer {
@@ -128,10 +135,10 @@ export class ImageService {
     });
   }
 
-  // 업로드된 파일의 URL 반환 - 컨트롤러에서 호출
-  async uploadImage(file: Express.Multer.File): Promise<string> {
+  // 업로드된 파일들의 URL 목록 반환 - 컨트롤러에서 호출
+  async uploadImages(files: Express.Multer.File[]): Promise<string[]> {
     try {
-      return this.storage.getFileUrl(file);
+      return files.map((file) => this.storage.getFileUrl(file));
     } catch {
       throw new PhotoUploadFailedError();
     }

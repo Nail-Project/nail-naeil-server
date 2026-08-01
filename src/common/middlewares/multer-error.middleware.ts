@@ -3,27 +3,32 @@ import { Multer, MulterError } from 'multer';
 import { PhotoUploadFailedError } from '../errors/common.error';
 import { ImageRequiredError, InvalidImageTypeError } from '../../image/error/image.error';
 
-// multer 미들웨어 실행 후 에러를 커스텀 에러로 변환해 공통 에러 핸들러로 넘김
-// multer 쓰는 라우터에서 upload.single() 대신 wrapMulter(upload, 'fieldName') 사용
+// multer 에러를 커스텀 에러로 변환하는 공통 핸들러
+const handleMulterError = (err: unknown, next: NextFunction) => {
+  if (!err) return next();
+
+  if (err instanceof MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') return next(new ImageRequiredError());
+    return next(new PhotoUploadFailedError());
+  }
+
+  if (err instanceof InvalidImageTypeError) {
+    return next(new ImageRequiredError());
+  }
+
+  next(new PhotoUploadFailedError());
+};
+
+// 단일 파일 업로드 미들웨어 래퍼
 export const wrapMulter =
   (upload: Multer, fieldName: string) =>
   (req: Request, res: Response, next: NextFunction) => {
-    upload.single(fieldName)(req, res, (err) => {
-      if (!err) return next();
+    upload.single(fieldName)(req, res, (err) => handleMulterError(err, next));
+  };
 
-      if (err instanceof MulterError) {
-        // 파일 크기 초과
-        if (err.code === 'LIMIT_FILE_SIZE') return next(new ImageRequiredError());
-        // 그 외 multer 에러 (필드명 불일치 등)
-        return next(new PhotoUploadFailedError());
-      }
-
-      // fileFilter에서 던진 에러 (이미지 아닌 파일) - instanceof로 안전하게 판별
-      if (err instanceof InvalidImageTypeError) {
-        return next(new ImageRequiredError());
-      }
-
-      // 그 외 예상치 못한 에러
-      next(new PhotoUploadFailedError());
-    });
+// 다중 파일 업로드 미들웨어 래퍼 (최대 maxCount개)
+export const wrapMulterArray =
+  (upload: Multer, fieldName: string, maxCount: number) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    upload.array(fieldName, maxCount)(req, res, (err) => handleMulterError(err, next));
   };
