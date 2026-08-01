@@ -1,5 +1,7 @@
-import path from 'path';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SolapiMessageService } from 'solapi';
 import { EstimateRequestRepository } from '../repository/estimate-request.repository';
 import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request.dto';
@@ -53,28 +55,48 @@ class SmsService {
     }
   }
 
-  // 이미지 URL → Solapi fileId 변환 (업로드)
-  // 파일이 없거나 업로드 실패한 이미지는 건너뛴다.
+  // S3 이미지 URL → 임시 파일 다운로드 → Solapi fileId 변환
+  // 업로드 실패한 이미지는 건너뛰고, 임시 파일은 업로드 후 삭제한다.
   private async uploadImages(imageUrls: string[]): Promise<string[]> {
     if (!this.client || imageUrls.length === 0) return [];
 
-    const baseUrl = process.env.BASE_URL ?? 'http://localhost:3000';
+    const s3 = new S3Client({
+      region: process.env.AWS_REGION ?? 'ap-northeast-2',
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+      },
+    });
+    const bucket = process.env.S3_BUCKET_NAME ?? '';
     const fileIds: string[] = [];
 
     for (const imageUrl of imageUrls) {
-      const filePath = imageUrl.replace(`${baseUrl}/`, '');
-      const absolutePath = path.join(process.cwd(), filePath);
-
-      if (!fs.existsSync(absolutePath)) {
-        console.warn(`[SmsService] 이미지 파일 없음, 건너뜀: ${absolutePath}`);
-        continue;
-      }
+      // S3 URL에서 key 추출 (예: images/2026-08-01/uuid.jpg)
+      const urlObj = new URL(imageUrl);
+      const key = urlObj.pathname.replace(/^\//, '');
+      const tmpPath = path.join(os.tmpdir(), path.basename(key));
 
       try {
-        const { fileId } = await withTimeout(this.client.uploadFile(absolutePath, 'MMS'), SMS_TIMEOUT_MS);
+        // S3에서 임시 파일로 다운로드
+        const { Body } = await withTimeout(
+          s3.send(new GetObjectCommand({ Bucket: bucket, Key: key })),
+          SMS_TIMEOUT_MS,
+        );
+        if (!Body) {
+          console.warn(`[SmsService] S3 응답 바디 없음, 건너뜀: ${key}`);
+          continue;
+        }
+        const buffer = Buffer.from(await Body.transformToByteArray());
+        fs.writeFileSync(tmpPath, buffer);
+
+        // Solapi에 임시 파일 업로드
+        const { fileId } = (await withTimeout(this.client.uploadFile(tmpPath, 'MMS'), SMS_TIMEOUT_MS)) as { fileId: string };
         fileIds.push(fileId);
       } catch (error) {
-        console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${absolutePath}`, error);
+        console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${key}`, error);
+      } finally {
+        // 임시 파일 정리
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
       }
     }
 
