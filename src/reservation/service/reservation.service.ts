@@ -8,6 +8,7 @@ import type { ReservationCursor } from '../dto/get-reservations-request';
 import { GetReservationDetailResponse } from '../dto/get-reservation-detail-response';
 import type { ReservationListStatus } from '../reservation.constants';
 import { encodeCursor } from '../../common/pagination/cursor';
+import { NotificationService } from '../../notification/service/notification.service';
 import { ReservationFailedError } from '../../common/errors/common.error';
 import {
   AlreadyReservedError,
@@ -25,7 +26,10 @@ const isRecordNotFoundError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 
 export class ReservationService {
-  constructor(private readonly reservationRepository: ReservationRepository) {}
+  constructor(
+    private readonly reservationRepository: ReservationRepository,
+    private readonly notificationService = new NotificationService(),
+  ) {}
 
   // 예약 생성
   async createReservation(
@@ -67,6 +71,22 @@ export class ReservationService {
         userId,
         reservedAt: proposalTime.proposalDatetime,
       });
+
+      // 예약이 확정되면 사용자에게 알림. 알림 실패가 예약 성공을 막지 않도록 격리한다.
+      try {
+        await this.notificationService.notify({
+          userId: Number(userId),
+          type: 'RESERVATION_STATUS',
+          title: '예약이 확정되었어요',
+          body: `${result.proposal.shop.name}에서의 예약이 확정되었어요.`,
+          data: { reservationId: Number(result.id) },
+        });
+      } catch (notifyError) {
+        console.error('[ReservationService] 알림 생성 실패', {
+          reservationId: Number(result.id),
+          errorType: notifyError instanceof Error ? notifyError.name : typeof notifyError,
+        });
+      }
 
       return {
         reservationId: Number(result.id),

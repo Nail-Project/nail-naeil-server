@@ -1,5 +1,6 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { Prisma } from '../../src/generated/prisma/client';
+import type { NotificationService } from '../../src/notification/service/notification.service';
 import type { ReservationStatus } from '../../src/generated/prisma/enums';
 import type {
   CreatedReservationRecord,
@@ -87,13 +88,19 @@ const userId = 1n;
 const prismaError = (code: string) =>
   new Prisma.PrismaClientKnownRequestError('DB 에러', { code, clientVersion: 'test' });
 
+// 알림 서비스는 예약 로직과 분리 검증한다. 실제 prisma를 건드리지 않도록 fake를 주입한다.
+const createNotificationService = () =>
+  ({ notify: vi.fn().mockResolvedValue(undefined) }) as unknown as NotificationService;
+
 describe('ReservationService.createReservation', () => {
   let repository: FakeRepository;
+  let notificationService: NotificationService;
   let service: ReservationService;
 
   beforeEach(() => {
     repository = new FakeRepository();
-    service = new ReservationService(repository);
+    notificationService = createNotificationService();
+    service = new ReservationService(repository, notificationService);
   });
 
   it('정상적으로 예약을 생성한다', async () => {
@@ -101,6 +108,29 @@ describe('ReservationService.createReservation', () => {
       reservationId: 100,
       shopName: '영찬 네일 강남점',
       totalPrice: 55_000,
+      status: 'CONFIRMED',
+    });
+  });
+
+  it('예약 확정 시 사용자에게 RESERVATION_STATUS 알림을 생성한다', async () => {
+    await service.createReservation(createDto, userId);
+
+    expect(notificationService.notify).toHaveBeenCalledWith({
+      userId: 1,
+      type: 'RESERVATION_STATUS',
+      title: '예약이 확정되었어요',
+      body: '영찬 네일 강남점에서의 예약이 확정되었어요.',
+      data: { reservationId: 100 },
+    });
+  });
+
+  it('알림 생성이 실패해도 예약은 정상 완료된다', async () => {
+    (notificationService.notify as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('알림 실패'),
+    );
+
+    await expect(service.createReservation(createDto, userId)).resolves.toMatchObject({
+      reservationId: 100,
       status: 'CONFIRMED',
     });
   });
@@ -186,7 +216,7 @@ describe('ReservationService.getReservations', () => {
 
   beforeEach(() => {
     repository = new FakeRepository();
-    service = new ReservationService(repository);
+    service = new ReservationService(repository, createNotificationService());
   });
 
   it('CONFIRMED 상태는 CONFIRMED만 조회한다', async () => {
@@ -269,7 +299,7 @@ describe('ReservationService.getReservationDetail', () => {
 
   beforeEach(() => {
     repository = new FakeRepository();
-    service = new ReservationService(repository);
+    service = new ReservationService(repository, createNotificationService());
   });
 
   it('존재하지 않는 예약이면 404를 던진다', async () => {

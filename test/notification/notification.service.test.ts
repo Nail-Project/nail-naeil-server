@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NotificationService } from '../../src/notification/service/notification.service';
 import type { NotificationRepository } from '../../src/notification/repository/notification.repository';
+import type { PushSender } from '../../src/notification/push/push-sender';
 import { encodeCursor } from '../../src/common/pagination/cursor';
 
 // Prisma Notification 레코드 형태의 최소 fake 데이터
@@ -17,9 +18,12 @@ const notificationRecord = (overrides: Partial<Record<string, unknown>> = {}) =>
   ...overrides,
 });
 
-// 필요한 메서드만 가진 fake repository를 만들어 주입한다.
-const createService = (repo: Partial<NotificationRepository>) =>
-  new NotificationService(repo as unknown as NotificationRepository);
+// 필요한 메서드만 가진 fake repository/pushSender를 만들어 주입한다.
+const createService = (repo: Partial<NotificationRepository>, push?: Partial<PushSender>) =>
+  new NotificationService(
+    repo as unknown as NotificationRepository,
+    (push as PushSender) ?? { send: vi.fn().mockResolvedValue(undefined) },
+  );
 
 describe('NotificationService.getMyNotifications', () => {
   it('마지막 페이지면 nextCursor=null, hasNext=false로 응답 DTO를 반환한다', async () => {
@@ -120,5 +124,41 @@ describe('NotificationService.markAllAsRead', () => {
     });
 
     await expect(service.markAllAsRead(1)).resolves.toEqual({ updatedCount: 5 });
+  });
+});
+
+describe('NotificationService.notify', () => {
+  it('DB에 알림을 저장하고 푸시를 발송한다', async () => {
+    const create = vi.fn().mockResolvedValue(notificationRecord());
+    const send = vi.fn().mockResolvedValue(undefined);
+    const service = createService({ create }, { send });
+
+    await service.notify({
+      userId: 1,
+      type: 'ESTIMATE_RESPONSE',
+      title: '견적 답변이 도착했어요',
+      body: '요청하신 견적에 새 답변이 도착했어요.',
+      data: { estimateRequestId: 12 },
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      userId: 1,
+      type: 'ESTIMATE_RESPONSE',
+      title: '견적 답변이 도착했어요',
+      body: '요청하신 견적에 새 답변이 도착했어요.',
+      data: { estimateRequestId: 12 },
+    });
+    expect(send).toHaveBeenCalledOnce();
+  });
+
+  it('푸시 발송이 실패해도 notify는 성공한다(격리)', async () => {
+    const create = vi.fn().mockResolvedValue(notificationRecord());
+    const send = vi.fn().mockRejectedValue(new Error('fcm down'));
+    const service = createService({ create }, { send });
+
+    await expect(
+      service.notify({ userId: 1, type: 'RESERVATION_STATUS', title: 't', body: 'b' }),
+    ).resolves.toBeUndefined();
+    expect(create).toHaveBeenCalledOnce();
   });
 });
