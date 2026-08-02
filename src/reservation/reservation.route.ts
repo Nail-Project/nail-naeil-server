@@ -34,9 +34,11 @@ const reservationRouter = Router();
  *             properties:
  *               proposalId:
  *                 type: integer
+ *                 description: 샵이 이 견적 요청에 대해 보낸 견적 응답(제안)의 id. 이 견적을 받아들이고 예약하겠다는 뜻으로 넘긴다.
  *                 example: 5
  *               timeId:
  *                 type: integer
+ *                 description: 해당 견적 응답에 딸린 예약 가능 시간 슬롯의 id. 샵이 견적과 함께 제시한 여러 시간대 중 사용자가 고른 하나.
  *                 example: 12
  *     responses:
  *       201:
