@@ -61,6 +61,7 @@ model User {
   updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
   authProviders UserAuthProvider[]
   refreshTokens RefreshToken[]
+  wishDesigns   WishDesign[]
 
   @@map("users")
 }
@@ -296,9 +297,11 @@ model DesignImage {
 model WishDesign {
   id        Int      @id @default(autoincrement())
   designId  Int      @map("design_id")
-  // TODO: [malibu] User 모델과 relation 연결 (feat/auth 병합됨, 확인 후 연결)
   userId    Int      @map("user_id")
   design    Design   @relation(fields: [designId], references: [id], onDelete: Cascade)
+  // feat/auth 병합 전엔 User 테이블이 없어 FK를 걸 수 없었다(2026-08-02, CodeRabbit 리뷰로
+  // 재확인 후 연결). 유저가 삭제되면 그 유저의 찜 기록도 같이 정리한다.
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
 
   @@unique([designId, userId])

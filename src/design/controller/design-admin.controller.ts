@@ -9,6 +9,17 @@ import { success } from '../../common/responses/api-response';
 export class DesignAdminController {
   constructor(private readonly designAdminService: DesignAdminService) {}
 
+  // updateDesign/deleteDesign이 공통으로 쓰는 designId path variable 파싱
+  private parseDesignId(params: unknown): number {
+    const parsed = GetDesignDetailRequest.safeParse(params);
+
+    if (!parsed.success) {
+      throw new InvalidDesignIdError(parsed.error.flatten());
+    }
+
+    return parsed.data.designId;
+  }
+
   // POST /admin/api/v1/designs
   createDesign = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -28,20 +39,14 @@ export class DesignAdminController {
   // PATCH /admin/api/v1/designs/:designId
   updateDesign = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const parsedId = GetDesignDetailRequest.safeParse(req.params);
-      if (!parsedId.success) {
-        throw new InvalidDesignIdError(parsedId.error.flatten());
-      }
+      const designId = this.parseDesignId(req.params);
 
       const parsedBody = UpdateDesignRequest.safeParse(req.body);
       if (!parsedBody.success) {
         throw new InvalidDesignAdminRequestError(parsedBody.error.flatten());
       }
 
-      const result = await this.designAdminService.updateDesign(
-        parsedId.data.designId,
-        parsedBody.data,
-      );
+      const result = await this.designAdminService.updateDesign(designId, parsedBody.data);
       res.status(200).json(success(result));
     } catch (error) {
       next(error);
@@ -51,12 +56,9 @@ export class DesignAdminController {
   // DELETE /admin/api/v1/designs/:designId
   deleteDesign = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const parsedId = GetDesignDetailRequest.safeParse(req.params);
-      if (!parsedId.success) {
-        throw new InvalidDesignIdError(parsedId.error.flatten());
-      }
+      const designId = this.parseDesignId(req.params);
 
-      await this.designAdminService.deleteDesign(parsedId.data.designId);
+      await this.designAdminService.deleteDesign(designId);
       res.status(204).send();
     } catch (error) {
       next(error);
