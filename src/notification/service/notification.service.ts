@@ -3,7 +3,9 @@ import {
   GetNotificationsResponse,
   NotificationItemResponse,
 } from '../dto/get-notifications-response';
+import type { NotificationCursor } from '../dto/get-notifications-request';
 import { NotificationNotFoundError } from '../error/notification.error';
+import { encodeCursor } from '../../common/pagination/cursor';
 
 // 인앱 알림(내 알림 조회/읽음) 비즈니스 로직을 담당한다.
 export class NotificationService {
@@ -12,24 +14,29 @@ export class NotificationService {
 
   async getMyNotifications(
     userId: number,
-    query: { unread?: boolean; page: number; size: number },
+    query: { unread?: boolean; cursor?: NotificationCursor; size: number },
   ): Promise<GetNotificationsResponse> {
-    const skip = query.page * query.size;
-
-    const [notifications, unreadCount] = await Promise.all([
+    // size보다 1개 더 가져와, 그 1개가 존재하면 다음 페이지가 있다는 뜻으로 사용한다(count 쿼리 대체).
+    const [rows, unreadCount] = await Promise.all([
       this.notificationRepository.findManyByUser(userId, {
         unread: query.unread,
-        skip,
+        cursor: query.cursor,
         take: query.size,
       }),
       this.notificationRepository.countUnreadByUser(userId),
     ]);
 
+    const hasNext = rows.length > query.size;
+    const notifications = hasNext ? rows.slice(0, query.size) : rows;
+    const last = notifications[notifications.length - 1];
+    const nextCursor =
+      hasNext && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
+
     return {
       notifications: notifications.map(toItemResponse),
       unreadCount,
-      page: query.page,
-      size: query.size,
+      nextCursor,
+      hasNext,
     };
   }
 

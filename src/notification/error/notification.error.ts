@@ -1,6 +1,6 @@
 import { AppError } from '../../common/errors/app.error';
 
-// GET /api/notifications - 유효하지 않은 unread/page/size 쿼리 값
+// GET /api/v1/notifications - 유효하지 않은 unread/cursor/size 쿼리 값
 export class InvalidNotificationRequestError extends AppError {
   constructor(data?: unknown) {
     super({

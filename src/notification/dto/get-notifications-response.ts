@@ -15,6 +15,7 @@ export interface GetNotificationsResponse {
   notifications: NotificationItemResponse[];
   // 안읽은 알림 개수(뱃지 표시용). 현재 조회 페이지와 무관하게 전체 기준.
   unreadCount: number;
-  page: number;
-  size: number;
+  // 다음 페이지 조회용 커서(base64url). 다음 페이지가 없으면 null.
+  nextCursor: string | null;
+  hasNext: boolean;
 }

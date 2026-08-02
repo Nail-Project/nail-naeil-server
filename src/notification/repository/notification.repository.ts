@@ -2,13 +2,26 @@ import { getPrisma } from '../../infra/prisma';
 import { NotificationType, Prisma } from '../../generated/prisma/client';
 
 export class NotificationRepository {
-  // 내 알림 목록: 최신순. unread=true면 안읽은 것만.
-  findManyByUser(userId: number, params: { unread?: boolean; skip: number; take: number }) {
+  // 내 알림 목록: 최신순(createdAt, id 내림차순) 커서 기반(keyset) 페이지네이션.
+  // unread=true면 안읽은 것만. take보다 1개 더 가져와 다음 페이지 유무 판단은 서비스에서 한다.
+  findManyByUser(
+    userId: number,
+    params: { unread?: boolean; cursor?: { createdAt: Date; id: number }; take: number },
+  ) {
     return getPrisma().notification.findMany({
-      where: { userId, ...(params.unread ? { isRead: false } : {}) },
-      orderBy: { createdAt: 'desc' },
-      skip: params.skip,
-      take: params.take,
+      where: {
+        userId,
+        ...(params.unread ? { isRead: false } : {}),
+        // (createdAt, id) 둘 다 정렬 방향과 같게 비교해야 커서 이후 항목만 걸러진다.
+        ...(params.cursor && {
+          OR: [
+            { createdAt: { lt: params.cursor.createdAt } },
+            { createdAt: params.cursor.createdAt, id: { lt: params.cursor.id } },
+          ],
+        }),
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: params.take + 1,
     });
   }
 

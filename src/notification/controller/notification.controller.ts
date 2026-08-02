@@ -12,7 +12,7 @@ export class NotificationController {
 
   /**
    * @openapi
-   * /api/notifications:
+   * /api/v1/notifications:
    *   get:
    *     summary: 내 알림 목록 조회
    *     tags:
@@ -26,10 +26,10 @@ export class NotificationController {
    *           type: boolean
    *         description: true면 안읽은 알림만 조회
    *       - in: query
-   *         name: page
+   *         name: cursor
    *         schema:
-   *           type: integer
-   *           default: 0
+   *           type: string
+   *         description: 다음 페이지 조회용 커서(이전 응답의 nextCursor). 첫 페이지는 생략.
    *       - in: query
    *         name: size
    *         schema:
@@ -59,7 +59,7 @@ export class NotificationController {
 
   /**
    * @openapi
-   * /api/notifications/{notificationId}/read:
+   * /api/v1/notifications/{notificationId}/read:
    *   patch:
    *     summary: 알림 단건 읽음 처리
    *     tags:
@@ -98,7 +98,7 @@ export class NotificationController {
 
   /**
    * @openapi
-   * /api/notifications/read-all:
+   * /api/v1/notifications/read-all:
    *   patch:
    *     summary: 내 알림 전체 읽음 처리
    *     tags:

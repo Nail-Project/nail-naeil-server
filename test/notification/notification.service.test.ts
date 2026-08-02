@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NotificationService } from '../../src/notification/service/notification.service';
 import type { NotificationRepository } from '../../src/notification/repository/notification.repository';
+import { encodeCursor } from '../../src/common/pagination/cursor';
 
 // Prisma Notification 레코드 형태의 최소 fake 데이터
 const notificationRecord = (overrides: Partial<Record<string, unknown>> = {}) => ({
@@ -21,12 +22,13 @@ const createService = (repo: Partial<NotificationRepository>) =>
   new NotificationService(repo as unknown as NotificationRepository);
 
 describe('NotificationService.getMyNotifications', () => {
-  it('내 알림 목록과 안읽음 개수를 응답 DTO로 반환한다', async () => {
+  it('마지막 페이지면 nextCursor=null, hasNext=false로 응답 DTO를 반환한다', async () => {
+    // size(20)보다 적게 반환 → 다음 페이지 없음
     const findManyByUser = vi.fn().mockResolvedValue([notificationRecord()]);
     const countUnreadByUser = vi.fn().mockResolvedValue(3);
     const service = createService({ findManyByUser, countUnreadByUser });
 
-    const result = await service.getMyNotifications(1, { page: 0, size: 20 });
+    const result = await service.getMyNotifications(1, { size: 20 });
 
     expect(result).toEqual({
       notifications: [
@@ -42,19 +44,37 @@ describe('NotificationService.getMyNotifications', () => {
         },
       ],
       unreadCount: 3,
-      page: 0,
-      size: 20,
+      nextCursor: null,
+      hasNext: false,
     });
   });
 
-  it('page/size로 skip을 계산해 repository에 전달한다', async () => {
+  it('unread/cursor/size를 repository에 그대로 전달한다', async () => {
     const findManyByUser = vi.fn().mockResolvedValue([]);
     const countUnreadByUser = vi.fn().mockResolvedValue(0);
     const service = createService({ findManyByUser, countUnreadByUser });
+    const cursor = { createdAt: new Date('2026-07-31T00:00:00Z'), id: 7 };
 
-    await service.getMyNotifications(1, { unread: true, page: 2, size: 10 });
+    await service.getMyNotifications(1, { unread: true, cursor, size: 10 });
 
-    expect(findManyByUser).toHaveBeenCalledWith(1, { unread: true, skip: 20, take: 10 });
+    expect(findManyByUser).toHaveBeenCalledWith(1, { unread: true, cursor, take: 10 });
+  });
+
+  it('size보다 1개 더 오면 hasNext=true, 마지막 노출 항목으로 nextCursor를 만든다', async () => {
+    const r1 = notificationRecord({ id: 1, createdAt: new Date('2026-07-31T03:00:00Z') });
+    const r2 = notificationRecord({ id: 2, createdAt: new Date('2026-07-31T02:00:00Z') });
+    const r3 = notificationRecord({ id: 3, createdAt: new Date('2026-07-31T01:00:00Z') });
+    const findManyByUser = vi.fn().mockResolvedValue([r1, r2, r3]);
+    const countUnreadByUser = vi.fn().mockResolvedValue(0);
+    const service = createService({ findManyByUser, countUnreadByUser });
+
+    const result = await service.getMyNotifications(1, { size: 2 });
+
+    expect(result.hasNext).toBe(true);
+    expect(result.notifications).toHaveLength(2);
+    expect(result.nextCursor).toBe(
+      encodeCursor({ createdAt: new Date('2026-07-31T02:00:00Z'), id: 2 }),
+    );
   });
 });
 
