@@ -30,10 +30,7 @@ export class DesignAdminService {
     return toResponse(design);
   }
 
-  async updateDesign(
-    designId: number,
-    dto: UpdateDesignRequestType,
-  ): Promise<DesignAdminResponse> {
+  async updateDesign(designId: number, dto: UpdateDesignRequestType): Promise<DesignAdminResponse> {
     try {
       const design = await this.designRepository.update(designId, dto);
 

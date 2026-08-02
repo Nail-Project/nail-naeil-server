@@ -1,4 +1,4 @@
-import type { Prisma } from '../../generated/prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { getPrisma } from '../../infra/prisma';
 import type { DesignCursor } from '../dto/get-designs-request';
 
@@ -90,16 +90,28 @@ const mapDesignAdminRecord = (design: DesignAdminRow): DesignAdminRecord => ({
   description: design.description,
 });
 
+const isUniqueConstraintError = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+
 // 태그를 이름으로 upsert해서 id 목록으로 변환한다.
 // AI 자동 태깅/관리자 수동 입력 둘 다 "이름"만 알고 있는 상황을 가정한 설계 - 이미 있는
 // 이름이면 재사용하고, 처음 보는 이름이면 그 자리에서 새로 만든다.
-const resolveTagIds = async (
-  tx: Prisma.TransactionClient,
-  names: string[],
-): Promise<number[]> => {
+const resolveTagIds = async (tx: Prisma.TransactionClient, names: string[]): Promise<number[]> => {
   const uniqueNames = [...new Set(names)];
   const tags = await Promise.all(
-    uniqueNames.map((name) => tx.tag.upsert({ where: { name }, update: {}, create: { name } })),
+    uniqueNames.map(async (name) => {
+      try {
+        return await tx.tag.upsert({ where: { name }, update: {}, create: { name } });
+      } catch (error) {
+        // 동시에 같은 새 태그 이름으로 upsert가 경쟁하면, upsert 내부의 create가
+        // unique 제약(P2002)에 걸릴 수 있다 - 그 사이 다른 트랜잭션이 먼저 만들었다는
+        // 뜻이므로, 실패로 처리하지 않고 그 행을 다시 조회해서 재사용한다.
+        if (isUniqueConstraintError(error)) {
+          return tx.tag.findUniqueOrThrow({ where: { name } });
+        }
+        throw error;
+      }
+    }),
   );
 
   return tags.map((tag) => tag.id);

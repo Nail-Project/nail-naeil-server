@@ -36,26 +36,50 @@ describe('CreateDesignRequest', () => {
   });
 
   it('title이 100자를 넘으면 거부한다', () => {
-    expect(
-      CreateDesignRequest.safeParse({ ...validPayload, title: 'a'.repeat(101) }).success,
-    ).toBe(false);
+    expect(CreateDesignRequest.safeParse({ ...validPayload, title: 'a'.repeat(101) }).success).toBe(
+      false,
+    );
   });
 
   it('durationMinutes가 0 이하면 거부한다', () => {
-    expect(
-      CreateDesignRequest.safeParse({ ...validPayload, durationMinutes: 0 }).success,
-    ).toBe(false);
+    expect(CreateDesignRequest.safeParse({ ...validPayload, durationMinutes: 0 }).success).toBe(
+      false,
+    );
   });
 
   it('durationMinutes가 정수가 아니면 거부한다', () => {
-    expect(
-      CreateDesignRequest.safeParse({ ...validPayload, durationMinutes: 1.5 }).success,
-    ).toBe(false);
+    expect(CreateDesignRequest.safeParse({ ...validPayload, durationMinutes: 1.5 }).success).toBe(
+      false,
+    );
   });
 
   it('description이 빈 문자열이면 거부한다', () => {
-    expect(CreateDesignRequest.safeParse({ ...validPayload, description: '' }).success).toBe(
-      false,
-    );
+    expect(CreateDesignRequest.safeParse({ ...validPayload, description: '' }).success).toBe(false);
+  });
+
+  it('description이 2000자를 넘으면 거부한다', () => {
+    expect(
+      CreateDesignRequest.safeParse({ ...validPayload, description: 'a'.repeat(2001) }).success,
+    ).toBe(false);
+  });
+
+  it('images가 10개를 넘으면 거부한다', () => {
+    const images = Array.from({ length: 11 }, (_, i) => `https://.../${i}.jpg`);
+    expect(CreateDesignRequest.safeParse({ ...validPayload, images }).success).toBe(false);
+  });
+
+  it('images가 10개면 통과한다', () => {
+    const images = Array.from({ length: 10 }, (_, i) => `https://.../${i}.jpg`);
+    expect(CreateDesignRequest.safeParse({ ...validPayload, images }).success).toBe(true);
+  });
+
+  it('tags가 20개를 넘으면 거부한다', () => {
+    const tags = Array.from({ length: 21 }, (_, i) => `태그${i}`);
+    expect(CreateDesignRequest.safeParse({ ...validPayload, tags }).success).toBe(false);
+  });
+
+  it('tags가 20개면 통과한다', () => {
+    const tags = Array.from({ length: 20 }, (_, i) => `태그${i}`);
+    expect(CreateDesignRequest.safeParse({ ...validPayload, tags }).success).toBe(true);
   });
 });

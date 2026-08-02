@@ -13,11 +13,11 @@ export const designAdminFields = {
   durationMinutes: z.number().int().positive(),
   difficulty: z.string().trim().min(1).max(20),
   recommendedShape: z.string().trim().min(1).max(20),
-  description: z.string().trim().min(1),
-  // 캐러셀에 쓰일 추가 이미지 - 순서대로 저장된다.
-  images: z.array(z.string().trim().min(1).max(255)),
+  description: z.string().trim().min(1).max(2000),
+  // 캐러셀에 쓰일 추가 이미지 - 순서대로 저장된다. 개수 상한은 과도한 payload를 막기 위함.
+  images: z.array(z.string().trim().min(1).max(255)).max(10),
   // 태그는 이름으로 받는다 - 이미 있는 이름이면 재사용, 없으면 새로 생성한다(upsert).
-  tags: z.array(z.string().trim().min(1).max(50)),
+  tags: z.array(z.string().trim().min(1).max(50)).max(20),
 };
 
 export const CreateDesignRequest = z.object({

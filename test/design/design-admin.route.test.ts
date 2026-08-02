@@ -42,7 +42,10 @@ const createApp = () => {
   const app = express();
 
   app.use(express.json());
-  app.use('/admin/api/v1/designs', createDesignAdminRouter(service as unknown as DesignAdminService));
+  app.use(
+    '/admin/api/v1/designs',
+    createDesignAdminRouter(service as unknown as DesignAdminService),
+  );
   app.use(errorHandler);
 
   return { app, service };

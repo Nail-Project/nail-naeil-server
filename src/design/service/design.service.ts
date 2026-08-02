@@ -20,7 +20,9 @@ export class DesignService {
 
     const last = designs[designs.length - 1];
     const nextCursor =
-      hasNext && last ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) : null;
+      hasNext && last
+        ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id })
+        : null;
 
     return {
       designs: designs.map((design) => ({

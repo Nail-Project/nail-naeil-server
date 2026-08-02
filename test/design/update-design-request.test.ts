@@ -31,4 +31,9 @@ describe('UpdateDesignRequest', () => {
   it('필드 값의 타입이 잘못되면 거부한다', () => {
     expect(UpdateDesignRequest.safeParse({ durationMinutes: '60' }).success).toBe(false);
   });
+
+  it('tags가 20개를 넘으면 거부한다 (max 제한이 partial에서도 유지된다)', () => {
+    const tags = Array.from({ length: 21 }, (_, i) => `태그${i}`);
+    expect(UpdateDesignRequest.safeParse({ tags }).success).toBe(false);
+  });
 });

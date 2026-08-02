@@ -103,7 +103,12 @@ describe('DesignService.getDesigns', () => {
 
     expect(result).toEqual({
       designs: [
-        { designId: 1, title: '글리터 프렌치', imageUrl: 'https://.../design1.jpg', tags: ['프렌치', '글리터'] },
+        {
+          designId: 1,
+          title: '글리터 프렌치',
+          imageUrl: 'https://.../design1.jpg',
+          tags: ['프렌치', '글리터'],
+        },
       ],
       pageInfo: { nextCursor: null, hasNext: false },
     });
