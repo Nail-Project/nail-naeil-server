@@ -17,8 +17,8 @@ export class DesignController {
         throw new InvalidDesignRequestError(parsed.error.flatten());
       }
 
-      const { cursor, size } = parsed.data;
-      const result = await this.designService.getDesigns(cursor, size);
+      const { cursor, category, size } = parsed.data;
+      const result = await this.designService.getDesigns(cursor, category, size);
       res.status(200).json(success(result));
     } catch (error) {
       next(error);

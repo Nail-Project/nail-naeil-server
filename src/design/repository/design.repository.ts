@@ -54,6 +54,7 @@ export type UpdateDesignData = Partial<CreateDesignData>;
 export interface DesignRepository {
   findFeed(
     cursor: DesignCursor | undefined,
+    category: string | undefined,
     size: number,
   ): Promise<{ designs: DesignSummaryRecord[]; hasNext: boolean }>;
   findDetailById(designId: number): Promise<DesignDetailRecord | null>;
@@ -124,6 +125,7 @@ export class PrismaDesignRepository implements DesignRepository {
   // offset 없이 "마지막으로 본 항목 이후" 조건으로 다음 페이지를 가져오므로 count 쿼리가 필요 없다.
   async findFeed(
     cursor: DesignCursor | undefined,
+    category: string | undefined,
     size: number,
   ): Promise<{ designs: DesignSummaryRecord[]; hasNext: boolean }> {
     // size보다 1개 더 가져와서, 그 1개가 존재하면 다음 페이지가 있다는 뜻으로 사용한다(count 쿼리 대체).
@@ -137,12 +139,17 @@ export class PrismaDesignRepository implements DesignRepository {
         tags: { select: { tag: { select: { name: true } } }, orderBy: { tagId: 'asc' } },
         _count: { select: { wishes: true } },
       },
-      where: cursor && {
+      where: {
         // (createdAt, id) 둘 다 내림차순 정렬 기준과 같은 방향으로 비교해야 커서 이후 항목만 걸러진다.
-        OR: [
-          { createdAt: { lt: cursor.createdAt } },
-          { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-        ],
+        ...(cursor && {
+          OR: [
+            { createdAt: { lt: cursor.createdAt } },
+            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+          ],
+        }),
+        // "카테고리 탭" = 이 태그가 달린 디자인만 필터링. 존재하지 않는 태그 이름이면
+        // 그냥 빈 배열이 나온다(에러 아님).
+        ...(category && { tags: { some: { tag: { name: category } } } }),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: size + 1,

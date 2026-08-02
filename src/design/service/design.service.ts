@@ -15,8 +15,12 @@ export class DesignService {
   constructor(private readonly designRepository: DesignRepository) {}
 
   // 디자인 피드 조회
-  async getDesigns(cursor: DesignCursor | undefined, size: number): Promise<GetDesignsResponse> {
-    const { designs, hasNext } = await this.designRepository.findFeed(cursor, size);
+  async getDesigns(
+    cursor: DesignCursor | undefined,
+    category: string | undefined,
+    size: number,
+  ): Promise<GetDesignsResponse> {
+    const { designs, hasNext } = await this.designRepository.findFeed(cursor, category, size);
 
     const last = designs[designs.length - 1];
     const nextCursor =

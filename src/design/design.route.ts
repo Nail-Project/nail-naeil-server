@@ -26,6 +26,11 @@ const designRouter = Router();
  *           type: string
  *         description: 이전 응답의 pageInfo.nextCursor 값. 첫 페이지는 생략한다.
  *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: 태그 이름으로 필터링(카테고리 탭). 생략하면 전체 조회.
+ *       - in: query
  *         name: size
  *         schema:
  *           type: integer

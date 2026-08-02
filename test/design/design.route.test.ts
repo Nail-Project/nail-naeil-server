@@ -55,7 +55,7 @@ describe('GET /api/v1/designs', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.resultType).toBe('SUCCESS');
-    expect(service.getDesigns).toHaveBeenCalledWith(undefined, 10);
+    expect(service.getDesigns).toHaveBeenCalledWith(undefined, undefined, 10);
   });
 
   it('cursor/size를 전달하면 디코딩해서 서비스에 전달한다', async () => {
@@ -67,8 +67,18 @@ describe('GET /api/v1/designs', () => {
     expect(response.status).toBe(200);
     expect(service.getDesigns).toHaveBeenCalledWith(
       { createdAt: new Date('2026-07-27T04:59:00.000Z'), id: 5 },
+      undefined,
       20,
     );
+  });
+
+  it('category를 전달하면 그대로 서비스에 전달한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).get('/api/v1/designs').query({ category: '심플' });
+
+    expect(response.status).toBe(200);
+    expect(service.getDesigns).toHaveBeenCalledWith(undefined, '심플', 10);
   });
 
   it('형식이 깨진 cursor는 400으로 응답한다', async () => {

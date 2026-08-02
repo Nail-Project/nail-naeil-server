@@ -30,15 +30,20 @@ class FakeRepository implements DesignRepository {
   wished = false;
   viewCountAfterIncrement = 7600;
   incrementError: unknown = null;
-  findFeedArgs: Array<{ cursor: DesignCursor | undefined; size: number }> = [];
+  findFeedArgs: Array<{
+    cursor: DesignCursor | undefined;
+    category: string | undefined;
+    size: number;
+  }> = [];
   incrementedIds: number[] = [];
   isWishedByUserArgs: Array<{ designId: number; userId: number }> = [];
 
   async findFeed(
     cursor: DesignCursor | undefined,
+    category: string | undefined,
     size: number,
   ): Promise<{ designs: DesignSummaryRecord[]; hasNext: boolean }> {
-    this.findFeedArgs.push({ cursor, size });
+    this.findFeedArgs.push({ cursor, category, size });
     return this.feedResult;
   }
 
@@ -101,7 +106,7 @@ describe('DesignService.getDesigns', () => {
       hasNext: false,
     };
 
-    const result = await service.getDesigns(undefined, 10);
+    const result = await service.getDesigns(undefined, undefined, 10);
 
     expect(result).toEqual({
       designs: [
@@ -134,7 +139,7 @@ describe('DesignService.getDesigns', () => {
       hasNext: true,
     };
 
-    const result = await service.getDesigns(undefined, 10);
+    const result = await service.getDesigns(undefined, undefined, 10);
 
     expect(result.pageInfo.hasNext).toBe(true);
     expect(result.pageInfo.nextCursor).toBe(
@@ -145,9 +150,15 @@ describe('DesignService.getDesigns', () => {
   it('요청한 cursor/size를 그대로 repository에 전달한다', async () => {
     const cursor: DesignCursor = { createdAt: new Date('2026-07-27T04:59:00.000Z'), id: 9 };
 
-    await service.getDesigns(cursor, 15);
+    await service.getDesigns(cursor, undefined, 15);
 
-    expect(repository.findFeedArgs).toEqual([{ cursor, size: 15 }]);
+    expect(repository.findFeedArgs).toEqual([{ cursor, category: undefined, size: 15 }]);
+  });
+
+  it('요청한 category를 그대로 repository에 전달한다', async () => {
+    await service.getDesigns(undefined, '심플', 10);
+
+    expect(repository.findFeedArgs).toEqual([{ cursor: undefined, category: '심플', size: 10 }]);
   });
 });
 

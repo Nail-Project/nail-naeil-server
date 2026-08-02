@@ -39,5 +39,9 @@ const cursorSchema = z
 
 export const GetDesignsRequest = z.object({
   cursor: cursorSchema,
+  // 태그 이름으로 필터링한다("카테고리 탭") - 고정된 목록을 여기서 강제하지 않는다.
+  // 태그는 AI 자동 태깅으로 계속 늘어나므로, 어떤 이름이 오든 그 태그가 달린 디자인만
+  // 걸러줄 뿐이다. 매칭되는 디자인이 없으면 에러가 아니라 빈 배열을 반환한다.
+  category: z.string().trim().min(1).max(50).optional(),
   size: stringToNumber.pipe(z.number().int().positive().max(MAX_SIZE)).default(DEFAULT_SIZE),
 });
