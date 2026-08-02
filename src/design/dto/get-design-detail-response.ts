@@ -3,7 +3,7 @@ export interface GetDesignDetailResponse {
   designId: number;
   title: string;
   images: string[];
-  tag: string;
+  tags: string[];
   viewCount: number;
   wishCount: number;
   durationMinutes: number;

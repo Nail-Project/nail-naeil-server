@@ -265,8 +265,6 @@ model Design {
   id               Int           @id @default(autoincrement())
   title            String        @db.VarChar(100)
   imageUrl         String        @map("image_url") @db.VarChar(255)
-  // 태그 여러 개를 콤마로 이어붙인 문자열 (예: "프렌치,글리터") - API 스펙/ERD 기준
-  tag              String        @db.VarChar(255)
   viewCount        Int           @default(0) @map("view_count")
   durationMinutes  Int           @map("duration_minutes")
   // TODO: [malibu] 값 종류(전체 옵션 목록) 확정되면 enum으로 전환
@@ -278,6 +276,7 @@ model Design {
   updatedAt        DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
   images           DesignImage[]
   wishes           WishDesign[]
+  tags             DesignTag[]
 
   // 피드 정렬(createdAt desc)이 데이터 증가 시 풀 테이블 스캔이 되지 않도록 인덱스를 둔다.
   @@index([createdAt])
@@ -304,4 +303,27 @@ model WishDesign {
 
   @@unique([designId, userId])
   @@map("wish_designs")
+}
+
+// AI 자동 태깅 + 인스타그램 스타일 태그 클릭 탐색을 위한 정규화된 태그.
+// 예전엔 Design.tag(콤마로 이어붙인 문자열) 하나였는데, 태그 단위 검색/집계가
+// 불가능해서 다대다 관계로 교체했다(2026-08-02, 실사용 데이터 없어서 컬럼 삭제로 바로 전환).
+model Tag {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique @db.VarChar(50)
+  createdAt DateTime    @default(now()) @map("created_at") @db.DateTime(3)
+  designs   DesignTag[]
+
+  @@map("tags")
+}
+
+model DesignTag {
+  designId  Int      @map("design_id")
+  tagId     Int      @map("tag_id")
+  design    Design   @relation(fields: [designId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@id([designId, tagId])
+  @@map("design_tags")
 }

@@ -1,3 +1,4 @@
+import type { Prisma } from '../../generated/prisma/client';
 import { getPrisma } from '../../infra/prisma';
 import type { DesignCursor } from '../dto/get-designs-request';
 
@@ -5,7 +6,7 @@ export interface DesignSummaryRecord {
   id: number;
   title: string;
   imageUrl: string;
-  tag: string;
+  tags: string[];
   // 커서 생성에만 쓰는 내부 필드 - 응답 DTO 매핑 시엔 사용하지 않는다.
   createdAt: Date;
 }
@@ -13,7 +14,7 @@ export interface DesignSummaryRecord {
 export interface DesignDetailRecord {
   id: number;
   title: string;
-  tag: string;
+  tags: string[];
   viewCount: number;
   durationMinutes: number;
   difficulty: string;
@@ -23,6 +24,31 @@ export interface DesignDetailRecord {
   wishCount: number;
 }
 
+export interface DesignAdminRecord {
+  id: number;
+  title: string;
+  imageUrl: string;
+  images: string[];
+  tags: string[];
+  durationMinutes: number;
+  difficulty: string;
+  recommendedShape: string;
+  description: string;
+}
+
+export interface CreateDesignData {
+  title: string;
+  imageUrl: string;
+  durationMinutes: number;
+  difficulty: string;
+  recommendedShape: string;
+  description: string;
+  images: string[];
+  tags: string[];
+}
+
+export type UpdateDesignData = Partial<CreateDesignData>;
+
 export interface DesignRepository {
   findFeed(
     cursor: DesignCursor | undefined,
@@ -31,7 +57,53 @@ export interface DesignRepository {
   findDetailById(designId: number): Promise<DesignDetailRecord | null>;
   incrementViewCount(designId: number): Promise<number>;
   isWishedByUser(designId: number, userId: number): Promise<boolean>;
+  create(data: CreateDesignData): Promise<DesignAdminRecord>;
+  update(designId: number, data: UpdateDesignData): Promise<DesignAdminRecord>;
+  delete(designId: number): Promise<void>;
 }
+
+// 관리자 생성/수정 응답에서 공통으로 쓰는 select+매핑 - 목록/상세 조회용 select와는
+// 필요한 필드가 달라(찜/조회수 없음, imageUrl 원본 필요) 별도로 둔다.
+const designAdminSelect = {
+  id: true,
+  title: true,
+  imageUrl: true,
+  durationMinutes: true,
+  difficulty: true,
+  recommendedShape: true,
+  description: true,
+  images: { select: { imageUrl: true }, orderBy: { id: 'asc' } },
+  tags: { select: { tag: { select: { name: true } } }, orderBy: { tagId: 'asc' } },
+} as const;
+
+type DesignAdminRow = Prisma.DesignGetPayload<{ select: typeof designAdminSelect }>;
+
+const mapDesignAdminRecord = (design: DesignAdminRow): DesignAdminRecord => ({
+  id: design.id,
+  title: design.title,
+  imageUrl: design.imageUrl,
+  images: design.images.map((image) => image.imageUrl),
+  tags: design.tags.map((t) => t.tag.name),
+  durationMinutes: design.durationMinutes,
+  difficulty: design.difficulty,
+  recommendedShape: design.recommendedShape,
+  description: design.description,
+});
+
+// 태그를 이름으로 upsert해서 id 목록으로 변환한다.
+// AI 자동 태깅/관리자 수동 입력 둘 다 "이름"만 알고 있는 상황을 가정한 설계 - 이미 있는
+// 이름이면 재사용하고, 처음 보는 이름이면 그 자리에서 새로 만든다.
+const resolveTagIds = async (
+  tx: Prisma.TransactionClient,
+  names: string[],
+): Promise<number[]> => {
+  const uniqueNames = [...new Set(names)];
+  const tags = await Promise.all(
+    uniqueNames.map((name) => tx.tag.upsert({ where: { name }, update: {}, create: { name } })),
+  );
+
+  return tags.map((tag) => tag.id);
+};
 
 export class PrismaDesignRepository implements DesignRepository {
   // 디자인 피드 조회 - 커서 기반(keyset) 페이지네이션
@@ -42,7 +114,13 @@ export class PrismaDesignRepository implements DesignRepository {
   ): Promise<{ designs: DesignSummaryRecord[]; hasNext: boolean }> {
     // size보다 1개 더 가져와서, 그 1개가 존재하면 다음 페이지가 있다는 뜻으로 사용한다(count 쿼리 대체).
     const rows = await getPrisma().design.findMany({
-      select: { id: true, title: true, imageUrl: true, tag: true, createdAt: true },
+      select: {
+        id: true,
+        title: true,
+        imageUrl: true,
+        createdAt: true,
+        tags: { select: { tag: { select: { name: true } } }, orderBy: { tagId: 'asc' } },
+      },
       where: cursor && {
         // (createdAt, id) 둘 다 내림차순 정렬 기준과 같은 방향으로 비교해야 커서 이후 항목만 걸러진다.
         OR: [
@@ -55,8 +133,18 @@ export class PrismaDesignRepository implements DesignRepository {
     });
 
     const hasNext = rows.length > size;
+    const page = hasNext ? rows.slice(0, size) : rows;
 
-    return { designs: hasNext ? rows.slice(0, size) : rows, hasNext };
+    return {
+      designs: page.map((row) => ({
+        id: row.id,
+        title: row.title,
+        imageUrl: row.imageUrl,
+        tags: row.tags.map((t) => t.tag.name),
+        createdAt: row.createdAt,
+      })),
+      hasNext,
+    };
   }
 
   // 디자인 상세 조회 - 이미지 목록(등록 순서)과 찜 개수 포함
@@ -66,13 +154,13 @@ export class PrismaDesignRepository implements DesignRepository {
       select: {
         id: true,
         title: true,
-        tag: true,
         viewCount: true,
         durationMinutes: true,
         difficulty: true,
         recommendedShape: true,
         description: true,
         images: { select: { imageUrl: true }, orderBy: { id: 'asc' } },
+        tags: { select: { tag: { select: { name: true } } }, orderBy: { tagId: 'asc' } },
         _count: { select: { wishes: true } },
       },
     });
@@ -82,7 +170,7 @@ export class PrismaDesignRepository implements DesignRepository {
     return {
       id: design.id,
       title: design.title,
-      tag: design.tag,
+      tags: design.tags.map((t) => t.tag.name),
       viewCount: design.viewCount,
       durationMinutes: design.durationMinutes,
       difficulty: design.difficulty,
@@ -113,5 +201,68 @@ export class PrismaDesignRepository implements DesignRepository {
     });
 
     return wish !== null;
+  }
+
+  // 관리자 디자인 생성 - 이미지 목록/태그를 한 트랜잭션으로 함께 만든다.
+  async create(data: CreateDesignData): Promise<DesignAdminRecord> {
+    const design = await getPrisma().$transaction(async (tx) => {
+      const tagIds = await resolveTagIds(tx, data.tags);
+
+      return tx.design.create({
+        data: {
+          title: data.title,
+          imageUrl: data.imageUrl,
+          durationMinutes: data.durationMinutes,
+          difficulty: data.difficulty,
+          recommendedShape: data.recommendedShape,
+          description: data.description,
+          images: { create: data.images.map((imageUrl) => ({ imageUrl })) },
+          tags: { create: tagIds.map((tagId) => ({ tagId })) },
+        },
+        select: designAdminSelect,
+      });
+    });
+
+    return mapDesignAdminRecord(design);
+  }
+
+  // 관리자 디자인 수정(PATCH) - images/tags가 전달되면 기존 목록을 통째로 대체한다.
+  // 존재하지 않는 designId면 Prisma가 P2025를 던지고, 그대로 서비스로 전파한다
+  // (reservation/design 다른 write 로직과 동일하게 repository는 매핑만, 에러 판단은 service).
+  async update(designId: number, data: UpdateDesignData): Promise<DesignAdminRecord> {
+    const design = await getPrisma().$transaction(async (tx) => {
+      const updateData: Prisma.DesignUpdateInput = {};
+
+      if (data.title !== undefined) updateData.title = data.title;
+      if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
+      if (data.durationMinutes !== undefined) updateData.durationMinutes = data.durationMinutes;
+      if (data.difficulty !== undefined) updateData.difficulty = data.difficulty;
+      if (data.recommendedShape !== undefined) updateData.recommendedShape = data.recommendedShape;
+      if (data.description !== undefined) updateData.description = data.description;
+
+      if (data.images !== undefined) {
+        await tx.designImage.deleteMany({ where: { designId } });
+        updateData.images = { create: data.images.map((imageUrl) => ({ imageUrl })) };
+      }
+
+      if (data.tags !== undefined) {
+        const tagIds = await resolveTagIds(tx, data.tags);
+        await tx.designTag.deleteMany({ where: { designId } });
+        updateData.tags = { create: tagIds.map((tagId) => ({ tagId })) };
+      }
+
+      return tx.design.update({
+        where: { id: designId },
+        data: updateData,
+        select: designAdminSelect,
+      });
+    });
+
+    return mapDesignAdminRecord(design);
+  }
+
+  // 관리자 디자인 삭제 - DesignImage/WishDesign/DesignTag는 FK cascade로 함께 삭제된다.
+  async delete(designId: number): Promise<void> {
+    await getPrisma().design.delete({ where: { id: designId } });
   }
 }

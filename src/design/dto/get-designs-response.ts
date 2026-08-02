@@ -3,7 +3,7 @@ export interface DesignSummaryItem {
   designId: number;
   title: string;
   imageUrl: string;
-  tag: string;
+  tags: string[];
 }
 
 export interface PageInfo {

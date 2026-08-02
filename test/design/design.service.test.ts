@@ -17,7 +17,7 @@ class FakeRepository implements DesignRepository {
   detailResult: DesignDetailRecord | null = {
     id: 1,
     title: '도트 프렌치 네일',
-    tag: '여름네일,아트,키치',
+    tags: ['여름네일', '아트', '키치'],
     viewCount: 7599,
     durationMinutes: 90,
     difficulty: '높음',
@@ -77,7 +77,7 @@ describe('DesignService.getDesigns', () => {
           id: 1,
           title: '글리터 프렌치',
           imageUrl: 'https://.../design1.jpg',
-          tag: '프렌치,글리터',
+          tags: ['프렌치', '글리터'],
           createdAt: new Date('2026-07-27T04:59:00.000Z'),
         },
       ],
@@ -88,7 +88,7 @@ describe('DesignService.getDesigns', () => {
 
     expect(result).toEqual({
       designs: [
-        { designId: 1, title: '글리터 프렌치', imageUrl: 'https://.../design1.jpg', tag: '프렌치,글리터' },
+        { designId: 1, title: '글리터 프렌치', imageUrl: 'https://.../design1.jpg', tags: ['프렌치', '글리터'] },
       ],
       pageInfo: { nextCursor: null, hasNext: false },
     });
@@ -101,7 +101,7 @@ describe('DesignService.getDesigns', () => {
           id: 1,
           title: '글리터 프렌치',
           imageUrl: 'https://.../design1.jpg',
-          tag: '프렌치,글리터',
+          tags: ['프렌치', '글리터'],
           createdAt: new Date('2026-07-27T04:59:00.000Z'),
         },
       ],
@@ -190,7 +190,7 @@ describe('DesignService.getDesignDetail', () => {
       designId: 1,
       title: '도트 프렌치 네일',
       images: ['https://.../design1-1.jpg', 'https://.../design1-2.jpg'],
-      tag: '여름네일,아트,키치',
+      tags: ['여름네일', '아트', '키치'],
       wishCount: 901,
       durationMinutes: 90,
       difficulty: '높음',

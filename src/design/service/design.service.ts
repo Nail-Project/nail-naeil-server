@@ -27,7 +27,7 @@ export class DesignService {
         designId: design.id,
         title: design.title,
         imageUrl: design.imageUrl,
-        tag: design.tag,
+        tags: design.tags,
       })),
       pageInfo: { nextCursor, hasNext },
     };
@@ -55,7 +55,7 @@ export class DesignService {
       designId: design.id,
       title: design.title,
       images: design.images,
-      tag: design.tag,
+      tags: design.tags,
       viewCount,
       wishCount: design.wishCount,
       durationMinutes: design.durationMinutes,

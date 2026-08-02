@@ -28,7 +28,7 @@ const createApp = () => {
       designId: 1,
       title: '도트 프렌치 네일',
       images: ['https://.../design1.jpg'],
-      tag: '여름네일,아트',
+      tags: ['여름네일', '아트'],
       viewCount: 7600,
       wishCount: 901,
       durationMinutes: 90,
