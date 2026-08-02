@@ -45,6 +45,36 @@ const designRouter = Router();
  */
 /**
  * @openapi
+ * /api/v1/designs/wishlist:
+ *   get:
+ *     summary: 내가 찜한 디자인 목록 조회
+ *     security:
+ *       - bearerAuth: []
+ *     tags:
+ *       - Design
+ *     parameters:
+ *       - in: query
+ *         name: cursor
+ *         schema:
+ *           type: string
+ *         description: 이전 응답의 pageInfo.nextCursor 값. 첫 페이지는 생략한다.
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: 찜한 디자인 목록 조회 성공
+ *       400:
+ *         description: 유효하지 않은 쿼리 값
+ *       401:
+ *         description: 인증 실패
+ *       500:
+ *         description: 서버 오류
+ */
+/**
+ * @openapi
  * /api/v1/designs/{designId}:
  *   get:
  *     summary: 디자인 상세 조회
@@ -68,9 +98,67 @@ const designRouter = Router();
  *       500:
  *         description: 서버 오류
  */
+/**
+ * @openapi
+ * /api/v1/designs/{designId}/wish:
+ *   post:
+ *     summary: 디자인 찜 생성
+ *     description: 이미 찜한 디자인을 다시 요청해도 에러 없이 성공(200)으로 멱등하게 처리한다.
+ *     security:
+ *       - bearerAuth: []
+ *     tags:
+ *       - Design
+ *     parameters:
+ *       - in: path
+ *         name: designId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 찜 생성 성공(이미 찜한 경우 포함)
+ *       400:
+ *         description: 유효하지 않은 디자인 id
+ *       401:
+ *         description: 인증 실패
+ *       404:
+ *         description: 존재하지 않는 디자인
+ *       500:
+ *         description: 서버 오류
+ *   delete:
+ *     summary: 디자인 찜 삭제
+ *     description: 찜하지 않은 디자인을 삭제 요청해도 에러 없이 성공(200)으로 멱등하게 처리한다.
+ *     security:
+ *       - bearerAuth: []
+ *     tags:
+ *       - Design
+ *     parameters:
+ *       - in: path
+ *         name: designId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 찜 삭제 성공(이미 찜 안 한 경우 포함)
+ *       400:
+ *         description: 유효하지 않은 디자인 id
+ *       401:
+ *         description: 인증 실패
+ *       404:
+ *         description: 존재하지 않는 디자인
+ *       500:
+ *         description: 서버 오류
+ */
 const registerRoutes = (router: Router, routeController: DesignController): Router => {
   router.get('/', routeController.getDesigns);
+  // 정적 경로(/wishlist)는 반드시 동적 경로(/:designId)보다 먼저 등록한다 -
+  // 등록 순서상 뒤에 두면 GET /wishlist 요청이 /:designId에 먼저 매칭되어
+  // "wishlist"를 디자인 id로 파싱하려다 실패(400)한다.
+  router.get('/wishlist', authMiddleware, routeController.getWishlist);
   router.get('/:designId', authMiddleware, routeController.getDesignDetail);
+  router.post('/:designId/wish', authMiddleware, routeController.createWish);
+  router.delete('/:designId/wish', authMiddleware, routeController.deleteWish);
 
   return router;
 };
