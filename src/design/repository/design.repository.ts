@@ -264,11 +264,19 @@ export class PrismaDesignRepository implements DesignRepository {
   // 같은 결과). 하트 토글 UI 특성상 프론트가 "찜 안 한 상태"를 정확히 안다고 가정하기
   // 어려워, service.createWish()에서도 이미 찜한 경우를 성공으로 취급하는 정책과 짝을 이룬다.
   async createWish(designId: number, userId: number): Promise<{ wishCount: number }> {
-    await getPrisma().wishDesign.upsert({
-      where: { designId_userId: { designId, userId } },
-      update: {},
-      create: { designId, userId },
-    });
+    try {
+      await getPrisma().wishDesign.upsert({
+        where: { designId_userId: { designId, userId } },
+        update: {},
+        create: { designId, userId },
+      });
+    } catch (error) {
+      // Prisma의 upsert는 MySQL에서 진짜 원자적 UPSERT가 아니라 조회 후 생성/수정이라,
+      // 같은 (designId, userId)로 두 요청이 거의 동시에 들어오면(하트 연타) 한쪽이
+      // unique 제약 위반(P2002)을 낼 수 있다. 원하는 최종 상태(찜 존재)는 이미
+      // 달성됐으므로, 멱등 처리 원칙에 따라 실패로 취급하지 않고 넘어간다.
+      if (!isUniqueConstraintError(error)) throw error;
+    }
 
     const wishCount = await getPrisma().wishDesign.count({ where: { designId } });
     return { wishCount };
