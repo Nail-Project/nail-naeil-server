@@ -4,6 +4,8 @@ export interface DesignSummaryItem {
   title: string;
   imageUrl: string;
   tags: string[];
+  viewCount: number;
+  wishCount: number;
 }
 
 export interface PageInfo {

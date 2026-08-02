@@ -7,6 +7,8 @@ export interface DesignSummaryRecord {
   title: string;
   imageUrl: string;
   tags: string[];
+  viewCount: number;
+  wishCount: number;
   // 커서 생성에만 쓰는 내부 필드 - 응답 DTO 매핑 시엔 사용하지 않는다.
   createdAt: Date;
 }
@@ -130,8 +132,10 @@ export class PrismaDesignRepository implements DesignRepository {
         id: true,
         title: true,
         imageUrl: true,
+        viewCount: true,
         createdAt: true,
         tags: { select: { tag: { select: { name: true } } }, orderBy: { tagId: 'asc' } },
+        _count: { select: { wishes: true } },
       },
       where: cursor && {
         // (createdAt, id) 둘 다 내림차순 정렬 기준과 같은 방향으로 비교해야 커서 이후 항목만 걸러진다.
@@ -153,6 +157,8 @@ export class PrismaDesignRepository implements DesignRepository {
         title: row.title,
         imageUrl: row.imageUrl,
         tags: row.tags.map((t) => t.tag.name),
+        viewCount: row.viewCount,
+        wishCount: row._count.wishes,
         createdAt: row.createdAt,
       })),
       hasNext,

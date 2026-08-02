@@ -30,6 +30,8 @@ export class DesignService {
         title: design.title,
         imageUrl: design.imageUrl,
         tags: design.tags,
+        viewCount: design.viewCount,
+        wishCount: design.wishCount,
       })),
       pageInfo: { nextCursor, hasNext },
     };
