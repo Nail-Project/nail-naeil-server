@@ -61,6 +61,7 @@ model User {
   updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
   authProviders UserAuthProvider[]
   refreshTokens RefreshToken[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -95,6 +96,33 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id])
 
   @@map("refresh_tokens")
+}
+
+// 인앱 알림. 견적/예약 상태 변경 등 이벤트를 사용자별로 쌓아두고 앱에서 조회한다.
+// FCM 외부 발송은 후속 단계에서 이 데이터를 재사용해 얹는다.
+enum NotificationType {
+  ESTIMATE_RESPONSE // 견적 응답 도착
+  RESERVATION_STATUS // 예약 상태 변경(확정/취소 등)
+}
+
+model Notification {
+  id     Int              @id @default(autoincrement())
+  userId Int              @map("user_id")
+  type   NotificationType
+  title  String           @db.VarChar(100)
+  body   String           @db.VarChar(255)
+  // 알림 클릭 시 이동에 필요한 관련 리소스 식별자 등을 담는다(예: { "reservationId": 12 }).
+  data      Json?
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at") @db.DateTime(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  // 회원 탈퇴 시 알림도 함께 삭제되도록 Cascade.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 내 알림 목록을 최신순으로, 안읽음 필터와 함께 조회하는 접근 패턴에 맞춘 인덱스.
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
 
 enum EstimateResponseStatus {
