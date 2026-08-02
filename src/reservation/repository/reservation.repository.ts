@@ -54,6 +54,17 @@ export interface ReservationDetailRecord {
   };
 }
 
+export interface ReservationStatusRecord {
+  id: bigint;
+  status: ReservationStatus;
+}
+
+export interface CancelledReservationRecord {
+  id: bigint;
+  status: ReservationStatus;
+  cancelReason: string | null;
+}
+
 export interface ProposalRecord {
   id: number;
   totalPrice: number;
@@ -84,6 +95,15 @@ export interface ReservationRepository {
     size: number,
   ): Promise<{ reservations: ReservationRecord[]; hasNext: boolean }>;
   findByIdAndUserId(reservationId: bigint, userId: bigint): Promise<ReservationDetailRecord | null>;
+  findStatusByIdAndUserId(
+    reservationId: bigint,
+    userId: bigint,
+  ): Promise<ReservationStatusRecord | null>;
+  cancel(
+    reservationId: bigint,
+    userId: bigint,
+    reason: string,
+  ): Promise<CancelledReservationRecord | null>;
 }
 
 export class PrismaReservationRepository implements ReservationRepository {
@@ -103,8 +123,12 @@ export class PrismaReservationRepository implements ReservationRepository {
   }
 
   // 동일 견적에 대한 중복 예약 여부 확인
+  // [malibu][A1] 취소된 예약은 같은 견적으로 재예약을 허용하는 정책(2026-08-03)에 따라
+  // CANCELLED 상태는 중복 판정에서 제외한다 - "취소되지 않은" 예약만 존재하면 중복으로 막는다.
   async existsByProposalId(proposalId: number): Promise<boolean> {
-    const count = await getPrisma().reservation.count({ where: { proposalId } });
+    const count = await getPrisma().reservation.count({
+      where: { proposalId, status: { not: 'CANCELLED' } },
+    });
     return count > 0;
   }
 
@@ -192,6 +216,40 @@ export class PrismaReservationRepository implements ReservationRepository {
           },
         },
       },
+    });
+  }
+
+  // 취소 처리 전 소유권 + 현재 상태 확인용 - 상세 조회처럼 견적/샵 정보까지 조인할 필요가 없어 별도 select로 둔다.
+  async findStatusByIdAndUserId(
+    reservationId: bigint,
+    userId: bigint,
+  ): Promise<ReservationStatusRecord | null> {
+    return await getPrisma().reservation.findFirst({
+      where: { id: reservationId, userId },
+      select: { id: true, status: true },
+    });
+  }
+
+  // 예약 취소 - status가 CONFIRMED인 경우에만 CANCELLED로 전이시키는 조건부 업데이트.
+  // updateMany의 where절에 status: 'CONFIRMED' 조건을 함께 걸어 원자적으로 처리하므로,
+  // 동시에 들어온 취소 요청 중 하나만 반영되고 나머지는 count 0으로 걸러진다(경쟁 상태 안전장치).
+  async cancel(
+    reservationId: bigint,
+    userId: bigint,
+    reason: string,
+  ): Promise<CancelledReservationRecord | null> {
+    const prisma = getPrisma();
+
+    const { count } = await prisma.reservation.updateMany({
+      where: { id: reservationId, userId, status: 'CONFIRMED' },
+      data: { status: 'CANCELLED', cancelReason: reason },
+    });
+
+    if (count === 0) return null;
+
+    return await prisma.reservation.findUniqueOrThrow({
+      where: { id: reservationId },
+      select: { id: true, status: true, cancelReason: true },
     });
   }
 }

@@ -72,13 +72,37 @@ export class AlreadyReservedError extends AppError {
   }
 }
 
-// GET /:reservationId - 존재하지 않거나 본인 소유가 아닌 예약 id
+// GET /:reservationId, DELETE /:reservationId - 존재하지 않거나 본인 소유가 아닌 예약 id
 export class ReservationNotFoundError extends AppError {
   constructor(data?: unknown) {
     super({
       code: 'RESERVATION_NOT_FOUND',
       statusCode: 404,
       message: '존재하지 않는 예약입니다.',
+      data,
+    });
+  }
+}
+
+// DELETE /:reservationId - 취소 request body(reason) 값 검증 실패
+export class CancelReservationValidationError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'CANCEL_RESERVATION_VALIDATION_FAILED',
+      statusCode: 400,
+      message: '취소 사유를 입력해주세요.',
+      data,
+    });
+  }
+}
+
+// DELETE /:reservationId - 이미 취소되었거나 완료된 예약은 취소할 수 없음
+export class ReservationAlreadyFinalizedError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'RESERVATION_ALREADY_FINALIZED',
+      statusCode: 409,
+      message: '이미 취소되었거나 완료된 예약은 취소할 수 없습니다.',
       data,
     });
   }

@@ -2,12 +2,14 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { Prisma } from '../../src/generated/prisma/client';
 import type { ReservationStatus } from '../../src/generated/prisma/enums';
 import type {
+  CancelledReservationRecord,
   CreatedReservationRecord,
   ProposalRecord,
   ProposalTimeRecord,
   ReservationDetailRecord,
   ReservationRecord,
   ReservationRepository,
+  ReservationStatusRecord,
 } from '../../src/reservation/repository/reservation.repository';
 import { ReservationService } from '../../src/reservation/service/reservation.service';
 import type { CreateReservationRequestType } from '../../src/reservation/dto/create-reservation-request';
@@ -46,6 +48,15 @@ class FakeRepository implements ReservationRepository {
   };
   detailResult: ReservationDetailRecord | null = null;
 
+  statusResult: ReservationStatusRecord | null = { id: 1n, status: 'CONFIRMED' };
+  cancelResult: CancelledReservationRecord | null = {
+    id: 1n,
+    status: 'CANCELLED',
+    cancelReason: '개인 사정으로 인해 취소할게요',
+  };
+  cancelError: unknown = null;
+  lastCancelArgs: { reservationId: bigint; userId: bigint; reason: string } | null = null;
+
   lastStatuses: ReservationStatus[] | null = null;
   lastCursor: ReservationCursor | undefined = undefined;
 
@@ -78,6 +89,20 @@ class FakeRepository implements ReservationRepository {
 
   async findByIdAndUserId(): Promise<ReservationDetailRecord | null> {
     return this.detailResult;
+  }
+
+  async findStatusByIdAndUserId(): Promise<ReservationStatusRecord | null> {
+    return this.statusResult;
+  }
+
+  async cancel(
+    reservationId: bigint,
+    userId: bigint,
+    reason: string,
+  ): Promise<CancelledReservationRecord | null> {
+    this.lastCancelArgs = { reservationId, userId, reason };
+    if (this.cancelError) throw this.cancelError;
+    return this.cancelResult;
   }
 }
 
@@ -327,6 +352,79 @@ describe('ReservationService.getReservationDetail', () => {
     await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
       address: '서울시 강남구',
       shopComment: null,
+    });
+  });
+});
+
+describe('ReservationService.cancelReservation', () => {
+  let repository: FakeRepository;
+  let service: ReservationService;
+
+  beforeEach(() => {
+    repository = new FakeRepository();
+    service = new ReservationService(repository);
+  });
+
+  it('정상적으로 예약을 취소한다', async () => {
+    await expect(
+      service.cancelReservation(1n, userId, '개인 사정으로 인해 취소할게요'),
+    ).resolves.toMatchObject({
+      reservationId: 1,
+      status: 'CANCELLED',
+      cancelReason: '개인 사정으로 인해 취소할게요',
+    });
+
+    expect(repository.lastCancelArgs).toEqual({
+      reservationId: 1n,
+      userId,
+      reason: '개인 사정으로 인해 취소할게요',
+    });
+  });
+
+  it('존재하지 않거나 본인 소유가 아닌 예약이면 404를 던진다', async () => {
+    repository.statusResult = null;
+
+    await expect(service.cancelReservation(1n, userId, '기타')).rejects.toMatchObject({
+      code: 'RESERVATION_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
+
+  it('이미 취소된 예약이면 409를 던진다', async () => {
+    repository.statusResult = { id: 1n, status: 'CANCELLED' };
+
+    await expect(service.cancelReservation(1n, userId, '기타')).rejects.toMatchObject({
+      code: 'RESERVATION_ALREADY_FINALIZED',
+      statusCode: 409,
+    });
+  });
+
+  it('이미 완료된 예약이면 409를 던진다', async () => {
+    repository.statusResult = { id: 1n, status: 'COMPLETED' };
+
+    await expect(service.cancelReservation(1n, userId, '기타')).rejects.toMatchObject({
+      code: 'RESERVATION_ALREADY_FINALIZED',
+      statusCode: 409,
+    });
+  });
+
+  it('사전 체크 통과 후 동시 취소 경쟁 상태로 반영이 안 됐으면(count 0) 409를 던진다', async () => {
+    repository.cancelResult = null;
+
+    await expect(service.cancelReservation(1n, userId, '기타')).rejects.toMatchObject({
+      code: 'RESERVATION_ALREADY_FINALIZED',
+      statusCode: 409,
+    });
+  });
+
+  it('취소 처리 중 알 수 없는 에러는 500으로 변환하고 원본 에러를 data에 담는다', async () => {
+    const originalError = new Error('예상치 못한 DB 오류');
+    repository.cancelError = originalError;
+
+    await expect(service.cancelReservation(1n, userId, '기타')).rejects.toMatchObject({
+      code: 'RESERVATION_FAILED',
+      statusCode: 500,
+      data: { originalError },
     });
   });
 });

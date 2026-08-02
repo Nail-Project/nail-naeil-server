@@ -184,10 +184,82 @@ const reservationRouter = Router();
  *               tokenInvalid:
  *                 value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null }
  */
+/**
+ * @openapi
+ * /api/v1/reserve/{reservationId}:
+ *   delete:
+ *     summary: 예약 취소
+ *     description: >
+ *       본인 예약만 취소할 수 있다. "예약 변경"은 별도 API 없이 프론트에서 샵 연락처 안내 팝업으로 처리한다(Figma 기준).
+ *     security:
+ *       - bearerAuth: []
+ *     tags:
+ *       - Reservation
+ *     parameters:
+ *       - in: path
+ *         name: reservationId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 example: 개인 사정으로 인해 취소할게요
+ *     responses:
+ *       200:
+ *         description: 예약 취소 성공
+ *       400:
+ *         description: 유효하지 않은 예약 id 또는 취소 사유
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             examples:
+ *               invalidId:
+ *                 value: { resultType: FAIL, error: { code: INVALID_RESERVATION_ID, message: 유효하지 않은 예약 id입니다., data: null }, success: null }
+ *               invalidReason:
+ *                 value: { resultType: FAIL, error: { code: CANCEL_RESERVATION_VALIDATION_FAILED, message: 취소 사유를 입력해주세요., data: null }, success: null }
+ *       404:
+ *         description: 존재하지 않거나 본인 소유가 아닌 예약
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: RESERVATION_NOT_FOUND, message: 존재하지 않는 예약입니다., data: null }, success: null }
+ *       409:
+ *         description: 이미 취소되었거나 완료된 예약
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: RESERVATION_ALREADY_FINALIZED, message: 이미 취소되었거나 완료된 예약은 취소할 수 없습니다., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             examples:
+ *               unauthorized:
+ *                 value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null }
+ *               tokenExpired:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null }
+ *               tokenInvalid:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null }
+ */
 const registerRoutes = (router: Router, routeController: ReservationController): Router => {
   router.post('/', authMiddleware, routeController.createReservation);
   router.get('/detail', authMiddleware, routeController.getReservations);
   router.get('/:reservationId', authMiddleware, routeController.getReservationDetail);
+  router.delete('/:reservationId', authMiddleware, routeController.cancelReservation);
 
   return router;
 };

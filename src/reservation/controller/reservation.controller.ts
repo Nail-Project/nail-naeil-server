@@ -3,7 +3,9 @@ import type { ReservationService } from '../service/reservation.service';
 import { CreateReservationRequest } from '../dto/create-reservation-request';
 import { GetReservationsRequest } from '../dto/get-reservations-request';
 import { GetReservationDetailRequest } from '../dto/get-reservation-detail-request';
+import { CancelReservationRequest } from '../dto/cancel-reservation-request';
 import {
+  CancelReservationValidationError,
   InvalidReservationIdError,
   InvalidReservationRequestError,
   ReservationValidationError,
@@ -65,6 +67,30 @@ export class ReservationController {
       const result = await this.reservationService.getReservationDetail(
         BigInt(parsed.data.reservationId),
         BigInt(req.userId),
+      );
+      res.status(200).json(success(result));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // DELETE /api/v1/reserve/:reservationId
+  cancelReservation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsedParams = GetReservationDetailRequest.safeParse(req.params);
+      if (!parsedParams.success) {
+        throw new InvalidReservationIdError(parsedParams.error.flatten());
+      }
+
+      const parsedBody = CancelReservationRequest.safeParse(req.body);
+      if (!parsedBody.success) {
+        throw new CancelReservationValidationError(parsedBody.error.flatten());
+      }
+
+      const result = await this.reservationService.cancelReservation(
+        BigInt(parsedParams.data.reservationId),
+        BigInt(req.userId),
+        parsedBody.data.reason,
       );
       res.status(200).json(success(result));
     } catch (error) {

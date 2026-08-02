@@ -6,6 +6,7 @@ import { CreateReservationResponse } from '../dto/create-reservation-response';
 import { GetReservationsResponse } from '../dto/get-reservations-response';
 import type { ReservationCursor } from '../dto/get-reservations-request';
 import { GetReservationDetailResponse } from '../dto/get-reservation-detail-response';
+import { CancelReservationResponse } from '../dto/cancel-reservation-response';
 import type { ReservationListStatus } from '../reservation.constants';
 import { encodeCursor } from '../../common/pagination/cursor';
 import { ReservationFailedError } from '../../common/errors/common.error';
@@ -13,6 +14,7 @@ import {
   AlreadyReservedError,
   ProposalNotFoundError,
   ProposalTimeNotFoundError,
+  ReservationAlreadyFinalizedError,
   ReservationNotFoundError,
 } from '../error/reservation.error';
 
@@ -147,6 +149,41 @@ export class ReservationService {
       status: reservation.status,
       // TODO: [malibu] Design 모델 추가 후 연결 예정
       designName: null,
+    };
+  }
+
+  // 예약 취소
+  async cancelReservation(
+    reservationId: bigint,
+    userId: bigint,
+    reason: string,
+  ): Promise<CancelReservationResponse> {
+    // 존재하지 않거나 본인 소유가 아닌 예약인 경우 404 (findStatusByIdAndUserId의 where절에서
+    // userId를 함께 걸어 소유권을 검증한다 - IDOR 방지)
+    const reservation = await this.reservationRepository.findStatusByIdAndUserId(
+      reservationId,
+      userId,
+    );
+    if (!reservation) throw new ReservationNotFoundError();
+
+    // 이미 취소됐거나 완료된 예약은 다시 취소할 수 없음 (사전 체크 - 일반적인 경우 빠르게 차단)
+    if (reservation.status !== 'CONFIRMED') throw new ReservationAlreadyFinalizedError();
+
+    let cancelled;
+    try {
+      cancelled = await this.reservationRepository.cancel(reservationId, userId, reason);
+    } catch (error) {
+      throw new ReservationFailedError({ originalError: error });
+    }
+
+    // 사전 체크와 조건부 업데이트(cancel()의 updateMany) 사이의 경쟁 상태로
+    // 동시에 들어온 취소 요청이 먼저 반영된 경우 - count가 0이라 null이 돌아온다.
+    if (!cancelled) throw new ReservationAlreadyFinalizedError();
+
+    return {
+      reservationId: Number(cancelled.id),
+      status: cancelled.status,
+      cancelReason: cancelled.cancelReason,
     };
   }
 }
