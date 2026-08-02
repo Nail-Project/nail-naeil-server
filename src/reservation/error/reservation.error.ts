@@ -85,10 +85,10 @@ export class ReservationNotFoundError extends AppError {
 }
 
 // DELETE /:reservationId - 취소 request body(reason) 값 검증 실패
-export class CancelReservationValidationError extends AppError {
+export class ReservationCancelValidationError extends AppError {
   constructor(data?: unknown) {
     super({
-      code: 'CANCEL_RESERVATION_VALIDATION_FAILED',
+      code: 'RESERVATION_CANCEL_VALIDATION_FAILED',
       statusCode: 400,
       message: '취소 사유를 입력해주세요.',
       data,

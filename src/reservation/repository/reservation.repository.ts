@@ -1,3 +1,4 @@
+import { Prisma } from '../../generated/prisma/client';
 import { getPrisma } from '../../infra/prisma';
 import type { ReservationStatus } from '../../generated/prisma/enums';
 import type { ReservationCursor } from '../dto/get-reservations-request';
@@ -133,16 +134,38 @@ export class PrismaReservationRepository implements ReservationRepository {
   }
 
   // 예약 생성 - 선택된 시간 슬롯을 isSelected=true로 함께 반영 (견적 응답 도메인의 예약 가능 시간 조회 API가 참조하는 값)
+  // [malibu][A1] proposalId의 DB unique 제약이 재예약 정책 변경으로 사라져서(2026-08-03),
+  // 사전 체크(existsByProposalId)만으로는 동시 요청에 대한 TOCTOU를 막지 못한다
+  // (두 요청이 거의 동시에 체크를 통과하면 둘 다 생성에 성공해 중복 CONFIRMED 예약이 생김 -
+  // 10기준 리뷰에서 정확성/보안/테스트커버리지 3개 에이전트가 독립적으로 발견).
+  // "아직 없는 예약 row"를 FOR UPDATE로 잠그려 하면(빈 레인지에 갭 락) MySQL/InnoDB가
+  // 곧이어 실행되는 INSERT의 삽입의도락과 얽혀 데드락을 낸다(실제로 재현됨, P2034
+  // "write conflict or deadlock"). 대신 이미 존재하는 EstimateResponse(견적) row
+  // 자체를 잠가서, 같은 proposalId로 몰리는 동시 요청을 그 row 하나의 락으로 직렬화한다.
   async create(data: {
     proposalId: number;
     timeId: number;
     userId: bigint;
     reservedAt: Date;
   }): Promise<CreatedReservationRecord> {
-    const prisma = getPrisma();
+    return getPrisma().$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM estimate_responses WHERE id = ${data.proposalId} FOR UPDATE`;
 
-    const [reservation] = await prisma.$transaction([
-      prisma.reservation.create({
+      const activeCount = await tx.reservation.count({
+        where: { proposalId: data.proposalId, status: { not: 'CANCELLED' } },
+      });
+
+      if (activeCount > 0) {
+        // 서비스 레이어의 기존 P2002(isUniqueConstraintError) 처리 경로를 그대로 태워
+        // AlreadyReservedError(409)로 매핑되게 한다 - 새 에러 타입/분기 추가 없이 기존
+        // 경쟁 상태 처리 로직을 재사용.
+        throw new Prisma.PrismaClientKnownRequestError('동시 예약 요청이 감지됐습니다.', {
+          code: 'P2002',
+          clientVersion: 'reservation-lock-check',
+        });
+      }
+
+      const reservation = await tx.reservation.create({
         data: {
           proposalId: data.proposalId,
           userId: data.userId,
@@ -150,14 +173,15 @@ export class PrismaReservationRepository implements ReservationRepository {
           status: 'CONFIRMED',
         },
         select: createReservationSelect,
-      }),
-      prisma.shopProposalTime.update({
+      });
+
+      await tx.shopProposalTime.update({
         where: { id: data.timeId },
         data: { isSelected: true },
-      }),
-    ]);
+      });
 
-    return reservation;
+      return reservation;
+    });
   }
 
   // 상태별 예약 목록 조회 (CONFIRMED 단건 상태 또는 PAST용 COMPLETED+CANCELLED 복수 상태)

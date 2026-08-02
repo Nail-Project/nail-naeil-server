@@ -5,13 +5,12 @@ import { GetReservationsRequest } from '../dto/get-reservations-request';
 import { GetReservationDetailRequest } from '../dto/get-reservation-detail-request';
 import { CancelReservationRequest } from '../dto/cancel-reservation-request';
 import {
-  CancelReservationValidationError,
+  ReservationCancelValidationError,
   InvalidReservationIdError,
   InvalidReservationRequestError,
   ReservationValidationError,
 } from '../error/reservation.error';
 import { success } from '../../common/responses/api-response';
-
 
 export class ReservationController {
   constructor(private readonly reservationService: ReservationService) {}
@@ -25,7 +24,10 @@ export class ReservationController {
         throw new ReservationValidationError(parsed.error.flatten());
       }
 
-      const result = await this.reservationService.createReservation(parsed.data, BigInt(req.userId));
+      const result = await this.reservationService.createReservation(
+        parsed.data,
+        BigInt(req.userId),
+      );
       res.status(201).json(success(result));
     } catch (error) {
       next(error);
@@ -84,7 +86,7 @@ export class ReservationController {
 
       const parsedBody = CancelReservationRequest.safeParse(req.body);
       if (!parsedBody.success) {
-        throw new CancelReservationValidationError(parsedBody.error.flatten());
+        throw new ReservationCancelValidationError(parsedBody.error.flatten());
       }
 
       const result = await this.reservationService.cancelReservation(

@@ -226,7 +226,7 @@ const reservationRouter = Router();
  *               invalidId:
  *                 value: { resultType: FAIL, error: { code: INVALID_RESERVATION_ID, message: 유효하지 않은 예약 id입니다., data: null }, success: null }
  *               invalidReason:
- *                 value: { resultType: FAIL, error: { code: CANCEL_RESERVATION_VALIDATION_FAILED, message: 취소 사유를 입력해주세요., data: null }, success: null }
+ *                 value: { resultType: FAIL, error: { code: RESERVATION_CANCEL_VALIDATION_FAILED, message: 취소 사유를 입력해주세요., data: null }, success: null }
  *       404:
  *         description: 존재하지 않거나 본인 소유가 아닌 예약
  *         content:
