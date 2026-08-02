@@ -139,7 +139,11 @@ export class ReservationService {
       shopName: shop.name,
       address: shop.addressDetail ? `${shop.address} ${shop.addressDetail}` : shop.address,
       reservedAt: reservation.reservedAt,
+      basePrice: reservation.proposal.basePrice,
+      removalPrice: reservation.proposal.removalPrice,
+      extraPrice: reservation.proposal.extraPrice,
       totalPrice: reservation.proposal.totalPrice,
+      shopComment: reservation.proposal.memo,
       status: reservation.status,
       // TODO: [malibu] Design 모델 추가 후 연결 예정
       designName: null,

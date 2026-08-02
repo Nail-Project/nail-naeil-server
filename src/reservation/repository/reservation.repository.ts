@@ -46,6 +46,10 @@ export interface ReservationDetailRecord {
   status: ReservationStatus;
   proposal: {
     totalPrice: number;
+    basePrice: number;
+    removalPrice: number;
+    extraPrice: number;
+    memo: string | null;
     shop: { name: string; address: string; addressDetail: string | null };
   };
 }
@@ -79,10 +83,7 @@ export interface ReservationRepository {
     cursor: ReservationCursor | undefined,
     size: number,
   ): Promise<{ reservations: ReservationRecord[]; hasNext: boolean }>;
-  findByIdAndUserId(
-    reservationId: bigint,
-    userId: bigint,
-  ): Promise<ReservationDetailRecord | null>;
+  findByIdAndUserId(reservationId: bigint, userId: bigint): Promise<ReservationDetailRecord | null>;
 }
 
 export class PrismaReservationRepository implements ReservationRepository {
@@ -183,6 +184,10 @@ export class PrismaReservationRepository implements ReservationRepository {
         proposal: {
           select: {
             totalPrice: true,
+            basePrice: true,
+            removalPrice: true,
+            extraPrice: true,
+            memo: true,
             shop: { select: { name: true, address: true, addressDetail: true } },
           },
         },
