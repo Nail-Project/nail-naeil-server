@@ -12,7 +12,7 @@ export class InvalidNotificationRequestError extends AppError {
   }
 }
 
-// PATCH /api/notifications/:notificationId/read - 유효하지 않은 알림 id (path variable)
+// PATCH /api/v1/notifications/:notificationId/read - 유효하지 않은 알림 id (path variable)
 export class InvalidNotificationIdError extends AppError {
   constructor(data?: unknown) {
     super({

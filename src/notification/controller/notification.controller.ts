@@ -8,7 +8,7 @@ import {
 import { success } from '../../common/responses/api-response';
 
 export class NotificationController {
-  private readonly notificationService = new NotificationService();
+  constructor(private readonly notificationService = new NotificationService()) {}
 
   /**
    * @openapi
