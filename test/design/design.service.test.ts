@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { Prisma } from '../../src/generated/prisma/client';
 import type {
+  DesignAdminRecord,
   DesignDetailRecord,
   DesignRepository,
   DesignSummaryRecord,
@@ -54,6 +55,20 @@ class FakeRepository implements DesignRepository {
   async isWishedByUser(designId: number, userId: number): Promise<boolean> {
     this.isWishedByUserArgs.push({ designId, userId });
     return this.wished;
+  }
+
+  // 이 파일은 읽기(getDesigns/getDesignDetail) 서비스 테스트 전용이라 관리자 CRUD 메서드는
+  // 실제로 쓰이지 않는다 - 인터페이스를 만족시키기 위한 최소 스텁만 둔다.
+  async create(): Promise<DesignAdminRecord> {
+    throw new Error('not implemented in this fake');
+  }
+
+  async update(): Promise<DesignAdminRecord> {
+    throw new Error('not implemented in this fake');
+  }
+
+  async delete(): Promise<void> {
+    throw new Error('not implemented in this fake');
   }
 }
 
