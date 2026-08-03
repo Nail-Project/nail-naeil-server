@@ -27,7 +27,13 @@ const reservationListSelect = {
   proposalId: true,
   reservedAt: true,
   status: true,
-  proposal: { select: { totalPrice: true, shop: { select: { name: true } } } },
+  proposal: {
+    select: {
+      totalPrice: true,
+      shop: { select: { name: true } },
+      request: { select: { nailType: true } },
+    },
+  },
 } as const;
 
 export interface ReservationRecord {
@@ -38,6 +44,7 @@ export interface ReservationRecord {
   proposal: {
     totalPrice: number;
     shop: { name: string };
+    request: { nailType: string };
   };
 }
 

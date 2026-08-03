@@ -120,6 +120,7 @@ export class ReservationService {
         // TODO: [malibu] Shop 도메인(B8) 개발 후 실제 컬럼으로 연결 예정
         shopThumbnailUrl: null,
         totalPrice: r.proposal.totalPrice,
+        nailType: r.proposal.request.nailType,
       })),
       pageInfo: { nextCursor, hasNext },
     };
