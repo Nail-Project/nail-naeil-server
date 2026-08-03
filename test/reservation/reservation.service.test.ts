@@ -318,6 +318,7 @@ describe('ReservationService.getReservationDetail', () => {
         extraPrice: 10_000,
         memo: '깔끔하게 해드릴게요',
         shop: { name: '영찬 네일 강남점', address: '서울시 강남구', addressDetail: '2층' },
+        request: { nailType: 'HAND' },
       },
     };
 
@@ -330,6 +331,7 @@ describe('ReservationService.getReservationDetail', () => {
       extraPrice: 10_000,
       totalPrice: 55_000,
       shopComment: '깔끔하게 해드릴게요',
+      nailType: 'HAND',
       status: 'CONFIRMED',
     });
   });
@@ -346,6 +348,7 @@ describe('ReservationService.getReservationDetail', () => {
         extraPrice: 10_000,
         memo: null,
         shop: { name: '영찬 네일 강남점', address: '서울시 강남구', addressDetail: null },
+        request: { nailType: 'PEDICURE' },
       },
     };
 

@@ -41,6 +41,7 @@ const createApp = () => {
       reservedAt: new Date('2026-08-01T10:00:00.000Z'),
       totalPrice: 55_000,
       status: 'CONFIRMED',
+      nailType: 'HAND',
       designName: null,
     }),
     cancelReservation: vi.fn().mockResolvedValue(undefined),
