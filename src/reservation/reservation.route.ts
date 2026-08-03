@@ -18,6 +18,10 @@ const reservationRouter = Router();
  * /api/v1/reserve:
  *   post:
  *     summary: 예약 생성
+ *     description: >
+ *       예약 가능 시간 목록은 이 API가 아니라 `GET /api/v1/estimate/{proposal_id}/time`(견적 응답 도메인)에서
+ *       먼저 조회한다 - 거기서 받은 시간 슬롯의 `id`를 `timeId`로 넘기면 된다.
+ *       예약자(사용자) 정보는 request body로 받지 않고, `Authorization` 헤더의 인증 토큰에서 서버가 채운다.
  *     security:
  *       - bearerAuth: []
  *     tags:
