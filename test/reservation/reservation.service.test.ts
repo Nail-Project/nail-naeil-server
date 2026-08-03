@@ -368,11 +368,7 @@ describe('ReservationService.cancelReservation', () => {
   it('정상적으로 예약을 취소한다', async () => {
     await expect(
       service.cancelReservation(1n, userId, '개인 사정으로 인해 취소할게요'),
-    ).resolves.toMatchObject({
-      reservationId: 1,
-      status: 'CANCELLED',
-      cancelReason: '개인 사정으로 인해 취소할게요',
-    });
+    ).resolves.toBeUndefined();
 
     expect(repository.lastCancelArgs).toEqual({
       reservationId: 1n,

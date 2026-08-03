@@ -6,7 +6,6 @@ import { CreateReservationResponse } from '../dto/create-reservation-response';
 import { GetReservationsResponse } from '../dto/get-reservations-response';
 import type { ReservationCursor } from '../dto/get-reservations-request';
 import { GetReservationDetailResponse } from '../dto/get-reservation-detail-response';
-import { CancelReservationResponse } from '../dto/cancel-reservation-response';
 import type { ReservationListStatus } from '../reservation.constants';
 import { encodeCursor } from '../../common/pagination/cursor';
 import { ReservationFailedError } from '../../common/errors/common.error';
@@ -153,11 +152,7 @@ export class ReservationService {
   }
 
   // 예약 취소
-  async cancelReservation(
-    reservationId: bigint,
-    userId: bigint,
-    reason: string,
-  ): Promise<CancelReservationResponse> {
+  async cancelReservation(reservationId: bigint, userId: bigint, reason: string): Promise<void> {
     // 존재하지 않거나 본인 소유가 아닌 예약인 경우 404 (findStatusByIdAndUserId의 where절에서
     // userId를 함께 걸어 소유권을 검증한다 - IDOR 방지)
     const reservation = await this.reservationRepository.findStatusByIdAndUserId(
@@ -179,11 +174,5 @@ export class ReservationService {
     // 사전 체크와 조건부 업데이트(cancel()의 updateMany) 사이의 경쟁 상태로
     // 동시에 들어온 취소 요청이 먼저 반영된 경우 - count가 0이라 null이 돌아온다.
     if (!cancelled) throw new ReservationAlreadyFinalizedError();
-
-    return {
-      reservationId: Number(cancelled.id),
-      status: cancelled.status,
-      cancelReason: cancelled.cancelReason,
-    };
   }
 }

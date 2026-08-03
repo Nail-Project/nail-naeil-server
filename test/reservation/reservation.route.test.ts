@@ -43,11 +43,7 @@ const createApp = () => {
       status: 'CONFIRMED',
       designName: null,
     }),
-    cancelReservation: vi.fn().mockResolvedValue({
-      reservationId: 1,
-      status: 'CANCELLED',
-      cancelReason: '개인 사정으로 인해 취소할게요',
-    }),
+    cancelReservation: vi.fn().mockResolvedValue(undefined),
   };
   const app = express();
 
@@ -188,15 +184,15 @@ describe('GET /api/v1/reserve/:reservationId', () => {
 });
 
 describe('DELETE /api/v1/reserve/:reservationId', () => {
-  it('정상 요청은 200으로 응답하고 서비스에 id/userId/사유를 전달한다', async () => {
+  it('정상 요청은 204로 응답하고(본문 없음) 서비스에 id/userId/사유를 전달한다', async () => {
     const { app, service } = createApp();
 
     const response = await request(app)
       .delete('/api/v1/reserve/1')
       .send({ reason: '개인 사정으로 인해 취소할게요' });
 
-    expect(response.status).toBe(200);
-    expect(response.body.resultType).toBe('SUCCESS');
+    expect(response.status).toBe(204);
+    expect(response.body).toEqual({});
     expect(service.cancelReservation).toHaveBeenCalledWith(
       1n,
       TEMP_USER_ID,

@@ -89,12 +89,12 @@ export class ReservationController {
         throw new ReservationCancelValidationError(parsedBody.error.flatten());
       }
 
-      const result = await this.reservationService.cancelReservation(
+      await this.reservationService.cancelReservation(
         BigInt(parsedParams.data.reservationId),
         BigInt(req.userId),
         parsedBody.data.reason,
       );
-      res.status(200).json(success(result));
+      res.status(204).send();
     } catch (error) {
       next(error);
     }

@@ -216,8 +216,8 @@ const reservationRouter = Router();
  *                 type: string
  *                 example: 개인 사정으로 인해 취소할게요
  *     responses:
- *       200:
- *         description: 예약 취소 성공
+ *       204:
+ *         description: 예약 취소 성공 (응답 본문 없음)
  *       400:
  *         description: 유효하지 않은 예약 id 또는 취소 사유
  *         content:
