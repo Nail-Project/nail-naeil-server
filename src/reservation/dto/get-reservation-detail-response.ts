@@ -26,6 +26,7 @@ export interface GetReservationDetailResponse {
   // 견적 요청 시 사용자가 업로드한 원본 참고 이미지 - EstimateRequest.images(RequestImage[])
   images: string[];
   status: ReservationStatus;
-  // TODO: [malibu] Design 모델 추가 후 연결 예정
+  // 카탈로그 디자인 그대로 견적받은 예약만 값이 있다. 사용자가 직접 사진을 올려
+  // 요청한 예약은 연결된 디자인이 없어 null.
   designName: string | null;
 }

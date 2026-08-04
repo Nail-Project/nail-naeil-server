@@ -64,7 +64,12 @@ export interface ReservationDetailRecord {
       address: string;
       addressDetail: string | null;
     };
-    request: { nailType: string; removalType: string; images: { imageUrl: string }[] };
+    request: {
+      nailType: string;
+      removalType: string;
+      images: { imageUrl: string }[];
+      design: { title: string } | null;
+    };
   };
 }
 
@@ -246,8 +251,15 @@ export class PrismaReservationRepository implements ReservationRepository {
             extraPrice: true,
             memo: true,
             shop: { select: { name: true, phoneNumber: true, address: true, addressDetail: true } },
+            // Reservation → proposal → request → design 체인을 타고 카탈로그 디자인명을 가져온다.
+            // 직접 사진을 올려 요청한 경우 request.design은 null.
             request: {
-              select: { nailType: true, removalType: true, images: { select: { imageUrl: true } } },
+              select: {
+                nailType: true,
+                removalType: true,
+                images: { select: { imageUrl: true } },
+                design: { select: { title: true } },
+              },
             },
           },
         },

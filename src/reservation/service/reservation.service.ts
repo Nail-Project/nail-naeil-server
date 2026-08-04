@@ -156,8 +156,7 @@ export class ReservationService {
       removalType: reservation.proposal.request.removalType,
       images: reservation.proposal.request.images.map((image) => image.imageUrl),
       status: reservation.status,
-      // TODO: [malibu] Design 모델 추가 후 연결 예정
-      designName: null,
+      designName: reservation.proposal.request.design?.title ?? null,
     };
   }
 

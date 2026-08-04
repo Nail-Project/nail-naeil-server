@@ -347,6 +347,7 @@ describe('ReservationService.getReservationDetail', () => {
           nailType: 'HAND',
           removalType: 'PARTS',
           images: [{ imageUrl: 'https://example.com/a.jpg' }],
+          design: null,
         },
       },
     };
@@ -386,7 +387,7 @@ describe('ReservationService.getReservationDetail', () => {
           address: '서울시 강남구',
           addressDetail: null,
         },
-        request: { nailType: 'PEDICURE', removalType: 'NONE', images: [] },
+        request: { nailType: 'PEDICURE', removalType: 'NONE', images: [], design: null },
       },
     };
 
@@ -466,6 +467,53 @@ describe('ReservationService.cancelReservation', () => {
       code: 'RESERVATION_FAILED',
       statusCode: 500,
       data: { originalError },
+    });
+  });
+
+  it('카탈로그 디자인 그대로 견적받은 예약이면 디자인명을 반환한다', async () => {
+    repository.detailResult = {
+      id: 1n,
+      reservedAt: TOMORROW,
+      status: 'CONFIRMED',
+      proposal: {
+        totalPrice: 55_000,
+        basePrice: 40_000,
+        removalPrice: 5_000,
+        extraPrice: 10_000,
+        memo: null,
+        shop: { name: '영찬 네일 강남점', phoneNumber: null, address: '서울시 강남구', addressDetail: null },
+        request: {
+          nailType: 'HAND',
+          removalType: 'NONE',
+          images: [],
+          design: { title: '도트 프렌치 네일' },
+        },
+      },
+    };
+
+    await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
+      designName: '도트 프렌치 네일',
+    });
+  });
+
+  it('직접 사진을 올려 요청한 예약이면 디자인명은 null이다', async () => {
+    repository.detailResult = {
+      id: 1n,
+      reservedAt: TOMORROW,
+      status: 'CONFIRMED',
+      proposal: {
+        totalPrice: 55_000,
+        basePrice: 40_000,
+        removalPrice: 5_000,
+        extraPrice: 10_000,
+        memo: null,
+        shop: { name: '영찬 네일 강남점', phoneNumber: null, address: '서울시 강남구', addressDetail: null },
+        request: { nailType: 'HAND', removalType: 'NONE', images: [], design: null },
+      },
+    };
+
+    await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
+      designName: null,
     });
   });
 });
