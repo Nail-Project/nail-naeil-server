@@ -14,6 +14,16 @@ export class EstimateRequestRepository {
     return shops.filter((s): s is { id: number; phoneNumber: string } => s.phoneNumber !== null);
   }
 
+  // designId로 카탈로그 디자인 존재 여부 확인
+  // "이 디자인 그대로 견적받기" 흐름에서 클라이언트가 잘못된/삭제된 designId를 보낸 경우를 걸러낸다.
+  async designExists(designId: number): Promise<boolean> {
+    const design = await getPrisma().design.findUnique({
+      where: { id: designId },
+      select: { id: true },
+    });
+    return design !== null;
+  }
+
   // 견적 요청 생성
   // 이미지 URL 목록을 RequestImage 레코드로 함께 생성(nested create)한다.
   // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller → service → repository로 전달받는다.
