@@ -30,7 +30,7 @@ export class ReservationService {
   // 예약 생성
   async createReservation(
     dto: CreateReservationRequestType,
-    userId: bigint,
+    userId: number,
   ): Promise<CreateReservationResponse> {
     const { proposalId, timeId } = dto;
 
@@ -89,7 +89,7 @@ export class ReservationService {
   // 확정(CONFIRMED)/지난(PAST=COMPLETED+CANCELLED) 예약 목록 조회
   async getReservations(
     status: ReservationListStatus,
-    userId: bigint,
+    userId: number,
     cursor: ReservationCursor | undefined,
     size: number,
   ): Promise<GetReservationsResponse> {
@@ -127,7 +127,7 @@ export class ReservationService {
   // 예약 상세 조회
   async getReservationDetail(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
   ): Promise<GetReservationDetailResponse> {
     const reservation = await this.reservationRepository.findByIdAndUserId(reservationId, userId);
     if (!reservation) throw new ReservationNotFoundError();

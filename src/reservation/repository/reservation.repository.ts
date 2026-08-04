@@ -74,16 +74,16 @@ export interface ReservationRepository {
   create(data: {
     proposalId: number;
     timeId: number;
-    userId: bigint;
+    userId: number;
     reservedAt: Date;
   }): Promise<CreatedReservationRecord>;
   findByUserIdAndStatuses(
-    userId: bigint,
+    userId: number,
     statuses: ReservationStatus[],
     cursor: ReservationCursor | undefined,
     size: number,
   ): Promise<{ reservations: ReservationRecord[]; hasNext: boolean }>;
-  findByIdAndUserId(reservationId: bigint, userId: bigint): Promise<ReservationDetailRecord | null>;
+  findByIdAndUserId(reservationId: bigint, userId: number): Promise<ReservationDetailRecord | null>;
 }
 
 export class PrismaReservationRepository implements ReservationRepository {
@@ -112,7 +112,7 @@ export class PrismaReservationRepository implements ReservationRepository {
   async create(data: {
     proposalId: number;
     timeId: number;
-    userId: bigint;
+    userId: number;
     reservedAt: Date;
   }): Promise<CreatedReservationRecord> {
     const prisma = getPrisma();
@@ -140,7 +140,7 @@ export class PrismaReservationRepository implements ReservationRepository {
   // 커서 기반(keyset) 페이지네이션: offset 없이 "마지막으로 본 항목 이후" 조건으로 다음 페이지를 가져온다.
   // count 쿼리가 필요 없어져 트랜잭션도 더 이상 필요 없다.
   async findByUserIdAndStatuses(
-    userId: bigint,
+    userId: number,
     statuses: ReservationStatus[],
     cursor: ReservationCursor | undefined,
     size: number,
@@ -173,7 +173,7 @@ export class PrismaReservationRepository implements ReservationRepository {
   // 예약 상세 조회 - 본인 예약만 조회 가능하도록 userId로 소유권 검증
   async findByIdAndUserId(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
   ): Promise<ReservationDetailRecord | null> {
     return await getPrisma().reservation.findFirst({
       where: { id: reservationId, userId },
