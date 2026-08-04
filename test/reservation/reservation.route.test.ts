@@ -15,7 +15,7 @@ vi.mock('../../src/common/middlewares/auth.middleware', () => ({
   },
 }));
 
-const TEMP_USER_ID = 1n;
+const TEMP_USER_ID = 1;
 
 const createApp = () => {
   const service = {
@@ -53,13 +53,14 @@ describe('POST /api/v1/reserve', () => {
   it('정상 요청은 201로 응답하고 서비스에 파싱된 값과 임시 userId를 전달한다', async () => {
     const { app, service } = createApp();
 
-    const response = await request(app)
-      .post('/api/v1/reserve')
-      .send({ proposalId: 5, timeId: 12 });
+    const response = await request(app).post('/api/v1/reserve').send({ proposalId: 5, timeId: 12 });
 
     expect(response.status).toBe(201);
     expect(response.body.resultType).toBe('SUCCESS');
-    expect(service.createReservation).toHaveBeenCalledWith({ proposalId: 5, timeId: 12 }, TEMP_USER_ID);
+    expect(service.createReservation).toHaveBeenCalledWith(
+      { proposalId: 5, timeId: 12 },
+      TEMP_USER_ID,
+    );
   });
 
   it('proposalId가 없으면 400으로 응답하고 서비스를 호출하지 않는다', async () => {
@@ -75,9 +76,7 @@ describe('POST /api/v1/reserve', () => {
   it('음수 timeId는 400으로 응답한다', async () => {
     const { app, service } = createApp();
 
-    const response = await request(app)
-      .post('/api/v1/reserve')
-      .send({ proposalId: 5, timeId: -1 });
+    const response = await request(app).post('/api/v1/reserve').send({ proposalId: 5, timeId: -1 });
 
     expect(response.status).toBe(400);
     expect(service.createReservation).not.toHaveBeenCalled();
@@ -88,15 +87,12 @@ describe('GET /api/v1/reserve/detail', () => {
   it('status를 전달하면 200으로 응답하고 서비스에 cursor 없이 기본 size와 함께 전달한다', async () => {
     const { app, service } = createApp();
 
-    const response = await request(app).get('/api/v1/reserve/detail').query({ status: 'CONFIRMED' });
+    const response = await request(app)
+      .get('/api/v1/reserve/detail')
+      .query({ status: 'CONFIRMED' });
 
     expect(response.status).toBe(200);
-    expect(service.getReservations).toHaveBeenCalledWith(
-      'CONFIRMED',
-      TEMP_USER_ID,
-      undefined,
-      10,
-    );
+    expect(service.getReservations).toHaveBeenCalledWith('CONFIRMED', TEMP_USER_ID, undefined, 10);
   });
 
   it('cursor/size를 전달하면 디코딩해서 서비스에 전달한다', async () => {
@@ -108,10 +104,15 @@ describe('GET /api/v1/reserve/detail', () => {
       .query({ status: 'PAST', cursor, size: '20' });
 
     expect(response.status).toBe(200);
-    expect(service.getReservations).toHaveBeenCalledWith('PAST', TEMP_USER_ID, {
-      reservedAt: new Date('2026-05-10T16:00:00.000Z'),
-      id: 7n,
-    }, 20);
+    expect(service.getReservations).toHaveBeenCalledWith(
+      'PAST',
+      TEMP_USER_ID,
+      {
+        reservedAt: new Date('2026-05-10T16:00:00.000Z'),
+        id: 7n,
+      },
+      20,
+    );
   });
 
   it('status가 없으면 400으로 응답한다', async () => {

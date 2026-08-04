@@ -67,7 +67,7 @@ class FakeRepository implements ReservationRepository {
   }
 
   async findByUserIdAndStatuses(
-    _userId: bigint,
+    _userId: number,
     statuses: ReservationStatus[],
     cursor: ReservationCursor | undefined,
   ): Promise<{ reservations: ReservationRecord[]; hasNext: boolean }> {
@@ -82,7 +82,7 @@ class FakeRepository implements ReservationRepository {
 }
 
 const createDto: CreateReservationRequestType = { proposalId: 1, timeId: 1 };
-const userId = 1n;
+const userId = 1;
 
 const prismaError = (code: string) =>
   new Prisma.PrismaClientKnownRequestError('DB 에러', { code, clientVersion: 'test' });

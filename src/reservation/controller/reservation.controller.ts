@@ -10,7 +10,6 @@ import {
 } from '../error/reservation.error';
 import { success } from '../../common/responses/api-response';
 
-
 export class ReservationController {
   constructor(private readonly reservationService: ReservationService) {}
 
@@ -23,7 +22,7 @@ export class ReservationController {
         throw new ReservationValidationError(parsed.error.flatten());
       }
 
-      const result = await this.reservationService.createReservation(parsed.data, BigInt(req.userId));
+      const result = await this.reservationService.createReservation(parsed.data, req.userId);
       res.status(201).json(success(result));
     } catch (error) {
       next(error);
@@ -43,7 +42,7 @@ export class ReservationController {
 
       const result = await this.reservationService.getReservations(
         status,
-        BigInt(req.userId),
+        req.userId,
         cursor,
         size,
       );
@@ -64,7 +63,7 @@ export class ReservationController {
 
       const result = await this.reservationService.getReservationDetail(
         BigInt(parsed.data.reservationId),
-        BigInt(req.userId),
+        req.userId,
       );
       res.status(200).json(success(result));
     } catch (error) {
