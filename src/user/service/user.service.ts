@@ -20,6 +20,7 @@ export class UserService {
       email: user.email,
       phoneNumber: user.phoneNumber,
       nickname: user.nickname,
+      profileImageUrl: user.profileImageUrl,
       role: user.role,
     };
   }
@@ -44,6 +45,7 @@ export class UserService {
       email: updated.email,
       phoneNumber: updated.phoneNumber,
       nickname: updated.nickname,
+      profileImageUrl: updated.profileImageUrl,
       role: updated.role,
     };
   }

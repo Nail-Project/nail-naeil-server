@@ -56,6 +56,8 @@ model User {
   email         String?            @db.VarChar(100)
   phoneNumber   String?            @map("phone_number") @db.VarChar(20)
   nickname      String?            @db.VarChar(100)
+  // 마이페이지에서 수정 가능한 프로필 사진 S3 URL. image 도메인에 업로드 후 URL만 저장한다.
+  profileImageUrl String?          @map("profile_image_url") @db.VarChar(255)
   role          UserRole           @default(CUSTOMER)
   createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
