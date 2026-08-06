@@ -276,7 +276,7 @@ const estimateRequestRouter = Router();
  *                           type: boolean
  *                           example: true
  *       400:
- *         description: 유효하지 않은 status 또는 cursor 값
+ *         description: 유효하지 않은 status, cursor 또는 size 값 (size=0, size=101, 비정수 등)
  *         content:
  *           application/json:
  *             schema:
