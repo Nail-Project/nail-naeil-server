@@ -3,13 +3,16 @@ import { getPrisma } from '../../infra/prisma';
 import type { DesignCursor } from '../dto/get-designs-request';
 
 export interface DesignSummaryRecord {
-  id: number;
-  title: string;
-  imageUrl: string;
-  tags: string[];
-  viewCount: number;
-  wishCount: number;
-  // 커서 생성에만 쓰는 내부 필드 - 응답 DTO 매핑 시엔 사용하지 않는다.
+  // 응답 DTO로 그대로 매핑되는 공개 필드만 여기 담는다.
+  design: {
+    id: number;
+    title: string;
+    imageUrl: string;
+    tags: string[];
+    viewCount: number;
+    wishCount: number;
+  };
+  // 커서 생성에만 쓰는 내부 필드 - design과 분리해둬서 실수로 응답에 통째로 spread할 수 없게 한다.
   createdAt: Date;
 }
 
@@ -160,12 +163,14 @@ export class PrismaDesignRepository implements DesignRepository {
 
     return {
       designs: page.map((row) => ({
-        id: row.id,
-        title: row.title,
-        imageUrl: row.imageUrl,
-        tags: row.tags.map((t) => t.tag.name),
-        viewCount: row.viewCount,
-        wishCount: row._count.wishes,
+        design: {
+          id: row.id,
+          title: row.title,
+          imageUrl: row.imageUrl,
+          tags: row.tags.map((t) => t.tag.name),
+          viewCount: row.viewCount,
+          wishCount: row._count.wishes,
+        },
         createdAt: row.createdAt,
       })),
       hasNext,
