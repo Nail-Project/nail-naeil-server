@@ -49,6 +49,10 @@ export class UserController {
    *                       type: string
    *                       nullable: true
    *                       example: 홍길동
+   *                     profileImageUrl:
+   *                       type: string
+   *                       nullable: true
+   *                       example: https://bucket.s3.ap-northeast-2.amazonaws.com/images/2026-08-05/0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d.jpg
    *                     role:
    *                       type: string
    *                       example: CUSTOMER
@@ -91,16 +95,15 @@ export class UserController {
    *         application/json:
    *           schema:
    *             type: object
+   *             description: 최초 가입 시 입력한 이름(nickname)과 전화번호는 수정할 수 없어 제외한다.
    *             properties:
-   *               nickname:
-   *                 type: string
-   *                 example: 홍길동
-   *               phoneNumber:
-   *                 type: string
-   *                 example: "01012345678"
    *               email:
    *                 type: string
    *                 example: new@test.com
+   *               profileImageUrl:
+   *                 type: string
+   *                 description: image 도메인에 업로드 후 받은 S3 이미지 URL
+   *                 example: https://bucket.s3.ap-northeast-2.amazonaws.com/images/2026-08-05/0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d.jpg
    *     responses:
    *       200:
    *         description: 수정 성공, 갱신된 내 정보 반환

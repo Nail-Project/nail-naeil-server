@@ -5,5 +5,6 @@ export class GetUserResponse {
   email!: string | null;
   phoneNumber!: string | null;
   nickname!: string | null;
+  profileImageUrl!: string | null;
   role!: string;
 }
