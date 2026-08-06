@@ -12,6 +12,7 @@ import type {
   ReservationStatusRecord,
 } from '../../src/reservation/repository/reservation.repository';
 import { ReservationService } from '../../src/reservation/service/reservation.service';
+import { ReservationLockConflictError } from '../../src/reservation/error/reservation.error';
 import type { CreateReservationRequestType } from '../../src/reservation/dto/create-reservation-request';
 import type { ReservationCursor } from '../../src/reservation/dto/get-reservations-request';
 import { encodeCursor } from '../../src/common/pagination/cursor';
@@ -177,6 +178,15 @@ describe('ReservationService.createReservation', () => {
 
   it('사전 체크 통과 후 DB unique 제약 위반(P2002)이면 409를 던진다', async () => {
     repository.createError = prismaError('P2002');
+
+    await expect(service.createReservation(createDto, userId)).rejects.toMatchObject({
+      code: 'ALREADY_RESERVED',
+      statusCode: 409,
+    });
+  });
+
+  it('사전 체크 통과 후 견적 row 락으로 동시 예약이 감지되면(ReservationLockConflictError) 409를 던진다', async () => {
+    repository.createError = new ReservationLockConflictError();
 
     await expect(service.createReservation(createDto, userId)).rejects.toMatchObject({
       code: 'ALREADY_RESERVED',

@@ -14,6 +14,7 @@ import {
   ProposalNotFoundError,
   ProposalTimeNotFoundError,
   ReservationAlreadyFinalizedError,
+  ReservationLockConflictError,
   ReservationNotFoundError,
 } from '../error/reservation.error';
 
@@ -77,6 +78,8 @@ export class ReservationService {
         status: result.status,
       };
     } catch (error) {
+      // 견적 row 락으로 감지한 동시 예약 경쟁 상태 (repository.create() 참고)
+      if (error instanceof ReservationLockConflictError) throw new AlreadyReservedError();
       // DB unique 제약조건 위반 - 사전 체크와 생성 사이의 경쟁 상태로 중복 예약된 경우
       if (isUniqueConstraintError(error)) throw new AlreadyReservedError();
       // 사전 체크 이후 예약 시간 slot이 동시에 삭제/변경된 경쟁 상태

@@ -1,7 +1,7 @@
-import { Prisma } from '../../generated/prisma/client';
 import { getPrisma } from '../../infra/prisma';
 import type { ReservationStatus } from '../../generated/prisma/enums';
 import type { ReservationCursor } from '../dto/get-reservations-request';
+import { ReservationLockConflictError } from '../error/reservation.error';
 
 // 예약 생성 응답 전용 select - CreateReservationResponse가 쓰는 필드만
 const createReservationSelect = {
@@ -164,13 +164,9 @@ export class PrismaReservationRepository implements ReservationRepository {
       });
 
       if (activeCount > 0) {
-        // 서비스 레이어의 기존 P2002(isUniqueConstraintError) 처리 경로를 그대로 태워
-        // AlreadyReservedError(409)로 매핑되게 한다 - 새 에러 타입/분기 추가 없이 기존
-        // 경쟁 상태 처리 로직을 재사용.
-        throw new Prisma.PrismaClientKnownRequestError('동시 예약 요청이 감지됐습니다.', {
-          code: 'P2002',
-          clientVersion: 'reservation-lock-check',
-        });
+        // 진짜 DB 유니크 제약 위반이 아니라 락으로 감지한 동시성 충돌이므로, 실제 Prisma
+        // 에러를 흉내내지 않고 전용 신호 에러를 던진다(service에서 instanceof로 판별).
+        throw new ReservationLockConflictError();
       }
 
       const reservation = await tx.reservation.create({

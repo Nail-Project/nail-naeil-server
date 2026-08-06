@@ -107,3 +107,13 @@ export class ReservationAlreadyFinalizedError extends AppError {
     });
   }
 }
+
+// repository.create() 내부에서 견적 row 락으로 동시 예약을 감지했을 때 던지는 신호용 에러.
+// 진짜 Prisma 에러가 아니므로(image.error.ts의 InvalidImageTypeError와 동일 패턴) 일반
+// Error를 상속한다. service에서 instanceof로 판별해 AlreadyReservedError(409)로 변환한다.
+export class ReservationLockConflictError extends Error {
+  constructor() {
+    super('동시 예약 요청이 감지됐습니다.');
+    this.name = 'ReservationLockConflictError';
+  }
+}
