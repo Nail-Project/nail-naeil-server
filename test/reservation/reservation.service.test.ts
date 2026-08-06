@@ -336,7 +336,12 @@ describe('ReservationService.getReservationDetail', () => {
         removalPrice: 5_000,
         extraPrice: 10_000,
         memo: '깔끔하게 해드릴게요',
-        shop: { name: '영찬 네일 강남점', address: '서울시 강남구', addressDetail: '2층' },
+        shop: {
+          name: '영찬 네일 강남점',
+          phoneNumber: '02-1234-5678',
+          address: '서울시 강남구',
+          addressDetail: '2층',
+        },
         request: { nailType: 'HAND', images: [{ imageUrl: 'https://example.com/a.jpg' }] },
       },
     };
@@ -344,6 +349,7 @@ describe('ReservationService.getReservationDetail', () => {
     await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
       reservationId: 1,
       shopName: '영찬 네일 강남점',
+      shopPhoneNumber: '02-1234-5678',
       address: '서울시 강남구 2층',
       basePrice: 40_000,
       removalPrice: 5_000,
@@ -367,13 +373,19 @@ describe('ReservationService.getReservationDetail', () => {
         removalPrice: 5_000,
         extraPrice: 10_000,
         memo: null,
-        shop: { name: '영찬 네일 강남점', address: '서울시 강남구', addressDetail: null },
+        shop: {
+          name: '영찬 네일 강남점',
+          phoneNumber: null,
+          address: '서울시 강남구',
+          addressDetail: null,
+        },
         request: { nailType: 'PEDICURE', images: [] },
       },
     };
 
     await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
       address: '서울시 강남구',
+      shopPhoneNumber: null,
       shopComment: null,
       images: [],
     });

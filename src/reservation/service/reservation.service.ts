@@ -142,6 +142,7 @@ export class ReservationService {
     return {
       reservationId: Number(reservation.id),
       shopName: shop.name,
+      shopPhoneNumber: shop.phoneNumber,
       address: shop.addressDetail ? `${shop.address} ${shop.addressDetail}` : shop.address,
       reservedAt: reservation.reservedAt,
       basePrice: reservation.proposal.basePrice,

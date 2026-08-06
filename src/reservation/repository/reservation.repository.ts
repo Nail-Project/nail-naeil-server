@@ -58,7 +58,12 @@ export interface ReservationDetailRecord {
     removalPrice: number;
     extraPrice: number;
     memo: string | null;
-    shop: { name: string; address: string; addressDetail: string | null };
+    shop: {
+      name: string;
+      phoneNumber: string | null;
+      address: string;
+      addressDetail: string | null;
+    };
     request: { nailType: string; images: { imageUrl: string }[] };
   };
 }
@@ -240,7 +245,7 @@ export class PrismaReservationRepository implements ReservationRepository {
             removalPrice: true,
             extraPrice: true,
             memo: true,
-            shop: { select: { name: true, address: true, addressDetail: true } },
+            shop: { select: { name: true, phoneNumber: true, address: true, addressDetail: true } },
             request: { select: { nailType: true, images: { select: { imageUrl: true } } } },
           },
         },

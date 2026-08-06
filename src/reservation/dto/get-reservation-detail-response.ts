@@ -4,6 +4,8 @@ import type { ReservationStatus } from '../../generated/prisma/enums';
 export interface GetReservationDetailResponse {
   reservationId: number;
   shopName: string;
+  // 예약 변경은 별도 API 없이 프론트에서 이 번호로 안내 팝업을 띄워 처리한다(Figma 기준).
+  shopPhoneNumber: string | null;
   address: string;
   reservedAt: Date;
   // 견적서 세부내역 - EstimateResponse에 이미 저장돼 있던 값을 그대로 노출한다.
