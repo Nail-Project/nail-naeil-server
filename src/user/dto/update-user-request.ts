@@ -11,6 +11,7 @@ export const UpdateUserRequestSchema = z
     // https://{bucket}.s3.{region}.amazonaws.com/images/YYYY-MM-DD/{uuid}.{ext}
     profileImageUrl: z
       .string()
+      .max(255, 'S3 이미지 URL은 255자를 초과할 수 없습니다.')
       .regex(
         /^https:\/\/[^/]+\.s3\.[^/]+\.amazonaws\.com\/images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/,
         '올바른 S3 이미지 URL이 아닙니다.',
