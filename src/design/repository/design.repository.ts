@@ -31,13 +31,16 @@ export interface DesignDetailRecord {
 }
 
 export interface WishlistItemRecord {
-  id: number;
-  title: string;
-  imageUrl: string;
-  tags: string[];
-  viewCount: number;
-  wishCount: number;
-  // 커서 생성에만 쓰는 내부 필드 - 응답 DTO 매핑 시엔 사용하지 않는다.
+  // 응답 DTO로 그대로 매핑되는 공개 필드만 여기 담는다.
+  design: {
+    id: number;
+    title: string;
+    imageUrl: string;
+    tags: string[];
+    viewCount: number;
+    wishCount: number;
+  };
+  // 커서 생성에만 쓰는 내부 필드 - design과 분리해둬서 실수로 응답에 통째로 spread할 수 없게 한다.
   // 디자인이 아니라 WishDesign(찜 기록) 행 기준이다("찜한 시점" 정렬).
   wishId: number;
   wishedAt: Date;
@@ -336,12 +339,14 @@ export class PrismaDesignRepository implements DesignRepository {
 
     return {
       items: page.map((row) => ({
-        id: row.design.id,
-        title: row.design.title,
-        imageUrl: row.design.imageUrl,
-        tags: row.design.tags.map((t) => t.tag.name),
-        viewCount: row.design.viewCount,
-        wishCount: row.design._count.wishes,
+        design: {
+          id: row.design.id,
+          title: row.design.title,
+          imageUrl: row.design.imageUrl,
+          tags: row.design.tags.map((t) => t.tag.name),
+          viewCount: row.design.viewCount,
+          wishCount: row.design._count.wishes,
+        },
         wishId: row.id,
         wishedAt: row.createdAt,
       })),

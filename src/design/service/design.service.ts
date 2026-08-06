@@ -132,12 +132,12 @@ export class DesignService {
 
     return {
       designs: items.map((item) => ({
-        designId: item.id,
-        title: item.title,
-        imageUrl: item.imageUrl,
-        tags: item.tags,
-        viewCount: item.viewCount,
-        wishCount: item.wishCount,
+        designId: item.design.id,
+        title: item.design.title,
+        imageUrl: item.design.imageUrl,
+        tags: item.design.tags,
+        viewCount: item.design.viewCount,
+        wishCount: item.design.wishCount,
       })),
       pageInfo: { nextCursor, hasNext },
     };
