@@ -6,9 +6,11 @@ import { SolapiMessageService } from 'solapi';
 import { createS3Client } from '../../infra/s3';
 import { EstimateRequestRepository } from '../repository/estimate-request.repository';
 import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request.dto';
+import type { EstimateRequestCursor } from '../dto/request/get-estimates-query';
 import { CreateEstimateResponseDto } from '../dto/response/create-estimate-response.dto';
-import { GetEstimatesResponseDto } from '../dto/response/get-estimates-response.dto';
+import { GetEstimatesPageResponse } from '../dto/response/get-estimates-response.dto';
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
+import { encodeCursor } from '../../common/pagination/cursor';
 
 // ─── SMS 설정 ───────────────────────────────────────────────────────────────────
 const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
@@ -262,41 +264,52 @@ export class EstimateRequestService {
     }
   }
 
-  // 상태별 견적 요청 목록 조회
+  // 상태별 견적 요청 목록 조회 (커서 기반 페이지네이션)
   // 각 요청에 달린 proposals를 집계해 카드에 필요한 통계값을 계산한다.
   async getEstimatesByStatus(
     status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL',
     userId: number,
-  ): Promise<GetEstimatesResponseDto[]> {
+    cursor: EstimateRequestCursor | undefined,
+    size: number,
+  ): Promise<GetEstimatesPageResponse> {
     try {
-      const estimates = await this.repository.findByStatus(status, userId);
+      const { estimates, hasNext } = await this.repository.findByStatus(status, userId, cursor, size);
 
-      return estimates.map((estimate) => {
-        const proposals = estimate.proposals;
+      const last = estimates[estimates.length - 1];
+      const nextCursor =
+        hasNext && last
+          ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id })
+          : null;
 
-        // 전체 견적 응답(샵 제안) 수
-        const proposalCount = proposals.length;
+      return {
+        estimates: estimates.map((estimate) => {
+          const proposals = estimate.proposals;
 
-        // SUBMITTED: 샵에서 견적을 제출했지만 사용자가 아직 수락/거절하지 않은 상태
-        const submittedShopCount = proposals.filter((p) => p.status === 'SUBMITTED').length;
+          // 전체 견적 응답(샵 제안) 수
+          const proposalCount = proposals.length;
 
-        // 도착한 견적 중 최저 총금액 (견적 응답이 없으면 null)
-        const prices = proposals
-          .map((p) => p.totalPrice)
-          .filter((price): price is number => price !== null);
-        const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+          // SUBMITTED: 샵에서 견적을 제출했지만 사용자가 아직 수락/거절하지 않은 상태
+          const submittedShopCount = proposals.filter((p) => p.status === 'SUBMITTED').length;
 
-        return {
-          estimateId: estimate.id,
-          thumbnailUrl: estimate.images[0]?.imageUrl ?? null,
-          nailType: estimate.nailType,
-          createdAt: estimate.createdAt,
-          status: estimate.status,
-          proposalCount,
-          submittedShopCount,
-          minPrice,
-        };
-      });
+          // 도착한 견적 중 최저 총금액 (견적 응답이 없으면 null)
+          const prices = proposals
+            .map((p) => p.totalPrice)
+            .filter((price): price is number => price !== null);
+          const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+
+          return {
+            estimateId: estimate.id,
+            thumbnailUrl: estimate.images[0]?.imageUrl ?? null,
+            nailType: estimate.nailType,
+            createdAt: estimate.createdAt,
+            status: estimate.status,
+            proposalCount,
+            submittedShopCount,
+            minPrice,
+          };
+        }),
+        pageInfo: { nextCursor, hasNext },
+      };
     } catch {
       throw new InternalServerError();
     }

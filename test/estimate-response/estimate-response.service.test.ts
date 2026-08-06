@@ -14,6 +14,11 @@ import type {
   EstimateResponseParser,
   ParsedEstimateResponse,
 } from '../../src/external/openai/estimate-response-parser.client';
+import type { NotificationService } from '../../src/notification/service/notification.service';
+
+// 알림 서비스는 별도 검증한다. 실제 prisma를 건드리지 않도록 fake를 주입한다.
+const createNotificationService = () =>
+  ({ notify: vi.fn().mockResolvedValue(undefined) }) as unknown as NotificationService;
 
 const smsRequest: CreateSmsMessageRequest = {
   source: 'android-device-a1b2c3',
@@ -167,7 +172,11 @@ class FakeParser implements EstimateResponseParser {
 
 describe('EstimateResponseService', () => {
   it('SMS 원본 저장 결과를 외부 응답 객체로 변환한다', async () => {
-    const service = new EstimateResponseService(new FakeRepository());
+    const service = new EstimateResponseService(
+      new FakeRepository(),
+      undefined,
+      createNotificationService(),
+    );
 
     await expect(service.createSmsMessage(smsRequest)).resolves.toMatchObject({
       id: 10,
@@ -189,7 +198,7 @@ describe('EstimateResponseService', () => {
       memo: '제거 포함',
       proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
     });
-    const service = new EstimateResponseService(repository, parser);
+    const service = new EstimateResponseService(repository, parser, createNotificationService());
 
     await expect(service.createSmsMessage(smsRequest)).resolves.toMatchObject({
       status: 'PENDING',
@@ -206,6 +215,33 @@ describe('EstimateResponseService', () => {
     );
   });
 
+  it('견적 응답이 저장되면 요청자에게 ESTIMATE_RESPONSE 알림을 생성한다', async () => {
+    const repository = new LinkedSmsRepository();
+    const parser = new FakeParser({
+      canProvideService: true,
+      totalPrice: 55_000,
+      basePrice: 55_000,
+      removalPrice: 0,
+      extraPrice: 0,
+      memo: null,
+      proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
+    });
+    const notificationService = createNotificationService();
+    const service = new EstimateResponseService(repository, parser, notificationService);
+
+    await service.createSmsMessage(smsRequest);
+
+    await vi.waitFor(() => {
+      expect(notificationService.notify).toHaveBeenCalledWith({
+        userId: 1,
+        type: 'ESTIMATE_RESPONSE',
+        title: '견적 답변이 도착했어요',
+        body: '요청하신 견적에 새 답변이 도착했어요.',
+        data: { estimateRequestId: 1 },
+      });
+    });
+  });
+
   it('가격이나 가능 시간이 불완전하면 추가 문자를 기다린다', async () => {
     const repository = new LinkedSmsRepository();
     const parser = new FakeParser({
@@ -218,7 +254,7 @@ describe('EstimateResponseService', () => {
       proposalDateTimes: [],
     });
 
-    await new EstimateResponseService(repository, parser).createSmsMessage(smsRequest);
+    await new EstimateResponseService(repository, parser, createNotificationService()).createSmsMessage(smsRequest);
 
     await vi.waitFor(() => expect(repository.updatedStatus).toBe('PENDING'));
     expect(repository.savedEstimateResponse).toBeNull();
@@ -240,7 +276,7 @@ describe('EstimateResponseService', () => {
       ],
     });
 
-    await new EstimateResponseService(repository, parser).createSmsMessage(smsRequest);
+    await new EstimateResponseService(repository, parser, createNotificationService()).createSmsMessage(smsRequest);
 
     await vi.waitFor(() => expect(repository.savedEstimateResponse).not.toBeNull());
     expect(repository.savedEstimateResponse?.proposalDateTimes).toHaveLength(1);
@@ -250,7 +286,11 @@ describe('EstimateResponseService', () => {
     const repository = new LinkedSmsRepository();
     repository.findSmsParsingContext = async () => null as never;
 
-    await new EstimateResponseService(repository).createSmsMessage(smsRequest);
+    await new EstimateResponseService(
+      repository,
+      undefined,
+      createNotificationService(),
+    ).createSmsMessage(smsRequest);
 
     await vi.waitFor(() => expect(repository.updatedStatus).toBe('FAILED'));
   });
@@ -262,7 +302,7 @@ describe('EstimateResponseService', () => {
     };
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await new EstimateResponseService(repository, parser).createSmsMessage(smsRequest);
+    await new EstimateResponseService(repository, parser, createNotificationService()).createSmsMessage(smsRequest);
 
     await vi.waitFor(() => expect(repository.updatedStatus).toBe('FAILED'));
   });
