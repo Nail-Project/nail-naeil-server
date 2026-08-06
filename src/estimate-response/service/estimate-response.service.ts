@@ -12,6 +12,7 @@ import {
   EstimateResponseForbiddenError,
 } from '../errors/estimate-response.error';
 import type { EstimateResponseRepository } from '../repository/estimate-response.repository';
+import { NotificationService } from '../../notification/service/notification.service';
 
 export class EstimateResponseService {
   private readonly processingSmsMessageIds = new Set<number>();
@@ -19,6 +20,7 @@ export class EstimateResponseService {
   constructor(
     private readonly repository: EstimateResponseRepository,
     private readonly parser: EstimateResponseParser = new OpenAiEstimateResponseParser(),
+    private readonly notificationService = new NotificationService(),
   ) {}
 
   async createSmsMessage(request: CreateSmsMessageRequest): Promise<CreateSmsMessageResponse> {
@@ -120,6 +122,25 @@ export class EstimateResponseService {
           proposalDateTimes,
         },
       );
+
+      // 견적 응답이 저장되면 요청자에게 알림. 알림 실패가 파싱 플로우를 막지 않도록 격리한다.
+      try {
+        const owner = await this.repository.findRequestOwner(message.requestId);
+        if (owner) {
+          await this.notificationService.notify({
+            userId: owner.userId,
+            type: 'ESTIMATE_RESPONSE',
+            title: '견적 답변이 도착했어요',
+            body: '요청하신 견적에 새 답변이 도착했어요.',
+            data: { estimateRequestId: message.requestId },
+          });
+        }
+      } catch (notifyError) {
+        console.error('[EstimateResponseService] 알림 생성 실패', {
+          smsMessageId: message.id,
+          errorType: notifyError instanceof Error ? notifyError.name : typeof notifyError,
+        });
+      }
     } catch (error) {
       console.error('[EstimateResponseService] 문자 견적 분석 실패', {
         smsMessageId: message.id,

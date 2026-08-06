@@ -8,6 +8,7 @@ const userRecord = (overrides: Partial<Record<string, unknown>> = {}) => ({
   email: 'test@test.com',
   phoneNumber: '01012345678',
   nickname: '홍길동',
+  profileImageUrl: null,
   role: 'CUSTOMER',
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -29,6 +30,7 @@ describe('UserService.getMyProfile', () => {
       email: 'test@test.com',
       phoneNumber: '01012345678',
       nickname: '홍길동',
+      profileImageUrl: null,
       role: 'CUSTOMER',
     });
   });
@@ -47,17 +49,21 @@ describe('UserService.getMyProfile', () => {
 
 describe('UserService.updateMyProfile', () => {
   it('전달된 필드로 수정하고 갱신된 정보를 반환한다', async () => {
-    const updateUser = vi.fn().mockResolvedValue(userRecord({ nickname: '새이름' }));
+    const newImageUrl =
+      'https://bucket.s3.ap-northeast-2.amazonaws.com/images/2026-08-05/0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d.jpg';
+    const updateUser = vi.fn().mockResolvedValue(userRecord({ profileImageUrl: newImageUrl }));
     const service = createService({
       findById: vi.fn().mockResolvedValue(userRecord()),
       updateUser,
     });
 
-    await expect(service.updateMyProfile(1, { nickname: '새이름' })).resolves.toMatchObject({
+    await expect(
+      service.updateMyProfile(1, { profileImageUrl: newImageUrl }),
+    ).resolves.toMatchObject({
       userId: 1,
-      nickname: '새이름',
+      profileImageUrl: newImageUrl,
     });
-    expect(updateUser).toHaveBeenCalledWith(1, { nickname: '새이름' });
+    expect(updateUser).toHaveBeenCalledWith(1, { profileImageUrl: newImageUrl });
   });
 
   it('유저가 없으면 USER_NOT_FOUND(404)를 던지고 수정하지 않는다', async () => {
@@ -67,7 +73,7 @@ describe('UserService.updateMyProfile', () => {
       updateUser,
     });
 
-    await expect(service.updateMyProfile(999, { nickname: '새이름' })).rejects.toMatchObject({
+    await expect(service.updateMyProfile(999, { email: 'new@test.com' })).rejects.toMatchObject({
       code: 'USER_NOT_FOUND',
     });
     expect(updateUser).not.toHaveBeenCalled();
