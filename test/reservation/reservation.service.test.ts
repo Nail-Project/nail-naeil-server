@@ -55,7 +55,7 @@ class FakeRepository implements ReservationRepository {
     cancelReason: '개인 사정으로 인해 취소할게요',
   };
   cancelError: unknown = null;
-  lastCancelArgs: { reservationId: bigint; userId: bigint; reason: string } | null = null;
+  lastCancelArgs: { reservationId: bigint; userId: number; reason: string } | null = null;
 
   lastStatuses: ReservationStatus[] | null = null;
   lastCursor: ReservationCursor | undefined = undefined;
@@ -78,7 +78,7 @@ class FakeRepository implements ReservationRepository {
   }
 
   async findByUserIdAndStatuses(
-    _userId: bigint,
+    _userId: number,
     statuses: ReservationStatus[],
     cursor: ReservationCursor | undefined,
   ): Promise<{ reservations: ReservationRecord[]; hasNext: boolean }> {
@@ -97,7 +97,7 @@ class FakeRepository implements ReservationRepository {
 
   async cancel(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
     reason: string,
   ): Promise<CancelledReservationRecord | null> {
     this.lastCancelArgs = { reservationId, userId, reason };
@@ -107,7 +107,7 @@ class FakeRepository implements ReservationRepository {
 }
 
 const createDto: CreateReservationRequestType = { proposalId: 1, timeId: 1 };
-const userId = 1n;
+const userId = 1;
 
 const prismaError = (code: string) =>
   new Prisma.PrismaClientKnownRequestError('DB 에러', { code, clientVersion: 'test' });

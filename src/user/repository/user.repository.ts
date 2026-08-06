@@ -91,7 +91,7 @@ export class UserRepository {
   }
 
   // 회원정보 수정: 전달된 필드만 부분 갱신
-  updateUser(userId: number, data: { nickname?: string; phoneNumber?: string; email?: string }) {
+  updateUser(userId: number, data: { email?: string; profileImageUrl?: string }) {
     return getPrisma().user.update({ where: { id: userId }, data });
   }
 

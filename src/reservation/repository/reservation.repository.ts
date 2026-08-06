@@ -94,23 +94,23 @@ export interface ReservationRepository {
   create(data: {
     proposalId: number;
     timeId: number;
-    userId: bigint;
+    userId: number;
     reservedAt: Date;
   }): Promise<CreatedReservationRecord>;
   findByUserIdAndStatuses(
-    userId: bigint,
+    userId: number,
     statuses: ReservationStatus[],
     cursor: ReservationCursor | undefined,
     size: number,
   ): Promise<{ reservations: ReservationRecord[]; hasNext: boolean }>;
-  findByIdAndUserId(reservationId: bigint, userId: bigint): Promise<ReservationDetailRecord | null>;
+  findByIdAndUserId(reservationId: bigint, userId: number): Promise<ReservationDetailRecord | null>;
   findStatusByIdAndUserId(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
   ): Promise<ReservationStatusRecord | null>;
   cancel(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
     reason: string,
   ): Promise<CancelledReservationRecord | null>;
 }
@@ -153,7 +153,7 @@ export class PrismaReservationRepository implements ReservationRepository {
   async create(data: {
     proposalId: number;
     timeId: number;
-    userId: bigint;
+    userId: number;
     reservedAt: Date;
   }): Promise<CreatedReservationRecord> {
     return getPrisma().$transaction(async (tx) => {
@@ -196,7 +196,7 @@ export class PrismaReservationRepository implements ReservationRepository {
   // 커서 기반(keyset) 페이지네이션: offset 없이 "마지막으로 본 항목 이후" 조건으로 다음 페이지를 가져온다.
   // count 쿼리가 필요 없어져 트랜잭션도 더 이상 필요 없다.
   async findByUserIdAndStatuses(
-    userId: bigint,
+    userId: number,
     statuses: ReservationStatus[],
     cursor: ReservationCursor | undefined,
     size: number,
@@ -229,7 +229,7 @@ export class PrismaReservationRepository implements ReservationRepository {
   // 예약 상세 조회 - 본인 예약만 조회 가능하도록 userId로 소유권 검증
   async findByIdAndUserId(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
   ): Promise<ReservationDetailRecord | null> {
     return await getPrisma().reservation.findFirst({
       where: { id: reservationId, userId },
@@ -255,7 +255,7 @@ export class PrismaReservationRepository implements ReservationRepository {
   // 취소 처리 전 소유권 + 현재 상태 확인용 - 상세 조회처럼 견적/샵 정보까지 조인할 필요가 없어 별도 select로 둔다.
   async findStatusByIdAndUserId(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
   ): Promise<ReservationStatusRecord | null> {
     return await getPrisma().reservation.findFirst({
       where: { id: reservationId, userId },
@@ -268,7 +268,7 @@ export class PrismaReservationRepository implements ReservationRepository {
   // 동시에 들어온 취소 요청 중 하나만 반영되고 나머지는 count 0으로 걸러진다(경쟁 상태 안전장치).
   async cancel(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
     reason: string,
   ): Promise<CancelledReservationRecord | null> {
     const prisma = getPrisma();

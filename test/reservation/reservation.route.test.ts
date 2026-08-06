@@ -19,7 +19,7 @@ vi.mock('../../src/common/middlewares/auth.middleware', () => ({
   },
 }));
 
-const TEMP_USER_ID = 1n;
+const TEMP_USER_ID = 1;
 
 const createApp = () => {
   const service = {

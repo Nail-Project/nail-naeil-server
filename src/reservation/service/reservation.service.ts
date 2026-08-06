@@ -31,7 +31,7 @@ export class ReservationService {
   // 예약 생성
   async createReservation(
     dto: CreateReservationRequestType,
-    userId: bigint,
+    userId: number,
   ): Promise<CreateReservationResponse> {
     const { proposalId, timeId } = dto;
 
@@ -90,7 +90,7 @@ export class ReservationService {
   // 확정(CONFIRMED)/지난(PAST=COMPLETED+CANCELLED) 예약 목록 조회
   async getReservations(
     status: ReservationListStatus,
-    userId: bigint,
+    userId: number,
     cursor: ReservationCursor | undefined,
     size: number,
   ): Promise<GetReservationsResponse> {
@@ -129,7 +129,7 @@ export class ReservationService {
   // 예약 상세 조회
   async getReservationDetail(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
   ): Promise<GetReservationDetailResponse> {
     const reservation = await this.reservationRepository.findByIdAndUserId(reservationId, userId);
     if (!reservation) throw new ReservationNotFoundError();
@@ -155,7 +155,7 @@ export class ReservationService {
   }
 
   // 예약 취소
-  async cancelReservation(reservationId: bigint, userId: bigint, reason: string): Promise<void> {
+  async cancelReservation(reservationId: bigint, userId: number, reason: string): Promise<void> {
     // 존재하지 않거나 본인 소유가 아닌 예약인 경우 404 (findStatusByIdAndUserId의 where절에서
     // userId를 함께 걸어 소유권을 검증한다 - IDOR 방지)
     const reservation = await this.reservationRepository.findStatusByIdAndUserId(
