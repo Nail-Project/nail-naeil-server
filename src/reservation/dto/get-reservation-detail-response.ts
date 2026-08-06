@@ -17,6 +17,8 @@ export interface GetReservationDetailResponse {
   shopComment: string | null;
   // 시술 부위 - EstimateRequest.nailType (HAND/PEDICURE/BOTH)
   nailType: string;
+  // 견적 요청 시 사용자가 업로드한 원본 참고 이미지 - EstimateRequest.images(RequestImage[])
+  images: string[];
   status: ReservationStatus;
   // TODO: [malibu] Design 모델 추가 후 연결 예정
   designName: string | null;

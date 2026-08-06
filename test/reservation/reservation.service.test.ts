@@ -327,7 +327,7 @@ describe('ReservationService.getReservationDetail', () => {
         extraPrice: 10_000,
         memo: '깔끔하게 해드릴게요',
         shop: { name: '영찬 네일 강남점', address: '서울시 강남구', addressDetail: '2층' },
-        request: { nailType: 'HAND' },
+        request: { nailType: 'HAND', images: [{ imageUrl: 'https://example.com/a.jpg' }] },
       },
     };
 
@@ -341,6 +341,7 @@ describe('ReservationService.getReservationDetail', () => {
       totalPrice: 55_000,
       shopComment: '깔끔하게 해드릴게요',
       nailType: 'HAND',
+      images: ['https://example.com/a.jpg'],
       status: 'CONFIRMED',
     });
   });
@@ -357,13 +358,14 @@ describe('ReservationService.getReservationDetail', () => {
         extraPrice: 10_000,
         memo: null,
         shop: { name: '영찬 네일 강남점', address: '서울시 강남구', addressDetail: null },
-        request: { nailType: 'PEDICURE' },
+        request: { nailType: 'PEDICURE', images: [] },
       },
     };
 
     await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
       address: '서울시 강남구',
       shopComment: null,
+      images: [],
     });
   });
 });
