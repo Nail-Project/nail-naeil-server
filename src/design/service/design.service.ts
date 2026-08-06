@@ -34,17 +34,17 @@ export class DesignService {
     const last = designs[designs.length - 1];
     const nextCursor =
       hasNext && last
-        ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id })
+        ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.design.id })
         : null;
 
     return {
-      designs: designs.map((design) => ({
-        designId: design.id,
-        title: design.title,
-        imageUrl: design.imageUrl,
-        tags: design.tags,
-        viewCount: design.viewCount,
-        wishCount: design.wishCount,
+      designs: designs.map((item) => ({
+        designId: item.design.id,
+        title: item.design.title,
+        imageUrl: item.design.imageUrl,
+        tags: item.design.tags,
+        viewCount: item.design.viewCount,
+        wishCount: item.design.wishCount,
       })),
       pageInfo: { nextCursor, hasNext },
     };

@@ -134,12 +134,14 @@ describe('DesignService.getDesigns', () => {
     repository.feedResult = {
       designs: [
         {
-          id: 1,
-          title: '글리터 프렌치',
-          imageUrl: 'https://.../design1.jpg',
-          tags: ['프렌치', '글리터'],
-          viewCount: 9359,
-          wishCount: 312,
+          design: {
+            id: 1,
+            title: '글리터 프렌치',
+            imageUrl: 'https://.../design1.jpg',
+            tags: ['프렌치', '글리터'],
+            viewCount: 9359,
+            wishCount: 312,
+          },
           createdAt: new Date('2026-07-27T04:59:00.000Z'),
         },
       ],
@@ -167,12 +169,14 @@ describe('DesignService.getDesigns', () => {
     repository.feedResult = {
       designs: [
         {
-          id: 1,
-          title: '글리터 프렌치',
-          imageUrl: 'https://.../design1.jpg',
-          tags: ['프렌치', '글리터'],
-          viewCount: 9359,
-          wishCount: 312,
+          design: {
+            id: 1,
+            title: '글리터 프렌치',
+            imageUrl: 'https://.../design1.jpg',
+            tags: ['프렌치', '글리터'],
+            viewCount: 9359,
+            wishCount: 312,
+          },
           createdAt: new Date('2026-07-27T04:59:00.000Z'),
         },
       ],
