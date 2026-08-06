@@ -16,7 +16,9 @@ export interface EstimateRequestCursor {
 }
 
 const CursorPayload = z.object({
-  createdAt: z.coerce.date(),
+  // z.coerce.date()는 null 같은 값도 epoch Date로 변환하므로
+  // ISO 8601 문자열인지 먼저 검증한 뒤 Date로 변환한다.
+  createdAt: z.string().datetime().pipe(z.coerce.date()),
   id: z.number().int().positive(),
 });
 
