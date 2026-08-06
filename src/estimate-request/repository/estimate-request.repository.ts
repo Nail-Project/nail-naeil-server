@@ -1,5 +1,6 @@
 import { getPrisma } from '../../infra/prisma';
 import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request.dto';
+import type { EstimateRequestCursor } from '../dto/request/get-estimates-query';
 
 export class EstimateRequestRepository {
   // shopIds로 샵 ID + 전화번호 목록 조회
@@ -37,12 +38,31 @@ export class EstimateRequestRepository {
     });
   }
 
-  // 상태별 견적 요청 목록 조회
+  // 상태별 견적 요청 목록 조회 (커서 기반 페이지네이션)
   // userId로 본인 견적만 필터링하고, status가 'ALL'이 아닌 경우 추가로 상태 필터를 건다.
-  // 목록 카드에 필요한 썸네일(첫 번째 이미지), 견적 수, 최저가 계산용 proposals만 select한다.
-  async findByStatus(status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL', userId: number) {
-    return getPrisma().estimateRequest.findMany({
-      where: status !== 'ALL' ? { status, userId } : { userId },
+  // 커서는 (createdAt, id) 튜플 — createdAt이 같은 경우 id로 순서를 보장한다.
+  // size+1개를 가져와 초과분이 있으면 hasNext=true로 처리한다(count 쿼리 불필요).
+  async findByStatus(
+    status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL',
+    userId: number,
+    cursor: EstimateRequestCursor | undefined,
+    size: number,
+  ) {
+    const baseWhere = status !== 'ALL' ? { status, userId } : { userId };
+
+    const where = {
+      ...baseWhere,
+      // (createdAt, id) 둘 다 내림차순 정렬 기준과 같은 방향으로 비교해야 커서 이후 항목만 걸러진다.
+      ...(cursor && {
+        OR: [
+          { createdAt: { lt: cursor.createdAt } },
+          { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+        ],
+      }),
+    };
+
+    const rows = await getPrisma().estimateRequest.findMany({
+      where,
       include: {
         // 썸네일은 가장 먼저 등록된 이미지 1장만 가져온다.
         images: {
@@ -53,13 +73,17 @@ export class EstimateRequestRepository {
         proposals: {
           select: {
             totalPrice: true,
-            // 팀원 스키마의 EstimateResponseStatus: SUBMITTED | ACCEPTED | REJECTED
             status: true,
           },
         },
       },
-      // 최신 요청이 위에 오도록 내림차순 정렬
-      orderBy: { createdAt: 'desc' },
+      // (createdAt, id) 모두 내림차순 — 최신 요청이 위에 오도록
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: size + 1,
     });
+
+    const hasNext = rows.length > size;
+
+    return { estimates: hasNext ? rows.slice(0, size) : rows, hasNext };
   }
 }
