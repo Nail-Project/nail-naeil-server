@@ -7,14 +7,16 @@ import type { NotificationCursor } from '../dto/get-notifications-request';
 import { NotificationNotFoundError } from '../error/notification.error';
 import { encodeCursor } from '../../common/pagination/cursor';
 import { NotificationType, Prisma } from '../../generated/prisma/client';
-import { PushSender, NoopPushSender } from '../push/push-sender';
+import { PushSender } from '../push/push-sender';
+import { createPushSender } from '../push/push-sender.factory';
 
 // 인앱 알림(내 알림 조회/읽음) 비즈니스 로직을 담당한다.
 export class NotificationService {
   // 테스트에서 fake repository/pushSender를 주입할 수 있도록 기본값과 함께 생성자로 받는다 (user 도메인과 동일 패턴).
   constructor(
     private readonly notificationRepository = new NotificationRepository(),
-    private readonly pushSender: PushSender = new NoopPushSender(),
+    // Firebase 설정 여부에 따라 FcmPushSender(운영) 또는 NoopPushSender(로컬/테스트)가 주입된다.
+    private readonly pushSender: PushSender = createPushSender(),
   ) {}
 
   async getMyNotifications(
