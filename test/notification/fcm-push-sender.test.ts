@@ -103,8 +103,8 @@ describe('FcmPushSender', () => {
     await sender.send({ userId: 1, title: '제목', body: '내용' });
 
     expect(sendEachForMulticast).toHaveBeenCalledTimes(2);
-    expect(sendEachForMulticast.mock.calls[0][0].tokens).toHaveLength(500);
-    expect(sendEachForMulticast.mock.calls[1][0].tokens).toHaveLength(100);
+    const batchSizes = sendEachForMulticast.mock.calls.map((call) => call[0].tokens.length);
+    expect(batchSizes).toEqual([500, 100]);
     expect(repo.deleteByTokens).toHaveBeenCalledWith(['t499', 't599']);
   });
 });
