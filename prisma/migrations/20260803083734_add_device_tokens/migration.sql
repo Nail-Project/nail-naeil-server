@@ -2,7 +2,7 @@
 CREATE TABLE `device_tokens` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `user_id` INTEGER NOT NULL,
-    `token` VARCHAR(255) NOT NULL,
+    `token` VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
     `platform` ENUM('ANDROID', 'IOS') NOT NULL DEFAULT 'ANDROID',
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,

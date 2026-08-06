@@ -4,6 +4,9 @@ import { getFirebaseMessaging } from '../../infra/firebase';
 
 // FCM을 통한 실제 푸시 발송 구현체.
 // PushMessage에는 userId만 있으므로, 발송 시 디바이스 토큰을 조회해 해당 사용자의 모든 기기로 멀티캐스트한다.
+// sendEachForMulticast는 한 번에 최대 500개 토큰만 허용한다(초과 시 invalid-argument로 전체 실패).
+const FCM_MULTICAST_LIMIT = 500;
+
 export class FcmPushSender implements PushSender {
   constructor(private readonly deviceTokenRepository = new DeviceTokenRepository()) {}
 
@@ -15,35 +18,43 @@ export class FcmPushSender implements PushSender {
       return;
     }
 
-    const response = await getFirebaseMessaging().sendEachForMulticast({
-      tokens,
-      notification: { title: message.title, body: message.body },
-      // FCM data payload는 문자열 맵만 허용하므로 변환한다.
-      data: toStringDataMap(message.data),
-    });
+    // FCM data payload는 문자열 맵만 허용하므로 변환한다.
+    const data = toStringDataMap(message.data);
+    const invalidTokens: string[] = [];
+
+    // 토큰이 500개를 넘으면 API가 실패하므로 500개씩 나눠 발송하고, 배치별 무효 토큰을 모은다.
+    for (let start = 0; start < tokens.length; start += FCM_MULTICAST_LIMIT) {
+      const batch = tokens.slice(start, start + FCM_MULTICAST_LIMIT);
+
+      const response = await getFirebaseMessaging().sendEachForMulticast({
+        tokens: batch,
+        notification: { title: message.title, body: message.body },
+        data,
+      });
+
+      response.responses.forEach((result, index) => {
+        if (result.success) {
+          return;
+        }
+
+        const token = batch[index];
+        if (!token) {
+          return;
+        }
+
+        // invalid-argument는 잘못된 payload 등 토큰 외 원인으로도 반환되므로 삭제 대상에서 제외한다.
+        // 토큰 자체가 무효임이 확실한 코드만 정리한다.
+        const code = result.error?.code;
+        if (
+          code === 'messaging/registration-token-not-registered' ||
+          code === 'messaging/invalid-registration-token'
+        ) {
+          invalidTokens.push(token);
+        }
+      });
+    }
 
     // 만료/무효 토큰은 계속 실패하므로 즉시 정리해 다음 발송의 낭비를 막는다.
-    const invalidTokens: string[] = [];
-    response.responses.forEach((result, index) => {
-      if (result.success) {
-        return;
-      }
-
-      const token = tokens[index];
-      if (!token) {
-        return;
-      }
-
-      const code = result.error?.code;
-      if (
-        code === 'messaging/registration-token-not-registered' ||
-        code === 'messaging/invalid-registration-token' ||
-        code === 'messaging/invalid-argument'
-      ) {
-        invalidTokens.push(token);
-      }
-    });
-
     if (invalidTokens.length > 0) {
       await this.deviceTokenRepository.deleteByTokens(invalidTokens);
     }

@@ -137,6 +137,8 @@ model DeviceToken {
   id     Int            @id @default(autoincrement())
   userId Int            @map("user_id")
   // FCM 등록 토큰. 기기당 유일하므로 unique로 두고, 재로그인 등으로 소유자가 바뀌면 upsert로 갱신한다.
+  // 토큰은 대소문자를 구분하므로 DB 컬럼 콜레이션을 utf8mb4_bin으로 지정한다(마이그레이션 SQL 참고).
+  // Prisma 스키마는 컬럼 콜레이션 표현을 지원하지 않아 마이그레이션에서만 관리한다.
   token    String         @unique @db.VarChar(255)
   platform DevicePlatform @default(ANDROID)
 

@@ -63,4 +63,48 @@ describe('FcmPushSender', () => {
 
     expect(repo.deleteByTokens).toHaveBeenCalledWith(['stale']);
   });
+
+  it('invalid-argument 실패는 토큰 문제가 아닐 수 있으므로 삭제하지 않는다', async () => {
+    const repo = createRepo(['t1', 't2']);
+    sendEachForMulticast.mockResolvedValue({
+      responses: [
+        { success: true },
+        { success: false, error: { code: 'messaging/invalid-argument' } },
+      ],
+    });
+    const sender = new FcmPushSender(repo as unknown as DeviceTokenRepository);
+
+    await sender.send({ userId: 1, title: '제목', body: '내용' });
+
+    expect(repo.deleteByTokens).not.toHaveBeenCalled();
+  });
+
+  it('토큰이 500개를 넘으면 500개씩 나눠 발송하고 무효 토큰을 합쳐 정리한다', async () => {
+    const tokens = Array.from({ length: 600 }, (_, i) => `t${i}`);
+    const repo = createRepo(tokens);
+    // 첫 배치(500): 마지막 토큰 t499 무효 / 둘째 배치(100): 마지막 토큰 t599 무효
+    sendEachForMulticast
+      .mockResolvedValueOnce({
+        responses: tokens.slice(0, 500).map((_, i) =>
+          i === 499
+            ? { success: false, error: { code: 'messaging/invalid-registration-token' } }
+            : { success: true },
+        ),
+      })
+      .mockResolvedValueOnce({
+        responses: tokens.slice(500).map((_, i) =>
+          i === 99
+            ? { success: false, error: { code: 'messaging/registration-token-not-registered' } }
+            : { success: true },
+        ),
+      });
+    const sender = new FcmPushSender(repo as unknown as DeviceTokenRepository);
+
+    await sender.send({ userId: 1, title: '제목', body: '내용' });
+
+    expect(sendEachForMulticast).toHaveBeenCalledTimes(2);
+    expect(sendEachForMulticast.mock.calls[0][0].tokens).toHaveLength(500);
+    expect(sendEachForMulticast.mock.calls[1][0].tokens).toHaveLength(100);
+    expect(repo.deleteByTokens).toHaveBeenCalledWith(['t499', 't599']);
+  });
 });
