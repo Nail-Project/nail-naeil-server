@@ -65,6 +65,7 @@ model User {
   refreshTokens RefreshToken[]
   notifications Notification[]
   deviceTokens  DeviceToken[]
+  reservations  Reservation[]
   wishDesigns   WishDesign[]
 
   @@map("users")
@@ -190,7 +191,10 @@ model EstimateResponse {
   shop          Shop                   @relation(fields: [shopId], references: [id])
   proposalTimes ShopProposalTime[]
   smsMessages   SmsMessage[]
-  reservation   Reservation?
+  // 취소된 예약은 같은 견적으로 재예약을 허용하기로 정책 변경(2026-08-03, A1)하면서
+  // Reservation.proposalId의 @unique 제약을 제거했다 - 1건의 견적에 여러 예약(취소분 포함)이
+  // 남을 수 있어 1:1이 아닌 1:N 관계로 바뀐다.
+  reservations  Reservation[]
 
   @@unique([requestId, shopId])
   @@map("estimate_responses")
@@ -305,16 +309,22 @@ model Reservation {
   id         BigInt            @id @default(autoincrement())
   // EstimateResponse.id가 Int라 FK 타입을 맞춤 (Prisma 제약상 불가피). Int 유지로 확정(2026-07-25).
   // ERD는 한때 proposal_id를 bigint로 그렸으나 실제 구현(Int)과 안 맞아 ERD 쪽을 수정 요청, 2026-07-25 반영 완료.
-  proposalId Int               @unique @map("proposal_id")
-  // TODO: [malibu] User 모델(feat/auth) 병합 후 relation을 연결한다.
-  userId     BigInt            @map("user_id")
-  reservedAt DateTime          @map("reserved_at") @db.DateTime(3)
-  status     ReservationStatus @default(CONFIRMED)
-  createdAt  DateTime          @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt  DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
-  proposal   EstimateResponse  @relation(fields: [proposalId], references: [id])
+  // [malibu][A1] @unique 제거(2026-08-03): 취소된 예약은 같은 견적으로 재예약을 허용하는 정책으로 바뀌면서
+  // proposalId 단위 유일성 제약을 DB에 걸어둘 수 없게 됐다. 대신 "취소되지 않은 예약" 단위 중복은
+  // 애플리케이션 레벨(existsByProposalId의 status != CANCELLED 조건)에서 막는다.
+  proposalId   Int               @map("proposal_id")
+  userId       Int               @map("user_id")
+  reservedAt   DateTime          @map("reserved_at") @db.DateTime(3)
+  status       ReservationStatus @default(CONFIRMED)
+  // 예약 취소 사유 - Figma 라디오 선택지("개인 사정" 등)를 자유 문자열로 저장, 취소하지 않은 예약은 null.
+  cancelReason String?           @map("cancel_reason") @db.VarChar(255)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  proposal     EstimateResponse  @relation(fields: [proposalId], references: [id])
+  user         User              @relation(fields: [userId], references: [id])
 
   @@index([userId, status, reservedAt])
+  @@index([proposalId])
   @@map("reservations")
 }
 

@@ -13,6 +13,8 @@ import {
   AlreadyReservedError,
   ProposalNotFoundError,
   ProposalTimeNotFoundError,
+  ReservationAlreadyFinalizedError,
+  ReservationLockConflictError,
   ReservationNotFoundError,
 } from '../error/reservation.error';
 
@@ -30,7 +32,7 @@ export class ReservationService {
   // 예약 생성
   async createReservation(
     dto: CreateReservationRequestType,
-    userId: bigint,
+    userId: number,
   ): Promise<CreateReservationResponse> {
     const { proposalId, timeId } = dto;
 
@@ -76,6 +78,8 @@ export class ReservationService {
         status: result.status,
       };
     } catch (error) {
+      // 견적 row 락으로 감지한 동시 예약 경쟁 상태 (repository.create() 참고)
+      if (error instanceof ReservationLockConflictError) throw new AlreadyReservedError();
       // DB unique 제약조건 위반 - 사전 체크와 생성 사이의 경쟁 상태로 중복 예약된 경우
       if (isUniqueConstraintError(error)) throw new AlreadyReservedError();
       // 사전 체크 이후 예약 시간 slot이 동시에 삭제/변경된 경쟁 상태
@@ -89,7 +93,7 @@ export class ReservationService {
   // 확정(CONFIRMED)/지난(PAST=COMPLETED+CANCELLED) 예약 목록 조회
   async getReservations(
     status: ReservationListStatus,
-    userId: bigint,
+    userId: number,
     cursor: ReservationCursor | undefined,
     size: number,
   ): Promise<GetReservationsResponse> {
@@ -119,6 +123,8 @@ export class ReservationService {
         // TODO: [malibu] Shop 도메인(B8) 개발 후 실제 컬럼으로 연결 예정
         shopThumbnailUrl: null,
         totalPrice: r.proposal.totalPrice,
+        nailType: r.proposal.request.nailType,
+        removalType: r.proposal.request.removalType,
       })),
       pageInfo: { nextCursor, hasNext },
     };
@@ -127,7 +133,7 @@ export class ReservationService {
   // 예약 상세 조회
   async getReservationDetail(
     reservationId: bigint,
-    userId: bigint,
+    userId: number,
   ): Promise<GetReservationDetailResponse> {
     const reservation = await this.reservationRepository.findByIdAndUserId(reservationId, userId);
     if (!reservation) throw new ReservationNotFoundError();
@@ -137,12 +143,46 @@ export class ReservationService {
     return {
       reservationId: Number(reservation.id),
       shopName: shop.name,
+      shopPhoneNumber: shop.phoneNumber,
       address: shop.addressDetail ? `${shop.address} ${shop.addressDetail}` : shop.address,
+      addressDetail: shop.addressDetail,
       reservedAt: reservation.reservedAt,
+      basePrice: reservation.proposal.basePrice,
+      removalPrice: reservation.proposal.removalPrice,
+      extraPrice: reservation.proposal.extraPrice,
       totalPrice: reservation.proposal.totalPrice,
+      shopComment: reservation.proposal.memo,
+      nailType: reservation.proposal.request.nailType,
+      removalType: reservation.proposal.request.removalType,
+      images: reservation.proposal.request.images.map((image) => image.imageUrl),
       status: reservation.status,
       // TODO: [malibu] Design 모델 추가 후 연결 예정
       designName: null,
     };
+  }
+
+  // 예약 취소
+  async cancelReservation(reservationId: bigint, userId: number, reason: string): Promise<void> {
+    // 존재하지 않거나 본인 소유가 아닌 예약인 경우 404 (findStatusByIdAndUserId의 where절에서
+    // userId를 함께 걸어 소유권을 검증한다 - IDOR 방지)
+    const reservation = await this.reservationRepository.findStatusByIdAndUserId(
+      reservationId,
+      userId,
+    );
+    if (!reservation) throw new ReservationNotFoundError();
+
+    // 이미 취소됐거나 완료된 예약은 다시 취소할 수 없음 (사전 체크 - 일반적인 경우 빠르게 차단)
+    if (reservation.status !== 'CONFIRMED') throw new ReservationAlreadyFinalizedError();
+
+    let cancelled;
+    try {
+      cancelled = await this.reservationRepository.cancel(reservationId, userId, reason);
+    } catch (error) {
+      throw new ReservationFailedError({ originalError: error });
+    }
+
+    // 사전 체크와 조건부 업데이트(cancel()의 updateMany) 사이의 경쟁 상태로
+    // 동시에 들어온 취소 요청이 먼저 반영된 경우 - count가 0이라 null이 돌아온다.
+    if (!cancelled) throw new ReservationAlreadyFinalizedError();
   }
 }
