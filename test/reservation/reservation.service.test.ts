@@ -356,6 +356,7 @@ describe('ReservationService.getReservationDetail', () => {
       shopName: '영찬 네일 강남점',
       shopPhoneNumber: '02-1234-5678',
       address: '서울시 강남구 2층',
+      addressDetail: '2층',
       basePrice: 40_000,
       removalPrice: 5_000,
       extraPrice: 10_000,
@@ -391,6 +392,7 @@ describe('ReservationService.getReservationDetail', () => {
 
     await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
       address: '서울시 강남구',
+      addressDetail: null,
       shopPhoneNumber: null,
       removalType: 'NONE',
       shopComment: null,

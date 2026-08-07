@@ -6,7 +6,9 @@ export interface GetReservationDetailResponse {
   shopName: string;
   // 예약 변경은 별도 API 없이 프론트에서 이 번호로 안내 팝업을 띄워 처리한다(Figma 기준).
   shopPhoneNumber: string | null;
+  // 기존 소비자와의 호환을 위해 address(합친 문자열)는 유지하고, 상세 주소만 따로도 내려준다.
   address: string;
+  addressDetail: string | null;
   reservedAt: Date;
   // 견적서 세부내역 - EstimateResponse에 이미 저장돼 있던 값을 그대로 노출한다.
   // Figma의 "디자인 추가"/"옵션 추가" 라벨과 정확히 어떤 필드가 대응하는지는
