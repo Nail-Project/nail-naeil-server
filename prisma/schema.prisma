@@ -363,6 +363,9 @@ model WishDesign {
   createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
 
   @@unique([designId, userId])
+  // 찜한 디자인 목록(findWishlistByUserId)이 userId로 필터링 후 createdAt/id로 정렬한다.
+  // 위 unique 인덱스는 designId가 선두 컬럼이라 이 조회엔 못 쓰여서 별도로 둔다.
+  @@index([userId, createdAt, id])
   @@map("wish_designs")
 }
 

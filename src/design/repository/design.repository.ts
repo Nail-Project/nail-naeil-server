@@ -1,6 +1,7 @@
 import { Prisma } from '../../generated/prisma/client';
 import { getPrisma } from '../../infra/prisma';
 import type { DesignCursor } from '../dto/get-designs-request';
+import type { WishCursor } from '../dto/get-wishlist-request';
 
 export interface DesignSummaryRecord {
   // 응답 DTO로 그대로 매핑되는 공개 필드만 여기 담는다.
@@ -27,6 +28,22 @@ export interface DesignDetailRecord {
   description: string;
   images: string[];
   wishCount: number;
+}
+
+export interface WishlistItemRecord {
+  // 응답 DTO로 그대로 매핑되는 공개 필드만 여기 담는다.
+  design: {
+    id: number;
+    title: string;
+    imageUrl: string;
+    tags: string[];
+    viewCount: number;
+    wishCount: number;
+  };
+  // 커서 생성에만 쓰는 내부 필드 - design과 분리해둬서 실수로 응답에 통째로 spread할 수 없게 한다.
+  // 디자인이 아니라 WishDesign(찜 기록) 행 기준이다("찜한 시점" 정렬).
+  wishId: number;
+  wishedAt: Date;
 }
 
 export interface DesignAdminRecord {
@@ -63,6 +80,14 @@ export interface DesignRepository {
   findDetailById(designId: number): Promise<DesignDetailRecord | null>;
   incrementViewCount(designId: number): Promise<number>;
   isWishedByUser(designId: number, userId: number): Promise<boolean>;
+  existsById(designId: number): Promise<boolean>;
+  createWish(designId: number, userId: number): Promise<{ wishCount: number }>;
+  deleteWish(designId: number, userId: number): Promise<{ wishCount: number }>;
+  findWishlistByUserId(
+    userId: number,
+    cursor: WishCursor | undefined,
+    size: number,
+  ): Promise<{ items: WishlistItemRecord[]; hasNext: boolean }>;
   create(data: CreateDesignData): Promise<DesignAdminRecord>;
   update(designId: number, data: UpdateDesignData): Promise<DesignAdminRecord>;
   delete(designId: number): Promise<void>;
@@ -231,6 +256,102 @@ export class PrismaDesignRepository implements DesignRepository {
     });
 
     return wish !== null;
+  }
+
+  // 찜 생성/삭제 전 존재 확인용 - 상세 조회(findDetailById)보다 가벼운 select만 쓴다.
+  async existsById(designId: number): Promise<boolean> {
+    const design = await getPrisma().design.findUnique({
+      where: { id: designId },
+      select: { id: true },
+    });
+
+    return design !== null;
+  }
+
+  // 디자인 찜 생성 - upsert로 멱등 처리한다(이미 찜한 상태에서 다시 호출해도 에러 없이
+  // 같은 결과). 하트 토글 UI 특성상 프론트가 "찜 안 한 상태"를 정확히 안다고 가정하기
+  // 어려워, service.createWish()에서도 이미 찜한 경우를 성공으로 취급하는 정책과 짝을 이룬다.
+  async createWish(designId: number, userId: number): Promise<{ wishCount: number }> {
+    try {
+      await getPrisma().wishDesign.upsert({
+        where: { designId_userId: { designId, userId } },
+        update: {},
+        create: { designId, userId },
+      });
+    } catch (error) {
+      // Prisma의 upsert는 MySQL에서 진짜 원자적 UPSERT가 아니라 조회 후 생성/수정이라,
+      // 같은 (designId, userId)로 두 요청이 거의 동시에 들어오면(하트 연타) 한쪽이
+      // unique 제약 위반(P2002)을 낼 수 있다. 원하는 최종 상태(찜 존재)는 이미
+      // 달성됐으므로, 멱등 처리 원칙에 따라 실패로 취급하지 않고 넘어간다.
+      if (!isUniqueConstraintError(error)) throw error;
+    }
+
+    const wishCount = await getPrisma().wishDesign.count({ where: { designId } });
+    return { wishCount };
+  }
+
+  // 디자인 찜 삭제 - deleteMany는 대상이 없어도 에러 없이 0건 삭제로 끝나므로
+  // 찜 안 한 상태에서 호출해도 자연스럽게 멱등하게 수렴한다.
+  async deleteWish(designId: number, userId: number): Promise<{ wishCount: number }> {
+    await getPrisma().wishDesign.deleteMany({ where: { designId, userId } });
+
+    const wishCount = await getPrisma().wishDesign.count({ where: { designId } });
+    return { wishCount };
+  }
+
+  // 내가 찜한 디자인 목록 - WishDesign.createdAt("찜한 시점") 기준 커서 페이지네이션.
+  // findFeed와 동일하게 size보다 1개 더 가져와 다음 페이지 존재 여부를 판단한다.
+  async findWishlistByUserId(
+    userId: number,
+    cursor: WishCursor | undefined,
+    size: number,
+  ): Promise<{ items: WishlistItemRecord[]; hasNext: boolean }> {
+    const rows = await getPrisma().wishDesign.findMany({
+      where: {
+        userId,
+        ...(cursor && {
+          OR: [
+            { createdAt: { lt: cursor.createdAt } },
+            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+          ],
+        }),
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: size + 1,
+      select: {
+        id: true,
+        createdAt: true,
+        design: {
+          select: {
+            id: true,
+            title: true,
+            imageUrl: true,
+            viewCount: true,
+            tags: { select: { tag: { select: { name: true } } }, orderBy: { tagId: 'asc' } },
+            _count: { select: { wishes: true } },
+          },
+        },
+      },
+    });
+
+    const hasNext = rows.length > size;
+    const page = hasNext ? rows.slice(0, size) : rows;
+
+    return {
+      items: page.map((row) => ({
+        design: {
+          id: row.design.id,
+          title: row.design.title,
+          imageUrl: row.design.imageUrl,
+          tags: row.design.tags.map((t) => t.tag.name),
+          viewCount: row.design.viewCount,
+          wishCount: row.design._count.wishes,
+        },
+        wishId: row.id,
+        wishedAt: row.createdAt,
+      })),
+      hasNext,
+    };
   }
 
   // 관리자 디자인 생성 - 이미지 목록/태그를 한 트랜잭션으로 함께 만든다.

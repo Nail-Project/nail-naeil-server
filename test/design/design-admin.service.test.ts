@@ -7,6 +7,7 @@ import type {
   DesignRepository,
   DesignSummaryRecord,
   UpdateDesignData,
+  WishlistItemRecord,
 } from '../../src/design/repository/design.repository';
 import { DesignAdminService } from '../../src/design/service/design-admin.service';
 
@@ -43,6 +44,24 @@ class FakeRepository implements DesignRepository {
 
   async isWishedByUser(): Promise<boolean> {
     return false;
+  }
+
+  // 이 파일은 관리자 CRUD(create/update/delete) 서비스 테스트 전용이라 찜 관련 메서드는
+  // 실제로 쓰이지 않는다 - 인터페이스를 만족시키기 위한 최소 스텁만 둔다.
+  async existsById(): Promise<boolean> {
+    return false;
+  }
+
+  async createWish(): Promise<{ wishCount: number }> {
+    throw new Error('not implemented in this fake');
+  }
+
+  async deleteWish(): Promise<{ wishCount: number }> {
+    throw new Error('not implemented in this fake');
+  }
+
+  async findWishlistByUserId(): Promise<{ items: WishlistItemRecord[]; hasNext: boolean }> {
+    return { items: [], hasNext: false };
   }
 
   async create(data: CreateDesignData): Promise<DesignAdminRecord> {

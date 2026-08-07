@@ -37,6 +37,12 @@ const createApp = () => {
       description: '설명',
       isBookmarked: false,
     }),
+    createWish: vi.fn().mockResolvedValue({ isBookmarked: true, wishCount: 902 }),
+    deleteWish: vi.fn().mockResolvedValue({ isBookmarked: false, wishCount: 900 }),
+    getWishlist: vi.fn().mockResolvedValue({
+      designs: [],
+      pageInfo: { nextCursor: null, hasNext: false },
+    }),
   };
   const app = express();
 
@@ -138,6 +144,120 @@ describe('GET /api/v1/designs/:designId', () => {
     const response = await request(app).get('/api/v1/designs/0');
 
     expect(response.status).toBe(400);
+    expect(service.getDesignDetail).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/v1/designs/:designId/wish', () => {
+  it('정상적인 id는 200으로 응답하고 서비스에 숫자 id와 인증된 userId를 전달한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).post('/api/v1/designs/1/wish');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toEqual({ isBookmarked: true, wishCount: 902 });
+    expect(service.createWish).toHaveBeenCalledWith(1, USER_ID);
+  });
+
+  it('존재하지 않는 디자인이면 404와 전용 에러 코드를 응답한다', async () => {
+    const { app, service } = createApp();
+    service.createWish.mockRejectedValueOnce(new DesignNotFoundError());
+
+    const response = await request(app).post('/api/v1/designs/999/wish');
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('DESIGN_NOT_FOUND');
+  });
+
+  it('숫자가 아닌 id는 400으로 응답하고 전용 에러 코드를 반환한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).post('/api/v1/designs/not-a-number/wish');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_DESIGN_ID');
+    expect(service.createWish).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /api/v1/designs/:designId/wish', () => {
+  it('정상적인 id는 200으로 응답하고 서비스에 숫자 id와 인증된 userId를 전달한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).delete('/api/v1/designs/1/wish');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toEqual({ isBookmarked: false, wishCount: 900 });
+    expect(service.deleteWish).toHaveBeenCalledWith(1, USER_ID);
+  });
+
+  it('존재하지 않는 디자인이면 404와 전용 에러 코드를 응답한다', async () => {
+    const { app, service } = createApp();
+    service.deleteWish.mockRejectedValueOnce(new DesignNotFoundError());
+
+    const response = await request(app).delete('/api/v1/designs/999/wish');
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('DESIGN_NOT_FOUND');
+  });
+
+  it('숫자가 아닌 id는 400으로 응답하고 전용 에러 코드를 반환한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).delete('/api/v1/designs/not-a-number/wish');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_DESIGN_ID');
+    expect(service.deleteWish).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/v1/designs/wishlist', () => {
+  it('기본 size로 200을 응답하고 인증된 userId를 서비스에 전달한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).get('/api/v1/designs/wishlist');
+
+    expect(response.status).toBe(200);
+    expect(response.body.resultType).toBe('SUCCESS');
+    expect(service.getWishlist).toHaveBeenCalledWith(USER_ID, undefined, 10);
+  });
+
+  it('cursor/size를 전달하면 디코딩해서 서비스에 전달한다', async () => {
+    const { app, service } = createApp();
+    const cursor = encodeCursor({ createdAt: '2026-08-01T04:59:00.000Z', id: 5 });
+
+    const response = await request(app)
+      .get('/api/v1/designs/wishlist')
+      .query({ cursor, size: '20' });
+
+    expect(response.status).toBe(200);
+    expect(service.getWishlist).toHaveBeenCalledWith(
+      USER_ID,
+      { createdAt: new Date('2026-08-01T04:59:00.000Z'), id: 5 },
+      20,
+    );
+  });
+
+  it('형식이 깨진 cursor는 400으로 응답한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app)
+      .get('/api/v1/designs/wishlist')
+      .query({ cursor: 'not-valid' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_DESIGN_REQUEST');
+    expect(service.getWishlist).not.toHaveBeenCalled();
+  });
+
+  it("'wishlist'가 :designId 라우트로 잘못 매칭되지 않고 getWishlist가 호출된다", async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).get('/api/v1/designs/wishlist');
+
+    expect(response.status).toBe(200);
+    expect(service.getWishlist).toHaveBeenCalled();
     expect(service.getDesignDetail).not.toHaveBeenCalled();
   });
 });

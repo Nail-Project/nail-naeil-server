@@ -5,9 +5,11 @@ import type {
   DesignDetailRecord,
   DesignRepository,
   DesignSummaryRecord,
+  WishlistItemRecord,
 } from '../../src/design/repository/design.repository';
 import { DesignService } from '../../src/design/service/design.service';
 import type { DesignCursor } from '../../src/design/dto/get-designs-request';
+import type { WishCursor } from '../../src/design/dto/get-wishlist-request';
 import { encodeCursor } from '../../src/common/pagination/cursor';
 
 class FakeRepository implements DesignRepository {
@@ -38,6 +40,19 @@ class FakeRepository implements DesignRepository {
   incrementedIds: number[] = [];
   isWishedByUserArgs: Array<{ designId: number; userId: number }> = [];
 
+  existsResult = true;
+  existsByIdArgs: number[] = [];
+  createWishResult: { wishCount: number } = { wishCount: 1 };
+  createWishError: unknown = null;
+  createWishArgs: Array<{ designId: number; userId: number }> = [];
+  deleteWishResult: { wishCount: number } = { wishCount: 0 };
+  deleteWishArgs: Array<{ designId: number; userId: number }> = [];
+  wishlistResult: { items: WishlistItemRecord[]; hasNext: boolean } = {
+    items: [],
+    hasNext: false,
+  };
+  findWishlistArgs: Array<{ userId: number; cursor: WishCursor | undefined; size: number }> = [];
+
   async findFeed(
     cursor: DesignCursor | undefined,
     category: string | undefined,
@@ -60,6 +75,31 @@ class FakeRepository implements DesignRepository {
   async isWishedByUser(designId: number, userId: number): Promise<boolean> {
     this.isWishedByUserArgs.push({ designId, userId });
     return this.wished;
+  }
+
+  async existsById(designId: number): Promise<boolean> {
+    this.existsByIdArgs.push(designId);
+    return this.existsResult;
+  }
+
+  async createWish(designId: number, userId: number): Promise<{ wishCount: number }> {
+    this.createWishArgs.push({ designId, userId });
+    if (this.createWishError) throw this.createWishError;
+    return this.createWishResult;
+  }
+
+  async deleteWish(designId: number, userId: number): Promise<{ wishCount: number }> {
+    this.deleteWishArgs.push({ designId, userId });
+    return this.deleteWishResult;
+  }
+
+  async findWishlistByUserId(
+    userId: number,
+    cursor: WishCursor | undefined,
+    size: number,
+  ): Promise<{ items: WishlistItemRecord[]; hasNext: boolean }> {
+    this.findWishlistArgs.push({ userId, cursor, size });
+    return this.wishlistResult;
   }
 
   // 이 파일은 읽기(getDesigns/getDesignDetail) 서비스 테스트 전용이라 관리자 CRUD 메서드는
@@ -237,5 +277,183 @@ describe('DesignService.getDesignDetail', () => {
       difficulty: '높음',
       recommendedShape: '스퀘어',
     });
+  });
+});
+
+describe('DesignService.createWish', () => {
+  let repository: FakeRepository;
+  let service: DesignService;
+
+  beforeEach(() => {
+    repository = new FakeRepository();
+    service = new DesignService(repository);
+  });
+
+  it('존재하지 않는 디자인이면 404를 던진다', async () => {
+    repository.existsResult = false;
+
+    await expect(service.createWish(999, userId)).rejects.toMatchObject({
+      code: 'DESIGN_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
+
+  it('찜 생성 성공 시 isBookmarked:true와 repository가 반환한 wishCount를 응답한다', async () => {
+    repository.createWishResult = { wishCount: 5 };
+
+    const result = await service.createWish(1, userId);
+
+    expect(result).toEqual({ isBookmarked: true, wishCount: 5 });
+    expect(repository.createWishArgs).toEqual([{ designId: 1, userId }]);
+  });
+
+  it('이미 찜한 디자인을 다시 찜해도 에러 없이 성공한다(멱등 처리 - repository.createWish는 upsert)', async () => {
+    repository.createWishResult = { wishCount: 5 };
+
+    const result = await service.createWish(1, userId);
+
+    expect(result.isBookmarked).toBe(true);
+  });
+
+  it('존재 확인 이후 삭제된 경쟁 상태(P2025)면 404를 던진다', async () => {
+    repository.createWishError = prismaError('P2025');
+
+    await expect(service.createWish(1, userId)).rejects.toMatchObject({
+      code: 'DESIGN_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
+
+  it('존재 확인 이후 삭제된 경쟁 상태(P2003 FK 위반)면 404를 던진다', async () => {
+    repository.createWishError = prismaError('P2003');
+
+    await expect(service.createWish(1, userId)).rejects.toMatchObject({
+      code: 'DESIGN_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
+
+  it('그 외 repository 에러는 그대로 전파한다', async () => {
+    const unexpected = new Error('DB 연결 실패');
+    repository.createWishError = unexpected;
+
+    await expect(service.createWish(1, userId)).rejects.toBe(unexpected);
+  });
+});
+
+describe('DesignService.deleteWish', () => {
+  let repository: FakeRepository;
+  let service: DesignService;
+
+  beforeEach(() => {
+    repository = new FakeRepository();
+    service = new DesignService(repository);
+  });
+
+  it('존재하지 않는 디자인이면 404를 던진다', async () => {
+    repository.existsResult = false;
+
+    await expect(service.deleteWish(999, userId)).rejects.toMatchObject({
+      code: 'DESIGN_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
+
+  it('찜 삭제 성공 시 isBookmarked:false와 repository가 반환한 wishCount를 응답한다', async () => {
+    repository.deleteWishResult = { wishCount: 3 };
+
+    const result = await service.deleteWish(1, userId);
+
+    expect(result).toEqual({ isBookmarked: false, wishCount: 3 });
+    expect(repository.deleteWishArgs).toEqual([{ designId: 1, userId }]);
+  });
+
+  it('찜하지 않은 디자인을 삭제해도 에러 없이 성공한다(멱등 처리 - repository.deleteWish는 deleteMany)', async () => {
+    repository.deleteWishResult = { wishCount: 0 };
+
+    const result = await service.deleteWish(1, userId);
+
+    expect(result).toEqual({ isBookmarked: false, wishCount: 0 });
+  });
+});
+
+describe('DesignService.getWishlist', () => {
+  let repository: FakeRepository;
+  let service: DesignService;
+
+  beforeEach(() => {
+    repository = new FakeRepository();
+    service = new DesignService(repository);
+  });
+
+  it('찜한 디자인 목록을 응답 형식에 맞게 매핑한다 (isBookmarked 필드는 응답에 없다)', async () => {
+    repository.wishlistResult = {
+      items: [
+        {
+          design: {
+            id: 1,
+            title: '글리터 프렌치',
+            imageUrl: 'https://.../design1.jpg',
+            tags: ['프렌치', '글리터'],
+            viewCount: 9359,
+            wishCount: 312,
+          },
+          wishId: 100,
+          wishedAt: new Date('2026-08-01T04:59:00.000Z'),
+        },
+      ],
+      hasNext: false,
+    };
+
+    const result = await service.getWishlist(userId, undefined, 10);
+
+    expect(result).toEqual({
+      designs: [
+        {
+          designId: 1,
+          title: '글리터 프렌치',
+          imageUrl: 'https://.../design1.jpg',
+          tags: ['프렌치', '글리터'],
+          viewCount: 9359,
+          wishCount: 312,
+        },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+  });
+
+  it('다음 페이지가 있으면 마지막 항목의 wishId/wishedAt 기준으로 nextCursor를 만든다', async () => {
+    repository.wishlistResult = {
+      items: [
+        {
+          design: {
+            id: 1,
+            title: '글리터 프렌치',
+            imageUrl: 'https://.../design1.jpg',
+            tags: ['프렌치', '글리터'],
+            viewCount: 9359,
+            wishCount: 312,
+          },
+          wishId: 100,
+          wishedAt: new Date('2026-08-01T04:59:00.000Z'),
+        },
+      ],
+      hasNext: true,
+    };
+
+    const result = await service.getWishlist(userId, undefined, 10);
+
+    expect(result.pageInfo.hasNext).toBe(true);
+    expect(result.pageInfo.nextCursor).toBe(
+      encodeCursor({ createdAt: '2026-08-01T04:59:00.000Z', id: 100 }),
+    );
+  });
+
+  it('요청한 userId/cursor/size를 그대로 repository에 전달한다', async () => {
+    const cursor: WishCursor = { createdAt: new Date('2026-08-01T04:59:00.000Z'), id: 9 };
+
+    await service.getWishlist(userId, cursor, 15);
+
+    expect(repository.findWishlistArgs).toEqual([{ userId, cursor, size: 15 }]);
   });
 });
