@@ -31,7 +31,7 @@ const reservationListSelect = {
     select: {
       totalPrice: true,
       shop: { select: { name: true } },
-      request: { select: { nailType: true } },
+      request: { select: { nailType: true, removalType: true } },
     },
   },
 } as const;
@@ -44,7 +44,7 @@ export interface ReservationRecord {
   proposal: {
     totalPrice: number;
     shop: { name: string };
-    request: { nailType: string };
+    request: { nailType: string; removalType: string };
   };
 }
 
@@ -64,7 +64,7 @@ export interface ReservationDetailRecord {
       address: string;
       addressDetail: string | null;
     };
-    request: { nailType: string; images: { imageUrl: string }[] };
+    request: { nailType: string; removalType: string; images: { imageUrl: string }[] };
   };
 }
 
@@ -246,7 +246,9 @@ export class PrismaReservationRepository implements ReservationRepository {
             extraPrice: true,
             memo: true,
             shop: { select: { name: true, phoneNumber: true, address: true, addressDetail: true } },
-            request: { select: { nailType: true, images: { select: { imageUrl: true } } } },
+            request: {
+              select: { nailType: true, removalType: true, images: { select: { imageUrl: true } } },
+            },
           },
         },
       },

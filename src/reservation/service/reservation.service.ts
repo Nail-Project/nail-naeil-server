@@ -124,6 +124,7 @@ export class ReservationService {
         shopThumbnailUrl: null,
         totalPrice: r.proposal.totalPrice,
         nailType: r.proposal.request.nailType,
+        removalType: r.proposal.request.removalType,
       })),
       pageInfo: { nextCursor, hasNext },
     };
@@ -151,6 +152,7 @@ export class ReservationService {
       totalPrice: reservation.proposal.totalPrice,
       shopComment: reservation.proposal.memo,
       nailType: reservation.proposal.request.nailType,
+      removalType: reservation.proposal.request.removalType,
       images: reservation.proposal.request.images.map((image) => image.imageUrl),
       status: reservation.status,
       // TODO: [malibu] Design 모델 추가 후 연결 예정

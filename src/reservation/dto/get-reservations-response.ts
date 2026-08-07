@@ -12,6 +12,8 @@ export interface ReservationListItem {
   totalPrice: number;
   // 시술 부위 - EstimateRequest.nailType (HAND/PEDICURE/BOTH)
   nailType: string;
+  // 제거 유무 - EstimateRequest.removalType
+  removalType: string;
 }
 
 export interface ReservationPageInfo {
