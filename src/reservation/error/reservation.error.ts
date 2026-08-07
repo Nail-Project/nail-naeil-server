@@ -72,7 +72,7 @@ export class AlreadyReservedError extends AppError {
   }
 }
 
-// GET /:reservationId - 존재하지 않거나 본인 소유가 아닌 예약 id
+// GET /:reservationId, DELETE /:reservationId - 존재하지 않거나 본인 소유가 아닌 예약 id
 export class ReservationNotFoundError extends AppError {
   constructor(data?: unknown) {
     super({
@@ -81,5 +81,39 @@ export class ReservationNotFoundError extends AppError {
       message: '존재하지 않는 예약입니다.',
       data,
     });
+  }
+}
+
+// DELETE /:reservationId - 취소 request body(reason) 값 검증 실패
+export class ReservationCancelValidationError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'RESERVATION_CANCEL_VALIDATION_FAILED',
+      statusCode: 400,
+      message: '취소 사유를 입력해주세요.',
+      data,
+    });
+  }
+}
+
+// DELETE /:reservationId - 이미 취소되었거나 완료된 예약은 취소할 수 없음
+export class ReservationAlreadyFinalizedError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'RESERVATION_ALREADY_FINALIZED',
+      statusCode: 409,
+      message: '이미 취소되었거나 완료된 예약은 취소할 수 없습니다.',
+      data,
+    });
+  }
+}
+
+// repository.create() 내부에서 견적 row 락으로 동시 예약을 감지했을 때 던지는 신호용 에러.
+// 진짜 Prisma 에러가 아니므로(image.error.ts의 InvalidImageTypeError와 동일 패턴) 일반
+// Error를 상속한다. service에서 instanceof로 판별해 AlreadyReservedError(409)로 변환한다.
+export class ReservationLockConflictError extends Error {
+  constructor() {
+    super('동시 예약 요청이 감지됐습니다.');
+    this.name = 'ReservationLockConflictError';
   }
 }

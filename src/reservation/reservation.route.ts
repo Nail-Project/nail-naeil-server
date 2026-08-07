@@ -18,6 +18,10 @@ const reservationRouter = Router();
  * /api/v1/reserve:
  *   post:
  *     summary: 예약 생성
+ *     description: >
+ *       예약 가능 시간 목록은 이 API가 아니라 `GET /api/v1/estimate/{proposal_id}/time`(견적 응답 도메인)에서
+ *       먼저 조회한다 - 거기서 받은 시간 슬롯의 `id`를 `timeId`로 넘기면 된다.
+ *       예약자(사용자) 정보는 request body로 받지 않고, `Authorization` 헤더의 인증 토큰에서 서버가 채운다.
  *     security:
  *       - bearerAuth: []
  *     tags:
@@ -34,9 +38,11 @@ const reservationRouter = Router();
  *             properties:
  *               proposalId:
  *                 type: integer
+ *                 description: 샵이 이 견적 요청에 대해 보낸 견적 응답(제안)의 id. 이 견적을 받아들이고 예약하겠다는 뜻으로 넘긴다.
  *                 example: 5
  *               timeId:
  *                 type: integer
+ *                 description: 해당 견적 응답에 딸린 예약 가능 시간 슬롯의 id. 샵이 견적과 함께 제시한 여러 시간대 중 사용자가 고른 하나.
  *                 example: 12
  *     responses:
  *       201:
@@ -184,10 +190,82 @@ const reservationRouter = Router();
  *               tokenInvalid:
  *                 value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null }
  */
+/**
+ * @openapi
+ * /api/v1/reserve/{reservationId}:
+ *   delete:
+ *     summary: 예약 취소
+ *     description: >
+ *       본인 예약만 취소할 수 있다. "예약 변경"은 별도 API 없이 프론트에서 샵 연락처 안내 팝업으로 처리한다(Figma 기준).
+ *     security:
+ *       - bearerAuth: []
+ *     tags:
+ *       - Reservation
+ *     parameters:
+ *       - in: path
+ *         name: reservationId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 example: 개인 사정으로 인해 취소할게요
+ *     responses:
+ *       204:
+ *         description: 예약 취소 성공 (응답 본문 없음)
+ *       400:
+ *         description: 유효하지 않은 예약 id 또는 취소 사유
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             examples:
+ *               invalidId:
+ *                 value: { resultType: FAIL, error: { code: INVALID_RESERVATION_ID, message: 유효하지 않은 예약 id입니다., data: null }, success: null }
+ *               invalidReason:
+ *                 value: { resultType: FAIL, error: { code: RESERVATION_CANCEL_VALIDATION_FAILED, message: 취소 사유를 입력해주세요., data: null }, success: null }
+ *       404:
+ *         description: 존재하지 않거나 본인 소유가 아닌 예약
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: RESERVATION_NOT_FOUND, message: 존재하지 않는 예약입니다., data: null }, success: null }
+ *       409:
+ *         description: 이미 취소되었거나 완료된 예약
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             example: { resultType: FAIL, error: { code: RESERVATION_ALREADY_FINALIZED, message: 이미 취소되었거나 완료된 예약은 취소할 수 없습니다., data: null }, success: null }
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiErrorResponse'
+ *             examples:
+ *               unauthorized:
+ *                 value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null }
+ *               tokenExpired:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null }
+ *               tokenInvalid:
+ *                 value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null }
+ */
 const registerRoutes = (router: Router, routeController: ReservationController): Router => {
   router.post('/', authMiddleware, routeController.createReservation);
   router.get('/detail', authMiddleware, routeController.getReservations);
   router.get('/:reservationId', authMiddleware, routeController.getReservationDetail);
+  router.delete('/:reservationId', authMiddleware, routeController.cancelReservation);
 
   return router;
 };
