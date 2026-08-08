@@ -57,6 +57,17 @@ export class ReservationFailedError extends AppError {
   }
 }
 
+export class ReviewFailedError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'REVIEW_FAILED',
+      statusCode: 500,
+      message: '리뷰를 등록하지 못했어요. 다시 시도해주세요.',
+      data,
+    });
+  }
+}
+
 export class InternalServerError extends AppError {
   constructor(data?: unknown) {
     super({

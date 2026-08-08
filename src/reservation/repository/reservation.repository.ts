@@ -63,6 +63,8 @@ export interface ReservationDetailRecord {
       phoneNumber: string | null;
       address: string;
       addressDetail: string | null;
+      rating: { toNumber(): number };
+      reviewCount: number;
     };
     request: { nailType: string; removalType: string; images: { imageUrl: string }[] };
   };
@@ -245,7 +247,16 @@ export class PrismaReservationRepository implements ReservationRepository {
             removalPrice: true,
             extraPrice: true,
             memo: true,
-            shop: { select: { name: true, phoneNumber: true, address: true, addressDetail: true } },
+            shop: {
+              select: {
+                name: true,
+                phoneNumber: true,
+                address: true,
+                addressDetail: true,
+                rating: true,
+                reviewCount: true,
+              },
+            },
             request: {
               select: { nailType: true, removalType: true, images: { select: { imageUrl: true } } },
             },
