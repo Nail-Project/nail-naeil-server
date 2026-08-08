@@ -1,6 +1,6 @@
 import { AppError } from '../../common/errors/app.error';
 
-// 리뷰 도메인 공통 - path/query 값(reviewId, shopId, cursor, size 등) 검증 실패
+// 리뷰 도메인 공통 - path 값(reviewId 등) 검증 실패
 export class InvalidReviewRequestError extends AppError {
   constructor(data?: unknown) {
     super({
@@ -12,7 +12,7 @@ export class InvalidReviewRequestError extends AppError {
   }
 }
 
-// POST /api/v1/reviews, PATCH /api/v1/reviews/:reviewId - body(rating/content 등) 검증 실패
+// POST /api/v1/reviews, PATCH /api/v1/reviews/:reviewId - body(shopId/rating/content 등) 검증 실패
 export class ReviewValidationError extends AppError {
   constructor(data?: unknown) {
     super({
@@ -24,13 +24,13 @@ export class ReviewValidationError extends AppError {
   }
 }
 
-// POST /api/v1/reviews - 존재하지 않거나 본인 소유가 아닌 예약
-export class ReviewReservationNotFoundError extends AppError {
+// POST /api/v1/reviews - 해당 샵에서 완료된 예약이 없어 리뷰를 작성할 수 없음
+export class ReviewNotEligibleError extends AppError {
   constructor(data?: unknown) {
     super({
-      code: 'REVIEW_RESERVATION_NOT_FOUND',
+      code: 'REVIEW_NOT_ELIGIBLE',
       statusCode: 404,
-      message: '존재하지 않는 예약입니다.',
+      message: '해당 샵에서 시술을 완료한 예약이 없어 리뷰를 작성할 수 없어요.',
       data,
     });
   }
@@ -48,37 +48,13 @@ export class ReviewNotFoundError extends AppError {
   }
 }
 
-// GET /api/v1/shops/:shopId/reviews - 존재하지 않는 샵
-export class ReviewShopNotFoundError extends AppError {
-  constructor(data?: unknown) {
-    super({
-      code: 'REVIEW_SHOP_NOT_FOUND',
-      statusCode: 404,
-      message: '존재하지 않는 샵입니다.',
-      data,
-    });
-  }
-}
-
-// POST /api/v1/reviews - 시술이 완료된 예약만 리뷰 작성 가능
-export class ReviewNotAllowedError extends AppError {
-  constructor(data?: unknown) {
-    super({
-      code: 'REVIEW_NOT_ALLOWED',
-      statusCode: 409,
-      message: '시술이 완료된 예약만 리뷰를 작성할 수 있습니다.',
-      data,
-    });
-  }
-}
-
-// POST /api/v1/reviews - 예약 1건당 리뷰는 1개까지만 작성 가능
+// POST /api/v1/reviews - 샵 1곳당 리뷰는 1개까지만 작성 가능
 export class ReviewAlreadyExistsError extends AppError {
   constructor(data?: unknown) {
     super({
       code: 'REVIEW_ALREADY_EXISTS',
       statusCode: 409,
-      message: '이미 리뷰를 작성한 예약입니다.',
+      message: '이미 리뷰를 작성한 매장입니다.',
       data,
     });
   }

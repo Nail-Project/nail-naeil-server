@@ -1,21 +1,24 @@
 import { getPrisma } from '../../infra/prisma';
 import { Prisma } from '../../generated/prisma/client';
-import type { ReservationStatus } from '../../generated/prisma/enums';
-import type { ShopReviewCursor } from '../dto/request/get-shop-reviews-request';
 
-export interface ReservationForReviewRecord {
+export interface CompletedReservationRecord {
   id: bigint;
-  status: ReservationStatus;
-  proposal: { shopId: number };
 }
 
-export interface CreatedReviewRecord {
+export interface ShopReviewRecord {
   id: number;
-  reservationId: bigint;
   shopId: number;
   rating: number;
-  content: string;
+  content: string | null;
   createdAt: Date;
+}
+
+export interface UpdatedShopReviewRecord {
+  id: number;
+  shopId: number;
+  rating: number;
+  content: string | null;
+  updatedAt: Date;
 }
 
 export interface ReviewOwnerRecord {
@@ -23,49 +26,26 @@ export interface ReviewOwnerRecord {
   shopId: number;
 }
 
-export interface UpdatedReviewRecord {
-  id: number;
-  reservationId: bigint;
-  shopId: number;
-  rating: number;
-  content: string;
-  updatedAt: Date;
-}
-
-export interface ShopReviewRecord {
-  id: number;
-  rating: number;
-  content: string;
-  createdAt: Date;
-  user: { nickname: string | null };
-}
-
 export interface ReviewRepository {
-  findReservationForReview(
-    reservationId: bigint,
+  // 해당 샵에서 시술이 완료된 본인 예약이 있는지 확인 (리뷰 작성 자격)
+  findCompletedReservationForShop(
+    shopId: number,
     userId: number,
-  ): Promise<ReservationForReviewRecord | null>;
-  existsByReservationId(reservationId: bigint): Promise<boolean>;
+  ): Promise<CompletedReservationRecord | null>;
+  existsByShopAndUser(shopId: number, userId: number): Promise<boolean>;
   create(data: {
-    reservationId: bigint;
     shopId: number;
     userId: number;
     rating: number;
-    content: string;
-  }): Promise<CreatedReviewRecord>;
+    content?: string;
+  }): Promise<ShopReviewRecord>;
   findByIdForOwner(reviewId: number, userId: number): Promise<ReviewOwnerRecord | null>;
   update(
     reviewId: number,
     shopId: number,
     data: { rating?: number; content?: string },
-  ): Promise<UpdatedReviewRecord>;
+  ): Promise<UpdatedShopReviewRecord>;
   delete(reviewId: number, shopId: number): Promise<void>;
-  shopExists(shopId: number): Promise<boolean>;
-  findByShopId(
-    shopId: number,
-    cursor: ShopReviewCursor | undefined,
-    size: number,
-  ): Promise<{ items: ShopReviewRecord[]; hasNext: boolean }>;
 }
 
 // 리뷰 생성/수정/삭제 시 샵 평점/리뷰수를 항상 최신 상태로 재계산한다.
@@ -74,7 +54,7 @@ const recalculateShopRating = async (
   tx: Prisma.TransactionClient,
   shopId: number,
 ): Promise<void> => {
-  const aggregate = await tx.review.aggregate({
+  const aggregate = await tx.shopReview.aggregate({
     where: { shopId },
     _avg: { rating: true },
     _count: { _all: true },
@@ -90,25 +70,20 @@ const recalculateShopRating = async (
 };
 
 export class PrismaReviewRepository implements ReviewRepository {
-  // 리뷰 작성 전 소유권 + 현재 상태(완료 여부) 확인용. shopId는 견적(EstimateResponse)에서 가져온다.
-  async findReservationForReview(
-    reservationId: bigint,
+  async findCompletedReservationForShop(
+    shopId: number,
     userId: number,
-  ): Promise<ReservationForReviewRecord | null> {
+  ): Promise<CompletedReservationRecord | null> {
     return await getPrisma().reservation.findFirst({
-      where: { id: reservationId, userId },
-      select: {
-        id: true,
-        status: true,
-        proposal: { select: { shopId: true } },
-      },
+      where: { userId, status: 'COMPLETED', proposal: { shopId } },
+      select: { id: true },
     });
   }
 
-  // 예약 1건당 리뷰 1개 제한 사전 체크 - 일반적인 경우 빠르게 차단한다.
-  // 동시 요청에 대한 최종 방어는 create()의 reviews_reservation_id_key unique 제약(P2002)이 맡는다.
-  async existsByReservationId(reservationId: bigint): Promise<boolean> {
-    const count = await getPrisma().review.count({ where: { reservationId } });
+  // 샵 1곳당 리뷰 1개 제한 사전 체크 - 일반적인 경우 빠르게 차단한다.
+  // 동시 요청에 대한 최종 방어는 create()의 shop_reviews_shop_id_user_id_key unique 제약(P2002)이 맡는다.
+  async existsByShopAndUser(shopId: number, userId: number): Promise<boolean> {
+    const count = await getPrisma().shopReview.count({ where: { shopId, userId } });
     return count > 0;
   }
 
@@ -118,18 +93,16 @@ export class PrismaReviewRepository implements ReviewRepository {
   // (reservation.repository.ts의 FOR UPDATE 패턴과 동일 - 샵은 이미 존재하는 row라 갭 락
   // 데드락 걱정 없이 바로 잠글 수 있다).
   async create(data: {
-    reservationId: bigint;
     shopId: number;
     userId: number;
     rating: number;
-    content: string;
-  }): Promise<CreatedReviewRecord> {
+    content?: string;
+  }): Promise<ShopReviewRecord> {
     return getPrisma().$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM shops WHERE id = ${data.shopId} FOR UPDATE`;
 
-      const review = await tx.review.create({
+      const review = await tx.shopReview.create({
         data: {
-          reservationId: data.reservationId,
           shopId: data.shopId,
           userId: data.userId,
           rating: data.rating,
@@ -146,23 +119,21 @@ export class PrismaReviewRepository implements ReviewRepository {
   // 리뷰 수정/삭제 전 소유권 확인용 (수정/삭제 대상이 본인 리뷰인지) - IDOR 방지를 위해
   // where절에서 userId를 함께 건다.
   async findByIdForOwner(reviewId: number, userId: number): Promise<ReviewOwnerRecord | null> {
-    return await getPrisma().review.findFirst({
+    return await getPrisma().shopReview.findFirst({
       where: { id: reviewId, userId },
       select: { id: true, shopId: true },
     });
   }
 
-  // 리뷰 수정 + 샵 평점 재계산을 한 트랜잭션으로 처리한다 (rating이 바뀌지 않아도 항상
-  // 재계산한다 - 리뷰 개수가 적은 MVP 단계라 조건부 최적화보다 단순함을 우선한다).
   async update(
     reviewId: number,
     shopId: number,
     data: { rating?: number; content?: string },
-  ): Promise<UpdatedReviewRecord> {
+  ): Promise<UpdatedShopReviewRecord> {
     return getPrisma().$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM shops WHERE id = ${shopId} FOR UPDATE`;
 
-      const review = await tx.review.update({
+      const review = await tx.shopReview.update({
         where: { id: reviewId },
         data,
       });
@@ -173,49 +144,12 @@ export class PrismaReviewRepository implements ReviewRepository {
     });
   }
 
-  // 리뷰 삭제 + 샵 평점/리뷰수 재계산을 한 트랜잭션으로 처리한다.
   async delete(reviewId: number, shopId: number): Promise<void> {
     await getPrisma().$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM shops WHERE id = ${shopId} FOR UPDATE`;
 
-      await tx.review.delete({ where: { id: reviewId } });
+      await tx.shopReview.delete({ where: { id: reviewId } });
       await recalculateShopRating(tx, shopId);
     });
-  }
-
-  async shopExists(shopId: number): Promise<boolean> {
-    const shop = await getPrisma().shop.findUnique({ where: { id: shopId }, select: { id: true } });
-    return shop !== null;
-  }
-
-  // 샵 리뷰 목록 조회 - 작성일(createdAt) 최신순, (createdAt, id) 커서 페이지네이션.
-  async findByShopId(
-    shopId: number,
-    cursor: ShopReviewCursor | undefined,
-    size: number,
-  ): Promise<{ items: ShopReviewRecord[]; hasNext: boolean }> {
-    const items = await getPrisma().review.findMany({
-      where: {
-        shopId,
-        ...(cursor && {
-          OR: [
-            { createdAt: { lt: cursor.createdAt } },
-            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-          ],
-        }),
-      },
-      select: {
-        id: true,
-        rating: true,
-        content: true,
-        createdAt: true,
-        user: { select: { nickname: true } },
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: size + 1,
-    });
-
-    const hasNext = items.length > size;
-    return { items: hasNext ? items.slice(0, size) : items, hasNext };
   }
 }

@@ -26,6 +26,7 @@ model Shop {
   longitude              Decimal               @db.Decimal(10, 7)
   locationGuide          String?               @map("location_guide") @db.VarChar(255)
   parkingInfo            String?               @map("parking_info") @db.VarChar(255)
+  thumbnailImageUrl      String?               @map("thumbnail_image_url") @db.VarChar(500)
   rating                 Decimal               @default(0) @db.Decimal(2, 1)
   reviewCount            Int                   @default(0) @map("review_count")
   businessHours          Json?                 @map("business_hours")
@@ -37,7 +38,8 @@ model Shop {
   estimateResponses      EstimateResponse[]
   smsMessages            SmsMessage[]
   estimateRequestTargets EstimateRequestShop[]
-  reviews                Review[]
+  wishes                 WishShop[]
+  reviews                ShopReview[]
 
   @@unique([dataSource, externalStoreId])
   @@index([provinceCode, districtCode, adminDongCode])
@@ -73,9 +75,39 @@ model User {
   deviceTokens    DeviceToken[]
   reservations    Reservation[]
   wishDesigns     WishDesign[]
-  reviews         Review[]
+  wishShops       WishShop[]
+  shopReviews     ShopReview[]
 
   @@map("users")
+}
+
+model WishShop {
+  id        Int      @id @default(autoincrement())
+  shopId    Int      @map("shop_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, userId])
+  @@index([userId, createdAt, id])
+  @@map("wish_shops")
+}
+
+model ShopReview {
+  id        Int      @id @default(autoincrement())
+  shopId    Int      @map("shop_id")
+  userId    Int      @map("user_id")
+  rating    Int
+  content   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, userId])
+  @@index([shopId, createdAt, id])
+  @@map("shop_reviews")
 }
 
 // 로컬/소셜 인증 수단을 User와 분리해 관리한다.
@@ -347,32 +379,10 @@ model Reservation {
   updatedAt    DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
   proposal     EstimateResponse  @relation(fields: [proposalId], references: [id])
   user         User              @relation(fields: [userId], references: [id])
-  review       Review?
 
   @@index([userId, status, reservedAt])
   @@index([proposalId])
   @@map("reservations")
-}
-
-// 예약(시술) 완료 후 남기는 샵 리뷰. 예약 1건당 리뷰 1개(reservationId unique)로
-// 제한해서 중복 작성을 막는다. Shop.rating/reviewCount는 리뷰 생성 시 재계산해서
-// 견적 비교 화면(estimate-response)이 참조하는 값과 항상 일치시킨다.
-model Review {
-  id            Int         @id @default(autoincrement())
-  reservationId BigInt      @unique @map("reservation_id")
-  shopId        Int         @map("shop_id")
-  userId        Int         @map("user_id")
-  rating        Int
-  content       String      @db.Text
-  createdAt     DateTime    @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime    @updatedAt @map("updated_at") @db.DateTime(3)
-  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  shop          Shop        @relation(fields: [shopId], references: [id])
-  user          User        @relation(fields: [userId], references: [id])
-
-  // 샵 리뷰 목록을 최신순으로 조회하는 접근 패턴에 맞춘 인덱스.
-  @@index([shopId, createdAt])
-  @@map("reviews")
 }
 
 // ─── Design 도메인 ──────────────────────────────────────────────────────────

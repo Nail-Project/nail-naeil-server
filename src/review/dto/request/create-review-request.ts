@@ -2,11 +2,10 @@
 import { z } from 'zod';
 
 export const CreateReviewRequest = z.object({
-  // Reservation.id는 BigInt 컬럼이라 MySQL INT 상한이 아니라, JS Number로 안전하게
-  // 표현 가능한 범위(정밀도 손실 없는 safe integer)까지만 허용한다.
-  reservationId: z.number().int().positive().safe(),
+  shopId: z.number().int().positive(),
   rating: z.number().int().min(1).max(5),
-  content: z.string().trim().min(1).max(1000),
+  // ShopReview.content가 nullable이라 별점만 남기는 리뷰도 허용한다.
+  content: z.string().trim().min(1).max(1000).optional(),
 });
 
 export type CreateReviewRequestType = z.infer<typeof CreateReviewRequest>;

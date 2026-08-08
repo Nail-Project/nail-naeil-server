@@ -1,6 +1,6 @@
 import type { MatchShopRequest, SupportedRecommendType } from '../dto/request/match-shop-request';
 import type { MatchedShopResponse } from '../dto/response/matched-shop-response';
-import { InvalidShopLocationError, UnsupportedShopRecommendTypeError } from '../errors/shop.error';
+import { InvalidShopLocationError } from '../errors/shop.error';
 import type { ShopMatchingRepository } from '../repository/shop-matching.repository';
 
 interface ShopMatchingPolicy {
@@ -21,6 +21,10 @@ export const SHOP_MATCHING_POLICIES: Record<SupportedRecommendType, ShopMatching
     radiusMeters: 10_000,
     limit: 10,
   },
+  CHEAP: {
+    radiusMeters: 10_000,
+    limit: 10,
+  },
 };
 
 export class ShopMatchingService {
@@ -29,11 +33,15 @@ export class ShopMatchingService {
   async match(request: MatchShopRequest): Promise<MatchedShopResponse[]> {
     this.validateLocation(request.latitude, request.longitude);
 
-    if (request.recommendType === 'CHEAP') {
-      throw new UnsupportedShopRecommendTypeError();
-    }
-
     const policy = SHOP_MATCHING_POLICIES[request.recommendType];
+    if (request.recommendType === 'CHEAP') {
+      return this.repository.findCheapShops(
+        request.latitude,
+        request.longitude,
+        policy.radiusMeters,
+        policy.limit,
+      );
+    }
     return this.repository.findNearbyShops(
       request.latitude,
       request.longitude,
