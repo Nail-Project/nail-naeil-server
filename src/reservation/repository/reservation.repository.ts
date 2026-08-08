@@ -32,7 +32,16 @@ const reservationListSelect = {
       totalPrice: true,
       shop: { select: { name: true } },
       request: {
-        select: { nailType: true, removalType: true, design: { select: { title: true } } },
+        select: {
+          nailType: true,
+          removalType: true,
+          design: {
+            select: {
+              title: true,
+              tags: { select: { tag: { select: { name: true } } }, orderBy: { tagId: 'asc' } },
+            },
+          },
+        },
       },
     },
   },
@@ -46,7 +55,11 @@ export interface ReservationRecord {
   proposal: {
     totalPrice: number;
     shop: { name: string };
-    request: { nailType: string; removalType: string; design: { title: string } | null };
+    request: {
+      nailType: string;
+      removalType: string;
+      design: { title: string; tags: { tag: { name: string } }[] } | null;
+    };
   };
 }
 

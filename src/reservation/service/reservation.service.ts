@@ -126,6 +126,7 @@ export class ReservationService {
         nailType: r.proposal.request.nailType,
         removalType: r.proposal.request.removalType,
         designName: r.proposal.request.design?.title ?? null,
+        designTags: r.proposal.request.design?.tags.map((t) => t.tag.name) ?? [],
       })),
       pageInfo: { nextCursor, hasNext },
     };
