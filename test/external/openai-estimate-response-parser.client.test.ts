@@ -59,6 +59,8 @@ describe('OpenAiEstimateResponseParser', () => {
                   type: 'output_text',
                   text: JSON.stringify({
                     canProvideService: true,
+                    estimatedDurationMinutes: 60,
+                    isRemovalIncluded: true,
                     totalPrice: 55_000,
                     basePrice: 55_000,
                     removalPrice: 0,
@@ -97,5 +99,49 @@ describe('OpenAiEstimateResponseParser', () => {
       model: string;
     };
     expect(requestBody.model).toBe('gpt-5-nano');
+  });
+
+  it('총액만 확인된 응답은 상세 가격을 null로 유지한다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  canProvideService: true,
+                  estimatedDurationMinutes: 60,
+                  isRemovalIncluded: false,
+                  totalPrice: 55_000,
+                  basePrice: null,
+                  removalPrice: null,
+                  extraPrice: null,
+                  memo: null,
+                  proposalDateTimes: ['2026-08-03T14:00:00+09:00'],
+                }),
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.OPENAI_API_KEY = 'test-key';
+
+    await expect(
+      new OpenAiEstimateResponseParser().parse({
+        messages: ['총 55,000원입니다.'],
+        receivedAt: '2026-08-01T10:00:00+09:00',
+        requestStartDate: '2026-08-02',
+        requestEndDate: '2026-08-07',
+      }),
+    ).resolves.toMatchObject({
+      totalPrice: 55_000,
+      basePrice: null,
+      removalPrice: null,
+      extraPrice: null,
+    });
   });
 });

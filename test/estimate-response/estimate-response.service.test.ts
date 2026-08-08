@@ -51,6 +51,20 @@ class FakeRepository implements EstimateResponseRepository {
     return null;
   }
 
+  async findRequestContext() {
+    return {
+      userId: 1,
+      latitude: { toNumber: () => 37.5 },
+      longitude: { toNumber: () => 127 },
+      createdAt: new Date('2026-07-18T03:00:00.000Z'),
+      targetShops: [{ shop: { id: 2, name: '내일네일' } }],
+    };
+  }
+
+  async findAverageResponseMinutes(): Promise<Map<number, number>> {
+    return new Map();
+  }
+
   async saveParsedEstimateResponse(
     _smsMessageId: number,
     _requestId: number,
@@ -87,6 +101,9 @@ class FakeRepository implements EstimateResponseRepository {
       basePrice: 45_000,
       removalPrice: 5_000,
       extraPrice: 5_000,
+      estimatedDurationMinutes: 60,
+      canProvideService: true,
+      isRemovalIncluded: true,
       memo: '파츠 비용 포함',
       status: 'SUBMITTED',
       createdAt: new Date('2026-07-18T04:21:00.000Z'),
@@ -96,6 +113,12 @@ class FakeRepository implements EstimateResponseRepository {
         phoneNumber: '01012345678',
         address: '서울시 강남구',
         addressDetail: '2층',
+        latitude: { toNumber: () => 37.501 },
+        longitude: { toNumber: () => 127.001 },
+        rating: { toNumber: () => 4.8 },
+        reviewCount: 120,
+        businessHours: { MON: '10:00-20:00' },
+        closedDays: ['SUN'],
       },
       proposalTimes: [{ proposalDatetime: new Date('2026-07-20T05:00:00.000Z') }],
     };
@@ -109,12 +132,20 @@ class FakeRepository implements EstimateResponseRepository {
           {
             id: detail.id,
             totalPrice: detail.totalPrice,
+            removalPrice: detail.removalPrice,
+            estimatedDurationMinutes: detail.estimatedDurationMinutes,
+            canProvideService: detail.canProvideService,
+            isRemovalIncluded: detail.isRemovalIncluded,
             status: detail.status,
             createdAt: detail.createdAt,
             shop: {
               id: detail.shop.id,
               name: detail.shop.name,
               address: detail.shop.address,
+              latitude: detail.shop.latitude,
+              longitude: detail.shop.longitude,
+              rating: detail.shop.rating,
+              reviewCount: detail.shop.reviewCount,
             },
             proposalTimes: detail.proposalTimes,
           },
@@ -162,6 +193,24 @@ class LinkedSmsRepository extends FakeRepository {
   }
 }
 
+class MixedAvailabilityRepository extends FakeRepository {
+  async findList(): Promise<EstimateResponseListRecord[]> {
+    const [available] = await super.findList();
+    if (!available) return [];
+
+    return [
+      {
+        ...available,
+        id: 9,
+        totalPrice: null,
+        canProvideService: false,
+        status: 'REJECTED',
+      },
+      available,
+    ];
+  }
+}
+
 class FakeParser implements EstimateResponseParser {
   constructor(private readonly result: ParsedEstimateResponse) {}
 
@@ -191,10 +240,12 @@ describe('EstimateResponseService', () => {
     const repository = new LinkedSmsRepository();
     const parser = new FakeParser({
       canProvideService: true,
+      estimatedDurationMinutes: 60,
+      isRemovalIncluded: true,
       totalPrice: 55_000,
       basePrice: null,
-      removalPrice: 0,
-      extraPrice: 0,
+      removalPrice: null,
+      extraPrice: null,
       memo: '제거 포함',
       proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
     });
@@ -206,7 +257,9 @@ describe('EstimateResponseService', () => {
     await vi.waitFor(() => {
       expect(repository.savedEstimateResponse).toMatchObject({
         totalPrice: 55_000,
-        basePrice: 55_000,
+        basePrice: null,
+        removalPrice: null,
+        extraPrice: null,
         memo: '제거 포함',
       });
     });
@@ -219,6 +272,8 @@ describe('EstimateResponseService', () => {
     const repository = new LinkedSmsRepository();
     const parser = new FakeParser({
       canProvideService: true,
+      estimatedDurationMinutes: 60,
+      isRemovalIncluded: false,
       totalPrice: 55_000,
       basePrice: 55_000,
       removalPrice: 0,
@@ -246,6 +301,8 @@ describe('EstimateResponseService', () => {
     const repository = new LinkedSmsRepository();
     const parser = new FakeParser({
       canProvideService: true,
+      estimatedDurationMinutes: 60,
+      isRemovalIncluded: false,
       totalPrice: 55_000,
       basePrice: null,
       removalPrice: 0,
@@ -254,16 +311,46 @@ describe('EstimateResponseService', () => {
       proposalDateTimes: [],
     });
 
-    await new EstimateResponseService(repository, parser, createNotificationService()).createSmsMessage(smsRequest);
+    await new EstimateResponseService(
+      repository,
+      parser,
+      createNotificationService(),
+    ).createSmsMessage(smsRequest);
 
     await vi.waitFor(() => expect(repository.updatedStatus).toBe('PENDING'));
     expect(repository.savedEstimateResponse).toBeNull();
+  });
+
+  it('시술 불가 응답은 가격을 0으로 변환하지 않고 null로 저장한다', async () => {
+    const repository = new LinkedSmsRepository();
+    const parser = new FakeParser({
+      canProvideService: false,
+      estimatedDurationMinutes: 60,
+      isRemovalIncluded: false,
+      totalPrice: null,
+      basePrice: null,
+      removalPrice: null,
+      extraPrice: null,
+      memo: '시술이 어려워요.',
+      proposalDateTimes: [],
+    });
+
+    await new EstimateResponseService(
+      repository,
+      parser,
+      createNotificationService(),
+    ).createSmsMessage(smsRequest);
+
+    await vi.waitFor(() => expect(repository.savedEstimateResponse).not.toBeNull());
+    expect(repository.savedEstimateResponse?.totalPrice).toBeNull();
   });
 
   it('요청 기간 밖 시간은 제외하고 중복 시간은 하나만 저장한다', async () => {
     const repository = new LinkedSmsRepository();
     const parser = new FakeParser({
       canProvideService: true,
+      estimatedDurationMinutes: 60,
+      isRemovalIncluded: false,
       totalPrice: 55_000,
       basePrice: 55_000,
       removalPrice: 0,
@@ -276,7 +363,11 @@ describe('EstimateResponseService', () => {
       ],
     });
 
-    await new EstimateResponseService(repository, parser, createNotificationService()).createSmsMessage(smsRequest);
+    await new EstimateResponseService(
+      repository,
+      parser,
+      createNotificationService(),
+    ).createSmsMessage(smsRequest);
 
     await vi.waitFor(() => expect(repository.savedEstimateResponse).not.toBeNull());
     expect(repository.savedEstimateResponse?.proposalDateTimes).toHaveLength(1);
@@ -302,7 +393,11 @@ describe('EstimateResponseService', () => {
     };
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await new EstimateResponseService(repository, parser, createNotificationService()).createSmsMessage(smsRequest);
+    await new EstimateResponseService(
+      repository,
+      parser,
+      createNotificationService(),
+    ).createSmsMessage(smsRequest);
 
     await vi.waitFor(() => expect(repository.updatedStatus).toBe('FAILED'));
   });
@@ -325,6 +420,18 @@ describe('EstimateResponseService', () => {
       responses: [{ id: 10, totalPrice: 55_000 }],
     });
   });
+
+  it.each(['LOWEST_PRICE', 'RECOMMENDED'] as const)(
+    '%s 정렬에서 시술 불가·가격 없음 응답을 뒤로 배치한다',
+    async (sort) => {
+      const service = new EstimateResponseService(new MixedAvailabilityRepository());
+
+      const result = await service.getList(1, 1, sort);
+
+      expect(result.responses.map(({ id }) => id)).toEqual([10, 9]);
+      expect(result.responses.map(({ isLowestPrice }) => isLowestPrice)).toEqual([true, false]);
+    },
+  );
 
   it('예약 가능 시간을 조회한다', async () => {
     const service = new EstimateResponseService(new FakeRepository());

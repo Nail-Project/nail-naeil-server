@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
   moduleFormat = "cjs"
 }
 
@@ -9,29 +9,37 @@ datasource db {
 }
 
 model Shop {
-  id                Int                @id @default(autoincrement())
-  dataSource        String?            @map("data_source") @db.VarChar(30)
-  externalStoreId   String?            @map("external_store_id") @db.VarChar(50)
-  name              String             @db.VarChar(100)
-  phoneNumber       String?            @map("phone_number") @db.VarChar(20)
-  address           String             @db.VarChar(255)
-  addressDetail     String?            @map("address_detail") @db.VarChar(255)
-  provinceCode      String?            @map("province_code") @db.VarChar(10)
-  provinceName      String?            @map("province_name") @db.VarChar(50)
-  districtCode      String?            @map("district_code") @db.VarChar(10)
-  districtName      String?            @map("district_name") @db.VarChar(50)
-  adminDongCode     String?            @map("admin_dong_code") @db.VarChar(20)
-  adminDongName     String?            @map("admin_dong_name") @db.VarChar(50)
-  latitude          Decimal            @db.Decimal(10, 7)
-  longitude         Decimal            @db.Decimal(10, 7)
-  locationGuide     String?            @map("location_guide") @db.VarChar(255)
-  parkingInfo       String?            @map("parking_info") @db.VarChar(255)
-  isDataActive      Boolean            @default(true) @map("is_data_active")
-  lastSyncedAt      DateTime?          @map("last_synced_at") @db.DateTime(3)
-  createdAt         DateTime           @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt         DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
-  estimateResponses EstimateResponse[]
-  smsMessages       SmsMessage[]
+  id                     Int                   @id @default(autoincrement())
+  dataSource             String?               @map("data_source") @db.VarChar(30)
+  externalStoreId        String?               @map("external_store_id") @db.VarChar(50)
+  name                   String                @db.VarChar(100)
+  phoneNumber            String?               @map("phone_number") @db.VarChar(20)
+  address                String                @db.VarChar(255)
+  addressDetail          String?               @map("address_detail") @db.VarChar(255)
+  provinceCode           String?               @map("province_code") @db.VarChar(10)
+  provinceName           String?               @map("province_name") @db.VarChar(50)
+  districtCode           String?               @map("district_code") @db.VarChar(10)
+  districtName           String?               @map("district_name") @db.VarChar(50)
+  adminDongCode          String?               @map("admin_dong_code") @db.VarChar(20)
+  adminDongName          String?               @map("admin_dong_name") @db.VarChar(50)
+  latitude               Decimal               @db.Decimal(10, 7)
+  longitude              Decimal               @db.Decimal(10, 7)
+  locationGuide          String?               @map("location_guide") @db.VarChar(255)
+  parkingInfo            String?               @map("parking_info") @db.VarChar(255)
+  thumbnailImageUrl      String?               @map("thumbnail_image_url") @db.VarChar(500)
+  rating                 Decimal               @default(0) @db.Decimal(2, 1)
+  reviewCount            Int                   @default(0) @map("review_count")
+  businessHours          Json?                 @map("business_hours")
+  closedDays             Json?                 @map("closed_days")
+  isDataActive           Boolean               @default(true) @map("is_data_active")
+  lastSyncedAt           DateTime?             @map("last_synced_at") @db.DateTime(3)
+  createdAt              DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.DateTime(3)
+  estimateResponses      EstimateResponse[]
+  smsMessages            SmsMessage[]
+  estimateRequestTargets EstimateRequestShop[]
+  wishes                 WishShop[]
+  reviews                ShopReview[]
 
   @@unique([dataSource, externalStoreId])
   @@index([provinceCode, districtCode, adminDongCode])
@@ -50,25 +58,56 @@ enum AuthProvider {
 }
 
 model User {
-  id            Int                @id @default(autoincrement())
+  id              Int                @id @default(autoincrement())
   // 이메일은 이제 로그인 식별자가 아니라 프로필 정보다.
   // 소셜(연락처 이메일)은 유니크 보장이 안 되고 미제공될 수 있어 nullable + non-unique로 둔다.
-  email         String?            @db.VarChar(100)
-  phoneNumber   String?            @map("phone_number") @db.VarChar(20)
-  nickname      String?            @db.VarChar(100)
+  email           String?            @db.VarChar(100)
+  phoneNumber     String?            @map("phone_number") @db.VarChar(20)
+  nickname        String?            @db.VarChar(100)
   // 마이페이지에서 수정 가능한 프로필 사진 S3 URL. image 도메인에 업로드 후 URL만 저장한다.
-  profileImageUrl String?          @map("profile_image_url") @db.VarChar(255)
-  role          UserRole           @default(CUSTOMER)
-  createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
-  authProviders UserAuthProvider[]
-  refreshTokens RefreshToken[]
-  notifications Notification[]
-  deviceTokens  DeviceToken[]
-  reservations  Reservation[]
-  wishDesigns   WishDesign[]
+  profileImageUrl String?            @map("profile_image_url") @db.VarChar(255)
+  role            UserRole           @default(CUSTOMER)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
+  authProviders   UserAuthProvider[]
+  refreshTokens   RefreshToken[]
+  notifications   Notification[]
+  deviceTokens    DeviceToken[]
+  reservations    Reservation[]
+  wishDesigns     WishDesign[]
+  wishShops       WishShop[]
+  shopReviews     ShopReview[]
 
   @@map("users")
+}
+
+model WishShop {
+  id        Int      @id @default(autoincrement())
+  shopId    Int      @map("shop_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, userId])
+  @@index([userId, createdAt, id])
+  @@map("wish_shops")
+}
+
+model ShopReview {
+  id        Int      @id @default(autoincrement())
+  shopId    Int      @map("shop_id")
+  userId    Int      @map("user_id")
+  rating    Int
+  content   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, userId])
+  @@index([shopId, createdAt, id])
+  @@map("shop_reviews")
 }
 
 // 로컬/소셜 인증 수단을 User와 분리해 관리한다.
@@ -111,16 +150,16 @@ enum NotificationType {
 }
 
 model Notification {
-  id     Int              @id @default(autoincrement())
-  userId Int              @map("user_id")
-  type   NotificationType
-  title  String           @db.VarChar(100)
-  body   String           @db.VarChar(255)
+  id        Int              @id @default(autoincrement())
+  userId    Int              @map("user_id")
+  type      NotificationType
+  title     String           @db.VarChar(100)
+  body      String           @db.VarChar(255)
   // 알림 클릭 시 이동에 필요한 관련 리소스 식별자 등을 담는다(예: { "reservationId": 12 }).
   data      Json?
-  isRead    Boolean   @default(false) @map("is_read")
-  readAt    DateTime? @map("read_at") @db.DateTime(3)
-  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  isRead    Boolean          @default(false) @map("is_read")
+  readAt    DateTime?        @map("read_at") @db.DateTime(3)
+  createdAt DateTime         @default(now()) @map("created_at") @db.DateTime(3)
 
   // 회원 탈퇴 시 알림도 함께 삭제되도록 Cascade.
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -138,8 +177,8 @@ enum DevicePlatform {
 }
 
 model DeviceToken {
-  id     Int            @id @default(autoincrement())
-  userId Int            @map("user_id")
+  id       Int            @id @default(autoincrement())
+  userId   Int            @map("user_id")
   // FCM 등록 토큰. 기기당 유일하므로 unique로 두고, 재로그인 등으로 소유자가 바뀌면 upsert로 갱신한다.
   // 토큰은 대소문자를 구분하므로 DB 컬럼 콜레이션을 utf8mb4_bin으로 지정한다(마이그레이션 SQL 참고).
   // Prisma 스키마는 컬럼 콜레이션 표현을 지원하지 않아 마이그레이션에서만 관리한다.
@@ -176,25 +215,28 @@ enum SmsStatus {
 }
 
 model EstimateResponse {
-  id            Int                    @id @default(autoincrement())
-  requestId     Int                    @map("request_id")
-  shopId        Int                    @map("shop_id")
-  totalPrice    Int                    @map("total_price")
-  basePrice     Int                    @map("base_price")
-  removalPrice  Int                    @default(0) @map("removal_price")
-  extraPrice    Int                    @default(0) @map("extra_price")
-  memo          String?                @db.Text
-  status        EstimateResponseStatus @default(SUBMITTED)
-  createdAt     DateTime               @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime               @updatedAt @map("updated_at") @db.DateTime(3)
-  request       EstimateRequest        @relation(fields: [requestId], references: [id])
-  shop          Shop                   @relation(fields: [shopId], references: [id])
-  proposalTimes ShopProposalTime[]
-  smsMessages   SmsMessage[]
+  id                       Int                    @id @default(autoincrement())
+  requestId                Int                    @map("request_id")
+  shopId                   Int                    @map("shop_id")
+  totalPrice               Int?                   @map("total_price")
+  basePrice                Int?                   @map("base_price")
+  removalPrice             Int?                   @map("removal_price")
+  extraPrice               Int?                   @map("extra_price")
+  memo                     String?                @db.Text
+  estimatedDurationMinutes Int                    @default(60) @map("estimated_duration_minutes")
+  canProvideService        Boolean                @default(true) @map("can_provide_service")
+  isRemovalIncluded        Boolean                @default(false) @map("is_removal_included")
+  status                   EstimateResponseStatus @default(SUBMITTED)
+  createdAt                DateTime               @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt                DateTime               @updatedAt @map("updated_at") @db.DateTime(3)
+  request                  EstimateRequest        @relation(fields: [requestId], references: [id])
+  shop                     Shop                   @relation(fields: [shopId], references: [id])
+  proposalTimes            ShopProposalTime[]
+  smsMessages              SmsMessage[]
   // 취소된 예약은 같은 견적으로 재예약을 허용하기로 정책 변경(2026-08-03, A1)하면서
   // Reservation.proposalId의 @unique 제약을 제거했다 - 1건의 견적에 여러 예약(취소분 포함)이
   // 남을 수 있어 1:1이 아닌 1:N 관계로 바뀐다.
-  reservations  Reservation[]
+  reservations             Reservation[]
 
   @@unique([requestId, shopId])
   @@map("estimate_responses")
@@ -267,24 +309,39 @@ enum EstimateStatus {
 }
 
 model EstimateRequest {
-  id            Int                @id @default(autoincrement())
-  nailType      NailType           @map("nail_type")
-  removalType   RemovalType        @map("removal_type")
-  startDate     DateTime           @map("start_date") @db.Date
-  endDate       DateTime           @map("end_date") @db.Date
-  preferredTime PreferredTime      @map("preferred_time")
-  recommendType RecommendType      @map("recommend_type")
-  description   String?            @db.Text
-  status        EstimateStatus     @default(MATCHING)
+  id            Int                   @id @default(autoincrement())
+  nailType      NailType              @map("nail_type")
+  removalType   RemovalType           @map("removal_type")
+  startDate     DateTime              @map("start_date") @db.Date
+  endDate       DateTime              @map("end_date") @db.Date
+  preferredTime PreferredTime         @map("preferred_time")
+  recommendType RecommendType         @map("recommend_type")
+  description   String?               @db.Text
+  latitude      Decimal?              @db.Decimal(10, 7)
+  longitude     Decimal?              @db.Decimal(10, 7)
+  status        EstimateStatus        @default(MATCHING)
   // TODO: [yej] User 모델 추가 후 @relation 연결
-  userId        Int                @map("user_id")
-  createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
+  userId        Int                   @map("user_id")
+  createdAt     DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime              @updatedAt @map("updated_at") @db.DateTime(3)
   images        RequestImage[]
   proposals     EstimateResponse[]
   smsMessages   SmsMessage[]
+  targetShops   EstimateRequestShop[]
 
   @@map("estimate_requests")
+}
+
+model EstimateRequestShop {
+  requestId Int             @map("request_id")
+  shopId    Int             @map("shop_id")
+  createdAt DateTime        @default(now()) @map("created_at") @db.DateTime(3)
+  request   EstimateRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  shop      Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@id([requestId, shopId])
+  @@index([shopId, createdAt])
+  @@map("estimate_request_shops")
 }
 
 model RequestImage {
@@ -306,7 +363,7 @@ enum ReservationStatus {
 }
 
 model Reservation {
-  id         BigInt            @id @default(autoincrement())
+  id           BigInt            @id @default(autoincrement())
   // EstimateResponse.id가 Int라 FK 타입을 맞춤 (Prisma 제약상 불가피). Int 유지로 확정(2026-07-25).
   // ERD는 한때 proposal_id를 bigint로 그렸으나 실제 구현(Int)과 안 맞아 ERD 쪽을 수정 요청, 2026-07-25 반영 완료.
   // [malibu][A1] @unique 제거(2026-08-03): 취소된 예약은 같은 견적으로 재예약을 허용하는 정책으로 바뀌면서

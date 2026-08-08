@@ -7,6 +7,30 @@ export interface ShopSummaryResponse {
   adminDongName: string | null;
   latitude: number;
   longitude: number;
+  thumbnailImageUrl: string | null;
+  businessHours: unknown;
+  closedDays: unknown;
+  rating: number;
+  reviewCount: number;
+  distanceMeters: number | null;
+  isWished: boolean;
+}
+
+export interface ShopWishResponse {
+  shopId: number;
+  isWished: boolean;
+}
+
+export interface ShopReviewListResponse {
+  reviews: Array<{
+    reviewId: number;
+    nickname: string | null;
+    profileImageUrl: string | null;
+    rating: number;
+    content: string | null;
+    createdAt: string;
+  }>;
+  nextCursor: number | null;
 }
 
 export interface ShopListResponse {
