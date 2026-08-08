@@ -140,6 +140,94 @@ const swaggerSpec = swaggerJsdoc({
           },
         },
       },
+      responses: {
+        InvalidShopQueryResponse: {
+          description: '잘못된 샵 조회 요청',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              example: {
+                resultType: 'FAIL',
+                error: {
+                  code: 'INVALID_SHOP_QUERY_REQUEST',
+                  message: '샵 조회 요청을 확인해주세요.',
+                  data: null,
+                },
+                success: null,
+              },
+            },
+          },
+        },
+        ShopNotFoundResponse: {
+          description: '샵을 찾을 수 없음',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              example: {
+                resultType: 'FAIL',
+                error: {
+                  code: 'SHOP_NOT_FOUND',
+                  message: '샵을 찾을 수 없습니다.',
+                  data: { shopId: 1 },
+                },
+                success: null,
+              },
+            },
+          },
+        },
+        AuthenticationRequiredResponse: {
+          description: '인증 실패',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              examples: {
+                unauthorized: {
+                  value: {
+                    resultType: 'FAIL',
+                    error: { code: 'UNAUTHORIZED', message: '로그인이 필요합니다.', data: null },
+                    success: null,
+                  },
+                },
+                tokenExpired: {
+                  value: {
+                    resultType: 'FAIL',
+                    error: { code: 'TOKEN_EXPIRED', message: '토큰이 만료됐습니다.', data: null },
+                    success: null,
+                  },
+                },
+                tokenInvalid: {
+                  value: {
+                    resultType: 'FAIL',
+                    error: {
+                      code: 'TOKEN_INVALID',
+                      message: '유효하지 않은 토큰입니다.',
+                      data: null,
+                    },
+                    success: null,
+                  },
+                },
+              },
+            },
+          },
+        },
+        InternalServerErrorResponse: {
+          description: '서버 내부 오류',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              example: {
+                resultType: 'FAIL',
+                error: {
+                  code: 'INTERNAL_SERVER_ERROR',
+                  message: '알 수 없는 오류가 발생했어요. 잠시 후 다시 시도해주세요.',
+                  data: null,
+                },
+                success: null,
+              },
+            },
+          },
+        },
+      },
     },
   },
   apis: [path.resolve(__dirname, '../**/*.{ts,js}')],

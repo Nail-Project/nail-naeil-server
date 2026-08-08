@@ -79,6 +79,10 @@ const shopQueryRouter = Router();
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       401:
+ *         $ref: '#/components/responses/AuthenticationRequiredResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerErrorResponse'
  */
 shopQueryRouter.get('/', authMiddleware, controller.getList);
 
@@ -154,6 +158,10 @@ shopQueryRouter.get('/', authMiddleware, controller.getList);
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       401:
+ *         $ref: '#/components/responses/AuthenticationRequiredResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerErrorResponse'
  */
 shopQueryRouter.get('/search', authMiddleware, controller.search);
 
@@ -188,6 +196,12 @@ shopQueryRouter.get('/search', authMiddleware, controller.search);
  *                 resultType: { type: string, example: SUCCESS }
  *                 error: { nullable: true, example: null }
  *                 success: { $ref: '#/components/schemas/ShopListSuccess' }
+ *       400:
+ *         $ref: '#/components/responses/InvalidShopQueryResponse'
+ *       401:
+ *         $ref: '#/components/responses/AuthenticationRequiredResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerErrorResponse'
  */
 shopQueryRouter.get('/wishlist', authMiddleware, controller.getWishlist);
 
@@ -214,6 +228,14 @@ shopQueryRouter.get('/wishlist', authMiddleware, controller.getWishlist);
  *                 resultType: { type: string, example: SUCCESS }
  *                 error: { nullable: true, example: null }
  *                 success: { $ref: '#/components/schemas/ShopWishResponse' }
+ *       400:
+ *         $ref: '#/components/responses/InvalidShopQueryResponse'
+ *       401:
+ *         $ref: '#/components/responses/AuthenticationRequiredResponse'
+ *       404:
+ *         $ref: '#/components/responses/ShopNotFoundResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerErrorResponse'
  *   delete:
  *     summary: 매장 찜 해제
  *     security: [{ bearerAuth: [] }]
@@ -234,6 +256,14 @@ shopQueryRouter.get('/wishlist', authMiddleware, controller.getWishlist);
  *                 resultType: { type: string, example: SUCCESS }
  *                 error: { nullable: true, example: null }
  *                 success: { $ref: '#/components/schemas/ShopWishResponse' }
+ *       400:
+ *         $ref: '#/components/responses/InvalidShopQueryResponse'
+ *       401:
+ *         $ref: '#/components/responses/AuthenticationRequiredResponse'
+ *       404:
+ *         $ref: '#/components/responses/ShopNotFoundResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerErrorResponse'
  */
 shopQueryRouter.post('/:shopId/wish', authMiddleware, controller.createWish);
 shopQueryRouter.delete('/:shopId/wish', authMiddleware, controller.deleteWish);
@@ -266,6 +296,12 @@ shopQueryRouter.delete('/:shopId/wish', authMiddleware, controller.deleteWish);
  *                 resultType: { type: string, example: SUCCESS }
  *                 error: { nullable: true, example: null }
  *                 success: { $ref: '#/components/schemas/ShopReviewListResponse' }
+ *       400:
+ *         $ref: '#/components/responses/InvalidShopQueryResponse'
+ *       404:
+ *         $ref: '#/components/responses/ShopNotFoundResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerErrorResponse'
  */
 shopQueryRouter.get('/:shopId/reviews', controller.getReviews);
 
@@ -376,6 +412,10 @@ shopQueryRouter.get('/:shopId/reviews', controller.getReviews);
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       401:
+ *         $ref: '#/components/responses/AuthenticationRequiredResponse'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerErrorResponse'
  *       404:
  *         description: 샵을 찾을 수 없음
  *         content:
