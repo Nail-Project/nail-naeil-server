@@ -76,6 +76,36 @@ const swaggerSpec = swaggerJsdoc({
             nextCursor: { type: 'integer', nullable: true },
           },
         },
+        ShopWishResponse: {
+          type: 'object',
+          required: ['shopId', 'isWished'],
+          properties: {
+            shopId: { type: 'integer', example: 1 },
+            isWished: { type: 'boolean', example: true },
+          },
+        },
+        ShopReviewListResponse: {
+          type: 'object',
+          required: ['reviews', 'nextCursor'],
+          properties: {
+            reviews: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['reviewId', 'rating', 'createdAt'],
+                properties: {
+                  reviewId: { type: 'integer', example: 1 },
+                  nickname: { type: 'string', nullable: true },
+                  profileImageUrl: { type: 'string', format: 'uri', nullable: true },
+                  rating: { type: 'integer', minimum: 1, maximum: 5, example: 5 },
+                  content: { type: 'string', nullable: true },
+                  createdAt: { type: 'string', format: 'date-time' },
+                },
+              },
+            },
+            nextCursor: { type: 'integer', nullable: true },
+          },
+        },
         ApiErrorResponse: {
           type: 'object',
           required: ['resultType', 'error', 'success'],

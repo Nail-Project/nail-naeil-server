@@ -38,7 +38,7 @@ export class ShopQueryController {
 
   getDetail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const parsed = GetShopDetailRequestSchema.safeParse({ ...req.params, ...req.query });
+      const parsed = GetShopDetailRequestSchema.safeParse({ ...req.query, ...req.params });
       if (!parsed.success) {
         throw new InvalidShopQueryRequestError(parsed.error.flatten());
       }
@@ -104,7 +104,7 @@ export class ShopQueryController {
 
   getReviews = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const parsed = GetShopReviewsRequestSchema.safeParse({ ...req.params, ...req.query });
+      const parsed = GetShopReviewsRequestSchema.safeParse({ ...req.query, ...req.params });
       if (!parsed.success) throw new InvalidShopQueryRequestError(parsed.error.flatten());
       res
         .status(200)

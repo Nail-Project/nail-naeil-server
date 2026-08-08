@@ -180,6 +180,14 @@ shopQueryRouter.get('/search', authMiddleware, controller.search);
  *     responses:
  *       200:
  *         description: 찜한 매장 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType: { type: string, example: SUCCESS }
+ *                 error: { nullable: true, example: null }
+ *                 success: { $ref: '#/components/schemas/ShopListSuccess' }
  */
 shopQueryRouter.get('/wishlist', authMiddleware, controller.getWishlist);
 
@@ -195,7 +203,17 @@ shopQueryRouter.get('/wishlist', authMiddleware, controller.getWishlist);
  *         name: shopId
  *         required: true
  *         schema: { type: integer }
- *     responses: { 200: { description: 매장 찜 추가 성공 } }
+ *     responses:
+ *       200:
+ *         description: 매장 찜 추가 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType: { type: string, example: SUCCESS }
+ *                 error: { nullable: true, example: null }
+ *                 success: { $ref: '#/components/schemas/ShopWishResponse' }
  *   delete:
  *     summary: 매장 찜 해제
  *     security: [{ bearerAuth: [] }]
@@ -205,7 +223,17 @@ shopQueryRouter.get('/wishlist', authMiddleware, controller.getWishlist);
  *         name: shopId
  *         required: true
  *         schema: { type: integer }
- *     responses: { 200: { description: 매장 찜 해제 성공 } }
+ *     responses:
+ *       200:
+ *         description: 매장 찜 해제 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType: { type: string, example: SUCCESS }
+ *                 error: { nullable: true, example: null }
+ *                 success: { $ref: '#/components/schemas/ShopWishResponse' }
  */
 shopQueryRouter.post('/:shopId/wish', authMiddleware, controller.createWish);
 shopQueryRouter.delete('/:shopId/wish', authMiddleware, controller.deleteWish);
@@ -227,7 +255,17 @@ shopQueryRouter.delete('/:shopId/wish', authMiddleware, controller.deleteWish);
  *       - in: query
  *         name: limit
  *         schema: { type: integer, default: 20, maximum: 50 }
- *     responses: { 200: { description: 매장 리뷰 목록 조회 성공 } }
+ *     responses:
+ *       200:
+ *         description: 매장 리뷰 목록 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType: { type: string, example: SUCCESS }
+ *                 error: { nullable: true, example: null }
+ *                 success: { $ref: '#/components/schemas/ShopReviewListResponse' }
  */
 shopQueryRouter.get('/:shopId/reviews', controller.getReviews);
 
