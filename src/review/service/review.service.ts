@@ -126,7 +126,6 @@ export class ReviewService {
     return {
       reviews: items.map((item) => ({
         reviewId: item.id,
-        userId: item.user.id,
         nickname: item.user.nickname,
         rating: item.rating,
         content: item.content,

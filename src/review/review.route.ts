@@ -329,9 +329,6 @@ const shopReviewsRouter = Router();
  *                           reviewId:
  *                             type: integer
  *                             example: 1
- *                           userId:
- *                             type: integer
- *                             example: 10
  *                           nickname:
  *                             type: string
  *                             nullable: true

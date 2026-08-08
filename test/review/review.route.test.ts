@@ -11,12 +11,13 @@ import {
   ReviewNotFoundError,
   ReviewShopNotFoundError,
 } from '../../src/review/error/review.error';
+import { ReviewFailedError } from '../../src/common/errors/common.error';
 
 // 라우트 테스트에서는 JWT 검증 없이 userId만 주입되면 충분하므로 미들웨어를 mock으로 대체한다.
 vi.mock('../../src/common/middlewares/auth.middleware', () => ({
   authMiddleware: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
     req.userId = 1;
-    req.role = 'USER';
+    req.role = 'CUSTOMER';
     next();
   },
 }));
@@ -46,7 +47,6 @@ const createApp = () => {
       reviews: [
         {
           reviewId: 100,
-          userId: 1,
           nickname: '네일러버',
           rating: 5,
           content: '시술이 꼼꼼하고 만족스러웠어요!',
@@ -160,6 +160,22 @@ describe('POST /api/v1/reviews', () => {
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('REVIEW_ALREADY_EXISTS');
   });
+
+  it('서비스가 저장 실패를 던지면 500으로 응답하고 원본 에러를 노출하지 않는다', async () => {
+    const { app, service } = createApp();
+    service.createReview.mockRejectedValueOnce(
+      new ReviewFailedError({ originalError: new Error('prisma failure') }),
+    );
+
+    const response = await request(app)
+      .post('/api/v1/reviews')
+      .send({ reservationId: 1, rating: 5, content: '좋아요' });
+
+    expect(response.status).toBe(500);
+    expect(response.body.error.code).toBe('REVIEW_FAILED');
+    expect(response.body.error.data).toBeNull();
+    expect(JSON.stringify(response.body)).not.toContain('prisma failure');
+  });
 });
 
 describe('PATCH /api/v1/reviews/:reviewId', () => {
@@ -254,7 +270,6 @@ describe('GET /api/v1/shops/:shopId/reviews', () => {
       reviews: [
         {
           reviewId: 100,
-          userId: 1,
           nickname: '네일러버',
           rating: 5,
           content: '시술이 꼼꼼하고 만족스러웠어요!',

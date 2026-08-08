@@ -37,7 +37,7 @@ export interface ShopReviewRecord {
   rating: number;
   content: string;
   createdAt: Date;
-  user: { id: number; nickname: string | null };
+  user: { nickname: string | null };
 }
 
 export interface ReviewRepository {
@@ -113,6 +113,10 @@ export class PrismaReviewRepository implements ReviewRepository {
   }
 
   // 리뷰 생성 + 샵 평점/리뷰수 재계산을 한 트랜잭션으로 처리해 항상 일치시킨다.
+  // 같은 샵에 대한 동시 리뷰 작성/수정/삭제가 서로의 재계산 결과를 덮어쓰는 경쟁 상태(lost
+  // update)를 막기 위해, 리뷰를 다루기 전에 대상 샵 row를 먼저 잠가 직렬화한다
+  // (reservation.repository.ts의 FOR UPDATE 패턴과 동일 - 샵은 이미 존재하는 row라 갭 락
+  // 데드락 걱정 없이 바로 잠글 수 있다).
   async create(data: {
     reservationId: bigint;
     shopId: number;
@@ -121,6 +125,8 @@ export class PrismaReviewRepository implements ReviewRepository {
     content: string;
   }): Promise<CreatedReviewRecord> {
     return getPrisma().$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM shops WHERE id = ${data.shopId} FOR UPDATE`;
+
       const review = await tx.review.create({
         data: {
           reservationId: data.reservationId,
@@ -154,6 +160,8 @@ export class PrismaReviewRepository implements ReviewRepository {
     data: { rating?: number; content?: string },
   ): Promise<UpdatedReviewRecord> {
     return getPrisma().$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM shops WHERE id = ${shopId} FOR UPDATE`;
+
       const review = await tx.review.update({
         where: { id: reviewId },
         data,
@@ -168,6 +176,8 @@ export class PrismaReviewRepository implements ReviewRepository {
   // 리뷰 삭제 + 샵 평점/리뷰수 재계산을 한 트랜잭션으로 처리한다.
   async delete(reviewId: number, shopId: number): Promise<void> {
     await getPrisma().$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM shops WHERE id = ${shopId} FOR UPDATE`;
+
       await tx.review.delete({ where: { id: reviewId } });
       await recalculateShopRating(tx, shopId);
     });
@@ -199,7 +209,7 @@ export class PrismaReviewRepository implements ReviewRepository {
         rating: true,
         content: true,
         createdAt: true,
-        user: { select: { id: true, nickname: true } },
+        user: { select: { nickname: true } },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: size + 1,

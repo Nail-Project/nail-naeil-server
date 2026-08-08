@@ -56,7 +56,7 @@ class FakeRepository implements ReviewRepository {
         rating: 5,
         content: '시술이 꼼꼼하고 만족스러웠어요!',
         createdAt: new Date('2026-08-08T10:00:00.000Z'),
-        user: { id: 1, nickname: '네일러버' },
+        user: { nickname: '네일러버' },
       },
     ],
     hasNext: false,
@@ -295,7 +295,6 @@ describe('ReviewService.getShopReviews', () => {
       reviews: [
         {
           reviewId: 100,
-          userId: 1,
           nickname: '네일러버',
           rating: 5,
           content: '시술이 꼼꼼하고 만족스러웠어요!',

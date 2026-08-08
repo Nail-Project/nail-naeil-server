@@ -38,8 +38,9 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
   }
 
   const appError = toAppError(err);
+  const isServerError = appError.statusCode >= 500;
 
-  if (appError.statusCode >= 500) {
+  if (isServerError) {
     console.error(err);
   }
 
@@ -48,7 +49,9 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
     error: {
       code: appError.code,
       message: appError.message,
-      data: appError.data,
+      // 5xx의 data에는 원본 에러(Prisma 에러 등 내부 정보)가 실려올 수 있어 응답에 노출하지
+      // 않는다. 원본 에러는 위 console.error(err)로만 남긴다.
+      data: isServerError ? null : appError.data,
     },
     success: null,
   };

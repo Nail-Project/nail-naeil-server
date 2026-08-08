@@ -6,7 +6,6 @@ export interface PageInfo {
 
 export interface ShopReviewItem {
   reviewId: number;
-  userId: number;
   nickname: string | null;
   rating: number;
   content: string;
