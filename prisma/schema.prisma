@@ -56,11 +56,17 @@ model User {
   email         String?            @db.VarChar(100)
   phoneNumber   String?            @map("phone_number") @db.VarChar(20)
   nickname      String?            @db.VarChar(100)
+  // 마이페이지에서 수정 가능한 프로필 사진 S3 URL. image 도메인에 업로드 후 URL만 저장한다.
+  profileImageUrl String?          @map("profile_image_url") @db.VarChar(255)
   role          UserRole           @default(CUSTOMER)
   createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
   authProviders UserAuthProvider[]
   refreshTokens RefreshToken[]
+  notifications Notification[]
+  deviceTokens  DeviceToken[]
+  reservations  Reservation[]
+  wishDesigns   WishDesign[]
 
   @@map("users")
 }
@@ -97,6 +103,60 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+// 인앱 알림. 견적/예약 상태 변경 등 이벤트를 사용자별로 쌓아두고 앱에서 조회한다.
+// FCM 외부 발송은 후속 단계에서 이 데이터를 재사용해 얹는다.
+enum NotificationType {
+  ESTIMATE_RESPONSE // 견적 응답 도착
+  RESERVATION_STATUS // 예약 상태 변경(확정/취소 등)
+}
+
+model Notification {
+  id     Int              @id @default(autoincrement())
+  userId Int              @map("user_id")
+  type   NotificationType
+  title  String           @db.VarChar(100)
+  body   String           @db.VarChar(255)
+  // 알림 클릭 시 이동에 필요한 관련 리소스 식별자 등을 담는다(예: { "reservationId": 12 }).
+  data      Json?
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at") @db.DateTime(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+
+  // 회원 탈퇴 시 알림도 함께 삭제되도록 Cascade.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 내 알림 목록을 최신순으로, 안읽음 필터와 함께 조회하는 접근 패턴에 맞춘 인덱스.
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+// FCM 푸시 발송 대상이 되는 사용자별 디바이스 토큰.
+// 앱이 기기에서 발급받은 FCM 등록 토큰을 서버에 저장해 두고, 알림 발송 시 userId로 조회해 발송한다.
+enum DevicePlatform {
+  ANDROID
+  IOS
+}
+
+model DeviceToken {
+  id     Int            @id @default(autoincrement())
+  userId Int            @map("user_id")
+  // FCM 등록 토큰. 기기당 유일하므로 unique로 두고, 재로그인 등으로 소유자가 바뀌면 upsert로 갱신한다.
+  // 토큰은 대소문자를 구분하므로 DB 컬럼 콜레이션을 utf8mb4_bin으로 지정한다(마이그레이션 SQL 참고).
+  // Prisma 스키마는 컬럼 콜레이션 표현을 지원하지 않아 마이그레이션에서만 관리한다.
+  token    String         @unique @db.VarChar(255)
+  platform DevicePlatform @default(ANDROID)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  // 회원 탈퇴 시 디바이스 토큰도 함께 삭제되도록 Cascade.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 특정 사용자의 모든 토큰을 조회해 발송하는 접근 패턴에 맞춘 인덱스.
+  @@index([userId])
+  @@map("device_tokens")
+}
+
 enum EstimateResponseStatus {
   SUBMITTED
   ACCEPTED
@@ -131,7 +191,12 @@ model EstimateResponse {
   shop          Shop                   @relation(fields: [shopId], references: [id])
   proposalTimes ShopProposalTime[]
   smsMessages   SmsMessage[]
+  // 취소된 예약은 같은 견적으로 재예약을 허용하기로 정책 변경(2026-08-03, A1)하면서
+  // Reservation.proposalId의 @unique 제약을 제거했다 - 1건의 견적에 여러 예약(취소분 포함)이
+  // 남을 수 있어 1:1이 아닌 1:N 관계로 바뀐다.
+  reservations  Reservation[]
 
+  @@unique([requestId, shopId])
   @@map("estimate_responses")
 }
 
@@ -230,4 +295,109 @@ model RequestImage {
   request   EstimateRequest @relation(fields: [requestId], references: [id])
 
   @@map("request_images")
+}
+
+// ─── Reservation 도메인 ────────────────────────────────────────────────────
+
+enum ReservationStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model Reservation {
+  id         BigInt            @id @default(autoincrement())
+  // EstimateResponse.id가 Int라 FK 타입을 맞춤 (Prisma 제약상 불가피). Int 유지로 확정(2026-07-25).
+  // ERD는 한때 proposal_id를 bigint로 그렸으나 실제 구현(Int)과 안 맞아 ERD 쪽을 수정 요청, 2026-07-25 반영 완료.
+  // [malibu][A1] @unique 제거(2026-08-03): 취소된 예약은 같은 견적으로 재예약을 허용하는 정책으로 바뀌면서
+  // proposalId 단위 유일성 제약을 DB에 걸어둘 수 없게 됐다. 대신 "취소되지 않은 예약" 단위 중복은
+  // 애플리케이션 레벨(existsByProposalId의 status != CANCELLED 조건)에서 막는다.
+  proposalId   Int               @map("proposal_id")
+  userId       Int               @map("user_id")
+  reservedAt   DateTime          @map("reserved_at") @db.DateTime(3)
+  status       ReservationStatus @default(CONFIRMED)
+  // 예약 취소 사유 - Figma 라디오 선택지("개인 사정" 등)를 자유 문자열로 저장, 취소하지 않은 예약은 null.
+  cancelReason String?           @map("cancel_reason") @db.VarChar(255)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
+  proposal     EstimateResponse  @relation(fields: [proposalId], references: [id])
+  user         User              @relation(fields: [userId], references: [id])
+
+  @@index([userId, status, reservedAt])
+  @@index([proposalId])
+  @@map("reservations")
+}
+
+// ─── Design 도메인 ──────────────────────────────────────────────────────────
+
+model Design {
+  id               Int           @id @default(autoincrement())
+  title            String        @db.VarChar(100)
+  imageUrl         String        @map("image_url") @db.VarChar(255)
+  viewCount        Int           @default(0) @map("view_count")
+  durationMinutes  Int           @map("duration_minutes")
+  // TODO: [malibu] 값 종류(전체 옵션 목록) 확정되면 enum으로 전환
+  difficulty       String        @db.VarChar(20)
+  // TODO: [malibu] 값 종류(전체 옵션 목록) 확정되면 enum으로 전환
+  recommendedShape String        @map("recommended_shape") @db.VarChar(20)
+  description      String        @db.Text
+  createdAt        DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  images           DesignImage[]
+  wishes           WishDesign[]
+  tags             DesignTag[]
+
+  // 피드 정렬(createdAt desc)이 데이터 증가 시 풀 테이블 스캔이 되지 않도록 인덱스를 둔다.
+  @@index([createdAt])
+  @@map("designs")
+}
+
+model DesignImage {
+  id        Int      @id @default(autoincrement())
+  imageUrl  String   @map("image_url") @db.VarChar(255)
+  designId  Int      @map("design_id")
+  design    Design   @relation(fields: [designId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@map("design_images")
+}
+
+model WishDesign {
+  id        Int      @id @default(autoincrement())
+  designId  Int      @map("design_id")
+  userId    Int      @map("user_id")
+  design    Design   @relation(fields: [designId], references: [id], onDelete: Cascade)
+  // feat/auth 병합 전엔 User 테이블이 없어 FK를 걸 수 없었다(2026-08-02, CodeRabbit 리뷰로
+  // 재확인 후 연결). 유저가 삭제되면 그 유저의 찜 기록도 같이 정리한다.
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@unique([designId, userId])
+  // 찜한 디자인 목록(findWishlistByUserId)이 userId로 필터링 후 createdAt/id로 정렬한다.
+  // 위 unique 인덱스는 designId가 선두 컬럼이라 이 조회엔 못 쓰여서 별도로 둔다.
+  @@index([userId, createdAt, id])
+  @@map("wish_designs")
+}
+
+// AI 자동 태깅 + 인스타그램 스타일 태그 클릭 탐색을 위한 정규화된 태그.
+// 예전엔 Design.tag(콤마로 이어붙인 문자열) 하나였는데, 태그 단위 검색/집계가
+// 불가능해서 다대다 관계로 교체했다(2026-08-02, 실사용 데이터 없어서 컬럼 삭제로 바로 전환).
+model Tag {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique @db.VarChar(50)
+  createdAt DateTime    @default(now()) @map("created_at") @db.DateTime(3)
+  designs   DesignTag[]
+
+  @@map("tags")
+}
+
+model DesignTag {
+  designId  Int      @map("design_id")
+  tagId     Int      @map("tag_id")
+  design    Design   @relation(fields: [designId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@id([designId, tagId])
+  @@map("design_tags")
 }

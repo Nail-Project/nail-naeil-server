@@ -3,18 +3,32 @@ import type { CreateSmsMessageResponse } from '../dto/response/create-sms-messag
 import type { EstimateResponseDetailResponse } from '../dto/response/estimate-response-detail-response';
 import type { EstimateResponseListResponse } from '../dto/response/estimate-response-list-response';
 import type { ProposalTimeListResponse } from '../dto/response/proposal-time-list-response';
-import { EstimateResponseNotFoundError } from '../errors/estimate-response.error';
+import {
+  OpenAiEstimateResponseParser,
+  type EstimateResponseParser,
+} from '../../external/openai/estimate-response-parser.client';
+import {
+  EstimateResponseNotFoundError,
+  EstimateResponseForbiddenError,
+} from '../errors/estimate-response.error';
 import type { EstimateResponseRepository } from '../repository/estimate-response.repository';
+import { NotificationService } from '../../notification/service/notification.service';
 
 export class EstimateResponseService {
-  constructor(private readonly repository: EstimateResponseRepository) {}
+  private readonly processingSmsMessageIds = new Set<number>();
+
+  constructor(
+    private readonly repository: EstimateResponseRepository,
+    private readonly parser: EstimateResponseParser = new OpenAiEstimateResponseParser(),
+    private readonly notificationService = new NotificationService(),
+  ) {}
 
   async createSmsMessage(request: CreateSmsMessageRequest): Promise<CreateSmsMessageResponse> {
     const message = await this.repository.createSmsMessage(request);
 
-    // TODO: [eun] SMS 원문에서 가격, 메모, 예약 가능 시간을 파싱한다.
-    // TODO: [eun] 파싱 결과로 EstimateResponse와 ShopProposalTime을 트랜잭션으로 생성한다.
-    // TODO: [eun] 처리 결과에 따라 SmsMessage를 PARSED 또는 FAILED로 변경하고 실패 사유를 저장한다.
+    if (message.requestId && message.shopId && message.status === 'PENDING') {
+      this.dispatchSmsParsing(message, request.rawPayload.receivedAt);
+    }
 
     return {
       id: message.id,
@@ -26,11 +40,132 @@ export class EstimateResponseService {
     };
   }
 
-  async getDetail(responseId: number): Promise<EstimateResponseDetailResponse> {
+  private dispatchSmsParsing(
+    message: Awaited<ReturnType<EstimateResponseRepository['createSmsMessage']>>,
+    receivedAt: string,
+  ): void {
+    if (this.processingSmsMessageIds.has(message.id)) {
+      return;
+    }
+
+    this.processingSmsMessageIds.add(message.id);
+    void this.processSmsMessage(message, receivedAt)
+      .catch((error) => {
+        console.error('[EstimateResponseService] 문자 견적 상태 변경 실패', {
+          smsMessageId: message.id,
+          errorType: error instanceof Error ? error.name : typeof error,
+        });
+      })
+      .finally(() => {
+        this.processingSmsMessageIds.delete(message.id);
+      });
+  }
+
+  private async processSmsMessage(
+    message: Awaited<ReturnType<EstimateResponseRepository['createSmsMessage']>>,
+    receivedAt: string,
+  ): Promise<void> {
+    if (!message.requestId || !message.shopId) {
+      return;
+    }
+
+    try {
+      const context = await this.repository.findSmsParsingContext(
+        message.requestId,
+        message.shopId,
+      );
+
+      if (!context) {
+        await this.repository.updateSmsMessageStatus(
+          message.id,
+          'FAILED',
+          '견적 요청 정보를 찾을 수 없습니다.',
+        );
+        return;
+      }
+
+      const parsed = await this.parser.parse({
+        messages: context.messages.map((payload) => this.readSmsBody(payload)).filter(Boolean),
+        receivedAt,
+        requestStartDate: this.formatSeoulDate(context.requestStartDate),
+        requestEndDate: this.formatSeoulDate(context.requestEndDate),
+      });
+      const proposalDateTimes = this.filterProposalDateTimes(
+        parsed.proposalDateTimes,
+        context.requestStartDate,
+        context.requestEndDate,
+      );
+
+      if (
+        !parsed.canProvideService ||
+        parsed.totalPrice === null ||
+        proposalDateTimes.length === 0
+      ) {
+        await this.repository.updateSmsMessageStatus(
+          message.id,
+          'PENDING',
+          '가격과 예약 가능 시간이 모두 확인될 때까지 추가 답장을 기다립니다.',
+        );
+        return;
+      }
+
+      await this.repository.saveParsedEstimateResponse(
+        message.id,
+        message.requestId,
+        message.shopId,
+        {
+          totalPrice: parsed.totalPrice,
+          basePrice: parsed.basePrice ?? parsed.totalPrice,
+          removalPrice: parsed.removalPrice,
+          extraPrice: parsed.extraPrice,
+          memo: parsed.memo,
+          proposalDateTimes,
+        },
+      );
+
+      // 견적 응답이 저장되면 요청자에게 알림. 알림 실패가 파싱 플로우를 막지 않도록 격리한다.
+      try {
+        const owner = await this.repository.findRequestOwner(message.requestId);
+        if (owner) {
+          await this.notificationService.notify({
+            userId: owner.userId,
+            type: 'ESTIMATE_RESPONSE',
+            title: '견적 답변이 도착했어요',
+            body: '요청하신 견적에 새 답변이 도착했어요.',
+            data: { estimateRequestId: message.requestId },
+          });
+        }
+      } catch (notifyError) {
+        console.error('[EstimateResponseService] 알림 생성 실패', {
+          smsMessageId: message.id,
+          errorType: notifyError instanceof Error ? notifyError.name : typeof notifyError,
+        });
+      }
+    } catch (error) {
+      console.error('[EstimateResponseService] 문자 견적 분석 실패', {
+        smsMessageId: message.id,
+        errorType: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      });
+      await this.repository.updateSmsMessageStatus(
+        message.id,
+        'FAILED',
+        '문자 견적 분석에 실패했습니다.',
+      );
+    }
+  }
+
+  async getDetail(responseId: number, userId: number): Promise<EstimateResponseDetailResponse> {
     const response = await this.repository.findDetail(responseId);
 
     if (!response) {
       throw new EstimateResponseNotFoundError({ responseId });
+    }
+
+    // 해당 견적 응답이 속한 견적 요청의 소유자인지 확인
+    const owner = await this.repository.findRequestOwner(response.requestId);
+    if (!owner || owner.userId !== userId) {
+      throw new EstimateResponseForbiddenError();
     }
 
     return {
@@ -52,7 +187,18 @@ export class EstimateResponseService {
     };
   }
 
-  async getList(requestId: number): Promise<EstimateResponseListResponse> {
+  async getList(requestId: number, userId: number): Promise<EstimateResponseListResponse> {
+    // 견적 요청 존재 여부 확인
+    const request = await this.repository.findRequestOwner(requestId);
+    if (!request) {
+      throw new EstimateResponseNotFoundError({ requestId });
+    }
+
+    // 본인 견적인지 확인 - 다른 사람의 견적 결과는 조회 불가
+    if (request.userId !== userId) {
+      throw new EstimateResponseForbiddenError();
+    }
+
     const responses = await this.repository.findList(requestId);
 
     return {
@@ -70,11 +216,21 @@ export class EstimateResponseService {
     };
   }
 
-  async getProposalTimes(responseId: number): Promise<ProposalTimeListResponse> {
+  async getProposalTimes(responseId: number, userId: number): Promise<ProposalTimeListResponse> {
     const proposalTimes = await this.repository.findProposalTimes(responseId);
 
     if (!proposalTimes) {
       throw new EstimateResponseNotFoundError({ responseId });
+    }
+
+    // 해당 견적 응답이 속한 견적 요청의 소유자인지 확인
+    const detail = await this.repository.findDetail(responseId);
+    if (!detail) {
+      throw new EstimateResponseNotFoundError({ responseId });
+    }
+    const owner = await this.repository.findRequestOwner(detail.requestId);
+    if (!owner || owner.userId !== userId) {
+      throw new EstimateResponseForbiddenError();
     }
 
     return {
@@ -85,5 +241,49 @@ export class EstimateResponseService {
         isSelected: proposalTime.isSelected,
       })),
     };
+  }
+
+  private readSmsBody(rawPayload: unknown): string {
+    if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
+      return '';
+    }
+
+    const payload = rawPayload as Record<string, unknown>;
+
+    return typeof payload.body === 'string' ? payload.body : '';
+  }
+
+  private filterProposalDateTimes(
+    dateTimes: string[],
+    requestStartDate: Date,
+    requestEndDate: Date,
+  ): Date[] {
+    const startDate = this.formatSeoulDate(requestStartDate);
+    const endDate = this.formatSeoulDate(requestEndDate);
+    const uniqueTimes = new Map<number, Date>();
+
+    for (const value of dateTimes) {
+      const dateTime = new Date(value);
+      if (Number.isNaN(dateTime.getTime())) {
+        continue;
+      }
+
+      const proposalDate = this.formatSeoulDate(dateTime);
+
+      if (proposalDate >= startDate && proposalDate <= endDate) {
+        uniqueTimes.set(dateTime.getTime(), dateTime);
+      }
+    }
+
+    return [...uniqueTimes.values()].sort((a, b) => a.getTime() - b.getTime());
+  }
+
+  private formatSeoulDate(date: Date): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
   }
 }

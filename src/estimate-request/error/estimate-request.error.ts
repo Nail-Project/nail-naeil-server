@@ -37,6 +37,18 @@ export class EstimateRequestNotFoundError extends AppError {
   }
 }
 
+// POST / - shopIds가 비어있을 때 (견적 보낼 샵이 없음)
+export class NoShopsSelectedError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'NO_SHOPS_SELECTED',
+      statusCode: 400,
+      message: '견적 요청할 샵이 없습니다.',
+      data,
+    });
+  }
+}
+
 // GET /result/:request_id - 요청자와 로그인한 사용자가 다를 때
 // TODO: [yej] 로그인 구현 후 활성화
 export class EstimateRequestForbiddenError extends AppError {

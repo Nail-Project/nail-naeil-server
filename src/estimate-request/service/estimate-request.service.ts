@@ -1,55 +1,158 @@
+import fsp from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { SolapiMessageService } from 'solapi';
+import { createS3Client } from '../../infra/s3';
 import { EstimateRequestRepository } from '../repository/estimate-request.repository';
 import { CreateEstimateRequestDto } from '../dto/request/create-estimate-request.dto';
+import type { EstimateRequestCursor } from '../dto/request/get-estimates-query';
 import { CreateEstimateResponseDto } from '../dto/response/create-estimate-response.dto';
-import { GetEstimatesResponseDto } from '../dto/response/get-estimates-response.dto';
+import { GetEstimatesPageResponse } from '../dto/response/get-estimates-response.dto';
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
+import { encodeCursor } from '../../common/pagination/cursor';
+
+// ─── SMS 설정 ───────────────────────────────────────────────────────────────────
+const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
+const SMS_FROM = process.env.SMS_FROM ?? '';
+const SMS_TIMEOUT_MS = 10_000; // 1회 발송 최대 대기 시간
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`SMS 타임아웃: ${ms}ms 초과`)), ms)
+    ),
+  ]);
+}
+
+// Solapi 에러에서 사용자에게 전달할 실패 이유를 추출한다.
+// DefaultError / MessageNotReceivedError: errorCode + errorMessage 필드 보유
+// 그 외 에러: message 필드 사용
+function extractSmsErrorReason(error: unknown): string {
+  if (error instanceof Error) {
+    const solapiError = error as Error & { errorCode?: string; errorMessage?: string };
+    if (solapiError.errorMessage) {
+      return solapiError.errorCode
+        ? `[${solapiError.errorCode}] ${solapiError.errorMessage}`
+        : solapiError.errorMessage;
+    }
+    return error.message;
+  }
+  return '알 수 없는 오류';
+}
+
+// ─── S3 URL 검증 ────────────────────────────────────────────────────────────────
+// 허용 호스트: {bucket}.s3.{region}.amazonaws.com (자체 버킷만 허용)
+// 허용 경로 형식: images/YYYY-MM-DD/<uuid>.<ext>
+// URL이 이 형식을 따르지 않으면 S3 키 추출 없이 건너뜀
+function isAllowedS3ImageUrl(imageUrl: string): boolean {
+  try {
+    const urlObj = new URL(imageUrl);
+    const bucket = process.env.S3_BUCKET_NAME ?? '';
+    const region = process.env.AWS_REGION ?? 'ap-northeast-2';
+    if (urlObj.hostname !== `${bucket}.s3.${region}.amazonaws.com`) return false;
+    const key = urlObj.pathname.replace(/^\//, '');
+    // UUID 형식 엄격 검사: 8-4-4-4-12 하이픈 위치까지 확인
+    return /^images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/.test(key);
+  } catch {
+    return false;
+  }
+}
 
 // ─── SMS 발신 서비스 ────────────────────────────────────────────────────────────
-// SMS_ENABLED=true 일 때만 실제 발송을 시도한다.
-// SMS API 확정 전까지는 .env에서 SMS_ENABLED를 설정하지 않으면 발송을 건너뛴다.
-// TODO: [yej] SMS API 확정 후 아래 항목을 실제 값으로 교체한다.
-//   - SMS_API_URL: CoolSMS / NCP 등 확정된 서비스의 엔드포인트
-//   - SMS_API_KEY: 발급받은 API 키 (환경변수로 관리)
-//   - SMS_FROM: 릴레이 기기 전화번호 (발신번호 등록 필요)
-const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
-const SMS_API_URL = process.env.SMS_API_URL ?? '';
-const SMS_API_KEY = process.env.SMS_API_KEY ?? '';
-const SMS_FROM = process.env.SMS_FROM ?? '';
-
 class SmsService {
-  // SMS API로 문자 발송
-  // SMS_ENABLED가 false면 로그만 출력하고 실제 발송은 건너뛴다.
-  // TODO: [yej] SMS API 확정 후 실제 SDK / HTTP 클라이언트로 교체한다.
-  //   예) import coolsms from 'coolsms-node-sdk';
-  async send(to: string, text: string): Promise<void> {
-    if (!SMS_ENABLED) {
-      console.log('[SmsService] SMS 미연동 상태 (SMS_ENABLED=false). 발송 건너뜀.');
+  private readonly client: SolapiMessageService | null;
+  // S3 클라이언트는 생성자에서 한 번만 생성한다 (루프마다 생성 방지)
+  private readonly s3 = createS3Client();
+  private readonly s3Bucket = process.env.S3_BUCKET_NAME ?? '';
+
+  constructor() {
+    const apiKey = process.env.COOLSMS_API_KEY;
+    const apiSecret = process.env.COOLSMS_API_SECRET;
+
+    if (apiKey && apiSecret) {
+      this.client = new SolapiMessageService(apiKey, apiSecret);
+    } else {
+      this.client = null;
+      console.warn('[SmsService] COOLSMS_API_KEY 또는 COOLSMS_API_SECRET이 설정되지 않았습니다.');
+    }
+  }
+
+  // S3 이미지 URL → 임시 파일 다운로드 → Solapi fileId 변환
+  // 업로드 실패한 이미지는 건너뛰고, 임시 파일은 업로드 후 삭제한다.
+  private async uploadImages(imageUrls: string[]): Promise<string[]> {
+    if (!this.client || imageUrls.length === 0) return [];
+
+    const fileIds: string[] = [];
+
+    for (const imageUrl of imageUrls) {
+      // 허용된 S3 URL인지 검증 (다른 버킷·경로 접근 차단)
+      if (!isAllowedS3ImageUrl(imageUrl)) {
+        console.warn(`[SmsService] 허용되지 않은 이미지 URL, 건너뜀: ${imageUrl}`);
+        continue;
+      }
+      // S3 URL에서 key 추출 (예: images/2026-08-01/uuid.jpg)
+      const urlObj = new URL(imageUrl);
+      const key = urlObj.pathname.replace(/^\//, '');
+      const tmpPath = path.join(os.tmpdir(), path.basename(key));
+
+      try {
+        // S3에서 임시 파일로 다운로드
+        const { Body } = await withTimeout(
+          this.s3.send(new GetObjectCommand({ Bucket: this.s3Bucket, Key: key })),
+          SMS_TIMEOUT_MS,
+        );
+        if (!Body) {
+          console.warn(`[SmsService] S3 응답 바디 없음, 건너뜀: ${key}`);
+          continue;
+        }
+        const buffer = Buffer.from(await Body.transformToByteArray());
+        await fsp.writeFile(tmpPath, buffer);
+
+        // Solapi에 임시 파일 업로드
+        const { fileId } = (await withTimeout(this.client.uploadFile(tmpPath, 'MMS'), SMS_TIMEOUT_MS)) as { fileId: string };
+        fileIds.push(fileId);
+      } catch (error) {
+        console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${key}`, error);
+      } finally {
+        // 임시 파일 정리 (force: true → 파일 없어도 에러 없이 통과)
+        await fsp.rm(tmpPath, { force: true });
+      }
+    }
+
+    return fileIds;
+  }
+
+  // 모든 샵에 SMS/MMS 발송 (1회 시도)
+  // 실패 시 에러를 throw → 호출부에서 EstimateRequestFailedError로 변환해 클라이언트에 반환한다.
+  // 재시도는 클라이언트가 견적 요청을 다시 보내는 방식으로 처리한다.
+  // SMS_ENABLED=false 또는 API Key 미설정이면 발송 없이 정상 통과한다.
+  async sendToShops(phoneNumbers: string[], text: string, imageUrls: string[]): Promise<void> {
+    if (!SMS_ENABLED || !this.client) {
+      console.log('[SmsService] SMS 발송 건너뜀');
       return;
     }
 
-    try {
-      // 10초 안에 응답 없으면 타임아웃 처리
-      const response = await fetch(SMS_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${SMS_API_KEY}`,
-        },
-        body: JSON.stringify({ from: SMS_FROM, to, text }),
-        signal: AbortSignal.timeout(10_000),
-      });
+    const fileIds = await this.uploadImages(imageUrls);
 
-      // fetch는 4xx/5xx에서 reject되지 않으므로 response.ok로 명시적으로 확인한다.
-      if (!response.ok) {
-        throw new Error(`SMS API 응답 오류: ${response.status}`);
-      }
-    } catch (error) {
-      // SMS 발송 실패는 견적 요청 자체를 막지 않는다.
-      // 요청은 이미 DB에 저장됐으므로 로그만 남기고 계속 진행한다.
-      // TODO: [yej] SMS API 확정 후 실패 정책 결정 필요
-      //   - 재발송 로직 추가 여부 (예: 최대 3회 retry)
-      //   - SMS 발송 실패 시 별도 에러 코드(SMS_SEND_FAILED)로 클라이언트에 알릴지 여부
-      console.error('[SmsService] SMS 발송 실패:', error);
+    // 이미지 없으면 LMS 1건, 있으면 이미지 수만큼 MMS 발송
+    // 첫 번째 MMS에만 본문 텍스트 포함
+    const sendTasks: Array<{ text: string; imageId?: string }> =
+      fileIds.length === 0
+        ? [{ text }]
+        : fileIds.map((fileId, i) => ({ text: i === 0 ? text : ' ', imageId: fileId }));
+
+    for (const task of sendTasks) {
+      await withTimeout(
+        this.client.send({
+          to: phoneNumbers,
+          from: SMS_FROM,
+          text: task.text,
+          ...(task.imageId ? { imageId: task.imageId } : { autoTypeDetect: true }),
+        }),
+        SMS_TIMEOUT_MS,
+      );
     }
   }
 }
@@ -118,24 +221,28 @@ export class EstimateRequestService {
   private readonly smsService = new SmsService();
 
   // 견적 요청 생성
-  // 1. DB에 견적 요청 저장
-  // 2. DTO를 문자 내용으로 변환
-  // 3. SMS API로 샵에 문자 발송
-  // TODO: [yej] 샵 전화번호를 어디서 가져올지 확정 후 실제 번호로 교체한다.
-  //   현재는 임시 번호로 발송하며, 추후 매칭된 샵 목록의 phoneNumber를 사용한다.
-  async createEstimateRequest(dto: CreateEstimateRequestDto): Promise<CreateEstimateResponseDto> {
+  // ① SMS 발송 — 실패 시 DB 저장 없이 EstimateRequestFailedError + 실패 이유 반환
+  // ② SMS 성공 후 DB 저장
+  // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller가 전달한다.
+  async createEstimateRequest(dto: CreateEstimateRequestDto, userId: number): Promise<CreateEstimateResponseDto> {
+    // ① SMS 발송 (실패 시 DB 저장 없이 즉시 에러 반환)
     try {
-      // ① DB 저장
-      const result = await this.repository.create(dto);
-
-      // ② DTO → 문자 문자열 변환
       const smsText = formatSmsText(dto);
+      const shops = await this.repository.findShopsByIds(dto.shopIds);
+      const phoneNumbers = shops.map((s) => s.phoneNumber);
+      // 유효한 S3 URL만 필터링 후 첫 번째 1장만 MMS 발송
+      // slice(0, 1) 대신 필터링 먼저: 첫 번째 URL이 무효여도 두 번째 유효 URL이 전송될 수 있도록
+      const smsImages = dto.images.filter(isAllowedS3ImageUrl).slice(0, 1);
+      await this.smsService.sendToShops(phoneNumbers, smsText, smsImages);
+    } catch (error) {
+      // 내부 에러 상세(IP, API 키 관련 정보 등)는 서버 로그에만 기록하고 클라이언트에 노출하지 않는다.
+      console.error('[EstimateRequestService] SMS 발송 실패:', extractSmsErrorReason(error));
+      throw new EstimateRequestFailedError();
+    }
 
-      // ③ SMS 발송 (실패해도 견적 요청은 정상 완료 처리)
-      // TODO: [yej] 매칭된 샵 목록의 phoneNumber로 교체
-      const tempShopPhone = '01000000000';
-      await this.smsService.send(tempShopPhone, smsText);
-
+    // ② DB 저장 (SMS 성공 후)
+    try {
+      const result = await this.repository.create(dto, userId);
       return {
         estimateId: result.id,
         nailType: result.nailType,
@@ -157,40 +264,52 @@ export class EstimateRequestService {
     }
   }
 
-  // 상태별 견적 요청 목록 조회
+  // 상태별 견적 요청 목록 조회 (커서 기반 페이지네이션)
   // 각 요청에 달린 proposals를 집계해 카드에 필요한 통계값을 계산한다.
   async getEstimatesByStatus(
     status: 'MATCHING' | 'COMPLETED' | 'EXPIRED' | 'ALL',
-  ): Promise<GetEstimatesResponseDto[]> {
+    userId: number,
+    cursor: EstimateRequestCursor | undefined,
+    size: number,
+  ): Promise<GetEstimatesPageResponse> {
     try {
-      const estimates = await this.repository.findByStatus(status);
+      const { estimates, hasNext } = await this.repository.findByStatus(status, userId, cursor, size);
 
-      return estimates.map((estimate) => {
-        const proposals = estimate.proposals;
+      const last = estimates[estimates.length - 1];
+      const nextCursor =
+        hasNext && last
+          ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id })
+          : null;
 
-        // 전체 견적 응답(샵 제안) 수
-        const proposalCount = proposals.length;
+      return {
+        estimates: estimates.map((estimate) => {
+          const proposals = estimate.proposals;
 
-        // SUBMITTED: 샵에서 견적을 제출했지만 사용자가 아직 수락/거절하지 않은 상태
-        const submittedShopCount = proposals.filter((p) => p.status === 'SUBMITTED').length;
+          // 전체 견적 응답(샵 제안) 수
+          const proposalCount = proposals.length;
 
-        // 도착한 견적 중 최저 총금액 (견적 응답이 없으면 null)
-        const prices = proposals
-          .map((p) => p.totalPrice)
-          .filter((price): price is number => price !== null);
-        const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+          // SUBMITTED: 샵에서 견적을 제출했지만 사용자가 아직 수락/거절하지 않은 상태
+          const submittedShopCount = proposals.filter((p) => p.status === 'SUBMITTED').length;
 
-        return {
-          estimateId: estimate.id,
-          thumbnailUrl: estimate.images[0]?.imageUrl ?? null,
-          nailType: estimate.nailType,
-          createdAt: estimate.createdAt,
-          status: estimate.status,
-          proposalCount,
-          submittedShopCount,
-          minPrice,
-        };
-      });
+          // 도착한 견적 중 최저 총금액 (견적 응답이 없으면 null)
+          const prices = proposals
+            .map((p) => p.totalPrice)
+            .filter((price): price is number => price !== null);
+          const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+
+          return {
+            estimateId: estimate.id,
+            thumbnailUrl: estimate.images[0]?.imageUrl ?? null,
+            nailType: estimate.nailType,
+            createdAt: estimate.createdAt,
+            status: estimate.status,
+            proposalCount,
+            submittedShopCount,
+            minPrice,
+          };
+        }),
+        pageInfo: { nextCursor, hasNext },
+      };
     } catch {
       throw new InternalServerError();
     }

@@ -1,4 +1,4 @@
-// POST /api/users/login - 로그인 Request Body 검증 스키마
+// POST /api/v1/users/login - 로그인 Request Body 검증 스키마
 import { z } from 'zod';
 
 export const LoginUserRequestSchema = z.object({

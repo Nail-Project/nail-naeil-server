@@ -1,4 +1,4 @@
-// GET /api/v1/estimate-request?status= - 상태별 견적 목록 조회 성공 시 Response
+// GET /api/v1/estimate/:status - 상태별 견적 목록 조회 성공 시 Response
 // 목록 카드에 표시할 최소한의 데이터만 포함한다.
 export interface GetEstimatesResponseDto {
   estimateId: number;
@@ -14,4 +14,12 @@ export interface GetEstimatesResponseDto {
   submittedShopCount: number;
   // 도착한 견적 중 최저 총금액 (견적 응답이 없으면 null)
   minPrice: number | null;
+}
+
+export interface GetEstimatesPageResponse {
+  estimates: GetEstimatesResponseDto[];
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
 }
