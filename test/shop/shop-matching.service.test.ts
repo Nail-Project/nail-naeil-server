@@ -17,12 +17,16 @@ const nearbyShop: NearbyShopRecord = {
   latitude: 37.499,
   longitude: 126.953,
   distanceMeters: 350,
+  averagePrice: null,
 };
 
 const createRepository = () => ({
   findNearbyShops: vi
     .fn<ShopMatchingRepository['findNearbyShops']>()
     .mockResolvedValue([nearbyShop]),
+  findCheapShops: vi
+    .fn<ShopMatchingRepository['findCheapShops']>()
+    .mockResolvedValue([{ ...nearbyShop, averagePrice: 45_000 }]),
 });
 
 describe('ShopMatchingService', () => {
@@ -44,7 +48,7 @@ describe('ShopMatchingService', () => {
     expect(result).toEqual([nearbyShop]);
   });
 
-  it('가격 데이터가 없는 동안 최저가 탐색은 지원하지 않는다', async () => {
+  it('최저가 탐색은 가격순 저장소 조회를 사용한다', async () => {
     const repository = createRepository();
     const service = new ShopMatchingService(repository);
 
@@ -54,10 +58,8 @@ describe('ShopMatchingService', () => {
         longitude: 126.953,
         recommendType: 'CHEAP',
       }),
-    ).rejects.toMatchObject({
-      code: 'UNSUPPORTED_SHOP_RECOMMEND_TYPE',
-      statusCode: 400,
-    });
+    ).resolves.toMatchObject([{ averagePrice: 45_000 }]);
+    expect(repository.findCheapShops).toHaveBeenCalledWith(37.499, 126.953, 10_000, 10);
     expect(repository.findNearbyShops).not.toHaveBeenCalled();
   });
 
@@ -83,6 +85,7 @@ describe('ShopMatchingService', () => {
       CLOSE: { radiusMeters: 2_000, limit: 5 },
       BALANCED: { radiusMeters: 5_000, limit: 8 },
       WIDE: { radiusMeters: 10_000, limit: 10 },
+      CHEAP: { radiusMeters: 10_000, limit: 10 },
     });
   });
 });

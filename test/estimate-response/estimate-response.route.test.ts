@@ -46,7 +46,7 @@ describe('estimate response routes', () => {
     const response = await request(app).get('/api/v1/estimate/result/1');
 
     expect(response.status).toBe(200);
-    expect(service.getList).toHaveBeenCalledWith(1, 1);
+    expect(service.getList).toHaveBeenCalledWith(1, 1, 'RECOMMENDED');
   });
 
   it('샵 견적 상세 API에 proposal_id를 전달한다', async () => {

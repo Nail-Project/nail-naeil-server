@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type SupportedRecommendType = 'CLOSE' | 'BALANCED' | 'WIDE';
+export type SupportedRecommendType = 'CLOSE' | 'BALANCED' | 'WIDE' | 'CHEAP';
 export type RecommendType = SupportedRecommendType | 'CHEAP';
 
 const CoordinateQuerySchema = z.string().trim().min(1).pipe(z.coerce.number());

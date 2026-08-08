@@ -15,6 +15,7 @@ const matchedShop: MatchedShopResponse = {
   latitude: 37.499,
   longitude: 126.953,
   distanceMeters: 350,
+  averagePrice: null,
 };
 
 const createApp = () => {

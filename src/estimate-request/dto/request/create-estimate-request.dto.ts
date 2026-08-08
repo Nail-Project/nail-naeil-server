@@ -2,6 +2,22 @@
 // zod로 런타임 검증 후 타입을 추론해 controller → service → repository에서 그대로 사용한다.
 import { z } from 'zod';
 
+const calendarDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.')
+  .refine((value) => {
+    const year = Number(value.slice(0, 4));
+    const month = Number(value.slice(5, 7));
+    const day = Number(value.slice(8, 10));
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    );
+  }, '유효한 날짜를 입력해야 합니다.');
+
 export const CreateEstimateRequestSchema = z
   .object({
     // 네일 종류: 손(HAND), 발(PEDICURE), 손+발(BOTH)
@@ -12,8 +28,8 @@ export const CreateEstimateRequestSchema = z
 
     // 희망 시술 기간 - YYYY-MM-DD 형식만 허용, DB 저장 시 Date로 변환
     // endDate는 startDate 이후여야 한다 (같은 날은 허용).
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.'),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.'),
+    startDate: calendarDateSchema,
+    endDate: calendarDateSchema,
 
     // 선호 시간대: 오전(AM), 오후(PM), 저녁(EVENING), 무관(ANY)
     preferredTime: z.enum(['AM', 'PM', 'EVENING', 'ANY']),
@@ -27,6 +43,10 @@ export const CreateEstimateRequestSchema = z
     // 디자인 매거진에서 "이 디자인 그대로 견적받기"로 요청한 경우의 카탈로그 디자인 id (선택)
     // 사용자가 직접 사진을 올려 요청하는 경우 생략한다.
     designId: z.number().int().positive().optional(),
+
+    // 거리 계산에는 견적 요청 당시 위치를 사용한다. 기존 클라이언트 호환을 위해 선택값이다.
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
 
     // 디자인 이미지 URL 목록 - image 도메인에서 미리 업로드 후 URL을 받아 전달한다.
     // 최대 3장까지 허용 (SMS 발송은 첫 번째 이미지 1장만 전송, 추후 기획 확정 후 조정)
@@ -58,6 +78,10 @@ export const CreateEstimateRequestSchema = z
     // endDate가 startDate보다 앞이면 400 반환
     message: '종료일은 시작일 이후여야 합니다.',
     path: ['endDate'],
+  })
+  .refine((data) => (data.latitude === undefined) === (data.longitude === undefined), {
+    message: '위도와 경도는 함께 입력해야 합니다.',
+    path: ['latitude'],
   });
 
 export type CreateEstimateRequestDto = z.infer<typeof CreateEstimateRequestSchema>;

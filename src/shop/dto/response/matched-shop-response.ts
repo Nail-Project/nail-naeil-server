@@ -7,4 +7,5 @@ export interface MatchedShopResponse {
   latitude: number;
   longitude: number;
   distanceMeters: number;
+  averagePrice: number | null;
 }

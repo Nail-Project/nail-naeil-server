@@ -40,6 +40,9 @@ export class EstimateRequestRepository {
         images: {
           create: images.map((url) => ({ imageUrl: url })),
         },
+        targetShops: {
+          create: dto.shopIds.map((shopId) => ({ shopId })),
+        },
       },
       include: {
         // 생성된 이미지 레코드를 응답에 포함하기 위해 join한다.
