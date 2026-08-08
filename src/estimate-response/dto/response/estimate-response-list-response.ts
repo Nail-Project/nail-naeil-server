@@ -9,7 +9,7 @@ export interface EstimateResponseListItem {
     rating: number;
     reviewCount: number;
   };
-  totalPrice: number;
+  totalPrice: number | null;
   distanceMeters: number | null;
   isLowestPrice: boolean;
   isRemovalIncluded: boolean;

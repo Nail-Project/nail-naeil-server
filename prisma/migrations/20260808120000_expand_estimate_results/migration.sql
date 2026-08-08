@@ -9,6 +9,7 @@ ALTER TABLE `estimate_requests`
   ADD COLUMN `longitude` DECIMAL(10, 7) NULL;
 
 ALTER TABLE `estimate_responses`
+  MODIFY COLUMN `total_price` INTEGER NULL,
   MODIFY COLUMN `base_price` INTEGER NULL,
   MODIFY COLUMN `removal_price` INTEGER NULL,
   MODIFY COLUMN `extra_price` INTEGER NULL,

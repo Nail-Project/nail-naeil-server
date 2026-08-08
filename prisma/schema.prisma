@@ -184,7 +184,7 @@ model EstimateResponse {
   id                       Int                    @id @default(autoincrement())
   requestId                Int                    @map("request_id")
   shopId                   Int                    @map("shop_id")
-  totalPrice               Int                    @map("total_price")
+  totalPrice               Int?                   @map("total_price")
   basePrice                Int?                   @map("base_price")
   removalPrice             Int?                   @map("removal_price")
   extraPrice               Int?                   @map("extra_price")

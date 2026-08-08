@@ -117,7 +117,7 @@ export class EstimateResponseService {
           canProvideService: parsed.canProvideService,
           estimatedDurationMinutes: parsed.estimatedDurationMinutes,
           isRemovalIncluded: parsed.isRemovalIncluded,
-          totalPrice: parsed.totalPrice ?? 0,
+          totalPrice: parsed.totalPrice,
           basePrice: parsed.basePrice,
           removalPrice: parsed.removalPrice,
           extraPrice: parsed.extraPrice,
@@ -216,9 +216,10 @@ export class EstimateResponseService {
 
     const context = await this.repository.findRequestContext(requestId);
     const responses = await this.repository.findList(requestId);
-    const minPrice = responses.length
-      ? Math.min(...responses.map(({ totalPrice }) => totalPrice))
-      : null;
+    const comparablePrices = responses
+      .filter(({ canProvideService, totalPrice }) => canProvideService && totalPrice !== null)
+      .map(({ totalPrice }) => totalPrice as number);
+    const minPrice = comparablePrices.length ? Math.min(...comparablePrices) : null;
     const respondedShopIds = new Set(responses.map(({ shop }) => shop.id));
     const waiting = (context?.targetShops ?? []).filter(
       ({ shop }) => !respondedShopIds.has(shop.id),
@@ -250,7 +251,10 @@ export class EstimateResponseService {
         },
         totalPrice: response.totalPrice,
         distanceMeters,
-        isLowestPrice: response.totalPrice === minPrice,
+        isLowestPrice:
+          response.canProvideService &&
+          response.totalPrice !== null &&
+          response.totalPrice === minPrice,
         isRemovalIncluded: response.isRemovalIncluded,
         removalPrice: response.removalPrice,
         estimatedDurationMinutes: response.estimatedDurationMinutes,
@@ -288,19 +292,35 @@ export class EstimateResponseService {
         ? new Date(item.proposalDateTimes[0]).getTime()
         : Number.MAX_SAFE_INTEGER;
     items.sort((a, b) => {
-      if (sort === 'LOWEST_PRICE') return a.totalPrice - b.totalPrice || a.id - b.id;
+      if (sort === 'LOWEST_PRICE') return this.compareNullablePrices(a, b) || a.id - b.id;
       if (sort === 'NEAREST')
         return (
           (a.distanceMeters ?? Number.MAX_SAFE_INTEGER) -
             (b.distanceMeters ?? Number.MAX_SAFE_INTEGER) || a.id - b.id
         );
       if (sort === 'EARLIEST_AVAILABLE') return earliest(a) - earliest(b) || a.id - b.id;
-      const scoreA =
-        a.shop.rating * 20 - a.totalPrice / 10_000 - (a.distanceMeters ?? 10_000) / 1_000;
-      const scoreB =
-        b.shop.rating * 20 - b.totalPrice / 10_000 - (b.distanceMeters ?? 10_000) / 1_000;
+      const scoreA = this.recommendationScore(a);
+      const scoreB = this.recommendationScore(b);
       return scoreB - scoreA || a.id - b.id;
     });
+  }
+
+  private compareNullablePrices(
+    a: EstimateResponseListResponse['responses'][number],
+    b: EstimateResponseListResponse['responses'][number],
+  ): number {
+    const priceA = a.canProvideService ? a.totalPrice : null;
+    const priceB = b.canProvideService ? b.totalPrice : null;
+    if (priceA === null) return priceB === null ? 0 : 1;
+    if (priceB === null) return -1;
+    return priceA - priceB;
+  }
+
+  private recommendationScore(item: EstimateResponseListResponse['responses'][number]): number {
+    if (!item.canProvideService || item.totalPrice === null) return Number.NEGATIVE_INFINITY;
+    return (
+      item.shop.rating * 20 - item.totalPrice / 10_000 - (item.distanceMeters ?? 10_000) / 1_000
+    );
   }
 
   private calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {

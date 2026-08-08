@@ -23,7 +23,7 @@ export interface SaveParsedEstimateResponseInput {
   canProvideService: boolean;
   estimatedDurationMinutes: number;
   isRemovalIncluded: boolean;
-  totalPrice: number;
+  totalPrice: number | null;
   basePrice: number | null;
   removalPrice: number | null;
   extraPrice: number | null;
@@ -35,7 +35,7 @@ export interface EstimateResponseDetail {
   id: number;
   requestId: number;
   shopId: number;
-  totalPrice: number;
+  totalPrice: number | null;
   basePrice: number | null;
   removalPrice: number | null;
   extraPrice: number | null;
@@ -63,7 +63,7 @@ export interface EstimateResponseDetail {
 
 export interface EstimateResponseListRecord {
   id: number;
-  totalPrice: number;
+  totalPrice: number | null;
   removalPrice: number | null;
   estimatedDurationMinutes: number;
   canProvideService: boolean;
@@ -365,6 +365,12 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
     input: SaveParsedEstimateResponseInput,
   ): Promise<CreatedSmsMessage> {
     return getPrisma().$transaction(async (prisma) => {
+      const existingResponse = await prisma.estimateResponse.findUnique({
+        where: { requestId_shopId: { requestId, shopId } },
+        select: { status: true },
+      });
+      const parsedStatus = input.canProvideService ? 'SUBMITTED' : 'REJECTED';
+
       const estimateResponse = await prisma.estimateResponse.upsert({
         where: { requestId_shopId: { requestId, shopId } },
         create: {
@@ -378,7 +384,7 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           estimatedDurationMinutes: input.estimatedDurationMinutes,
           canProvideService: input.canProvideService,
           isRemovalIncluded: input.isRemovalIncluded,
-          status: input.canProvideService ? 'SUBMITTED' : 'REJECTED',
+          status: parsedStatus,
         },
         update: {
           totalPrice: input.totalPrice,
@@ -389,7 +395,7 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           estimatedDurationMinutes: input.estimatedDurationMinutes,
           canProvideService: input.canProvideService,
           isRemovalIncluded: input.isRemovalIncluded,
-          status: input.canProvideService ? 'SUBMITTED' : 'REJECTED',
+          status: existingResponse?.status === 'ACCEPTED' ? 'ACCEPTED' : parsedStatus,
         },
         select: { id: true },
       });

@@ -80,6 +80,8 @@ const estimateResponseRouter = Router();
  *                                 example: 120
  *                           totalPrice:
  *                             type: integer
+ *                             nullable: true
+ *                             description: 시술 불가 응답이면 null
  *                             example: 55000
  *                           distanceMeters:
  *                             type: integer
@@ -453,11 +455,13 @@ const estimateResponseRouter = Router();
  *                           example: [SUN]
  *                     price:
  *                       type: object
- *                       description: 총액은 필수이며 상세 금액은 샵이 문자에 명시한 경우에만 제공한다. 총액만 전달된 경우 나머지 값은 null이다.
+ *                       required: [totalPrice]
+ *                       description: 시술 가능한 견적의 총액은 필수이며, 시술 불가 응답에서는 totalPrice가 null이다. 상세 금액은 샵이 문자에 명시한 경우에만 제공한다.
  *                       example: { totalPrice: 55000, basePrice: null, removalPrice: null, extraPrice: null }
  *                       properties:
  *                         totalPrice:
  *                           type: integer
+ *                           nullable: true
  *                           example: 55000
  *                         basePrice:
  *                           type: integer

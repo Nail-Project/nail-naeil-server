@@ -193,6 +193,24 @@ class LinkedSmsRepository extends FakeRepository {
   }
 }
 
+class MixedAvailabilityRepository extends FakeRepository {
+  async findList(): Promise<EstimateResponseListRecord[]> {
+    const [available] = await super.findList();
+    if (!available) return [];
+
+    return [
+      {
+        ...available,
+        id: 9,
+        totalPrice: null,
+        canProvideService: false,
+        status: 'REJECTED',
+      },
+      available,
+    ];
+  }
+}
+
 class FakeParser implements EstimateResponseParser {
   constructor(private readonly result: ParsedEstimateResponse) {}
 
@@ -303,6 +321,30 @@ describe('EstimateResponseService', () => {
     expect(repository.savedEstimateResponse).toBeNull();
   });
 
+  it('시술 불가 응답은 가격을 0으로 변환하지 않고 null로 저장한다', async () => {
+    const repository = new LinkedSmsRepository();
+    const parser = new FakeParser({
+      canProvideService: false,
+      estimatedDurationMinutes: 60,
+      isRemovalIncluded: false,
+      totalPrice: null,
+      basePrice: null,
+      removalPrice: null,
+      extraPrice: null,
+      memo: '시술이 어려워요.',
+      proposalDateTimes: [],
+    });
+
+    await new EstimateResponseService(
+      repository,
+      parser,
+      createNotificationService(),
+    ).createSmsMessage(smsRequest);
+
+    await vi.waitFor(() => expect(repository.savedEstimateResponse).not.toBeNull());
+    expect(repository.savedEstimateResponse?.totalPrice).toBeNull();
+  });
+
   it('요청 기간 밖 시간은 제외하고 중복 시간은 하나만 저장한다', async () => {
     const repository = new LinkedSmsRepository();
     const parser = new FakeParser({
@@ -378,6 +420,18 @@ describe('EstimateResponseService', () => {
       responses: [{ id: 10, totalPrice: 55_000 }],
     });
   });
+
+  it.each(['LOWEST_PRICE', 'RECOMMENDED'] as const)(
+    '%s 정렬에서 시술 불가·가격 없음 응답을 뒤로 배치한다',
+    async (sort) => {
+      const service = new EstimateResponseService(new MixedAvailabilityRepository());
+
+      const result = await service.getList(1, 1, sort);
+
+      expect(result.responses.map(({ id }) => id)).toEqual([10, 9]);
+      expect(result.responses.map(({ isLowestPrice }) => isLowestPrice)).toEqual([true, false]);
+    },
+  );
 
   it('예약 가능 시간을 조회한다', async () => {
     const service = new EstimateResponseService(new FakeRepository());

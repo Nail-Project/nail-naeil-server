@@ -16,7 +16,7 @@ export interface GetReservationDetailResponse {
   basePrice: number | null;
   removalPrice: number | null;
   extraPrice: number | null;
-  totalPrice: number;
+  totalPrice: number | null;
   // 샵이 견적 응답 시 남긴 코멘트 - EstimateResponse.memo
   shopComment: string | null;
   // 시술 부위 - EstimateRequest.nailType (HAND/PEDICURE/BOTH)

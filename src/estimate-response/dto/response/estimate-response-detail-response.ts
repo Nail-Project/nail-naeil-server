@@ -15,7 +15,7 @@ export interface EstimateResponseDetailResponse {
     closedDays: unknown;
   };
   price: {
-    totalPrice: number;
+    totalPrice: number | null;
     basePrice: number | null;
     removalPrice: number | null;
     extraPrice: number | null;

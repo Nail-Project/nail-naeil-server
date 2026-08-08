@@ -16,7 +16,7 @@ export interface CreatedReservationRecord {
   reservedAt: Date;
   status: ReservationStatus;
   proposal: {
-    totalPrice: number;
+    totalPrice: number | null;
     shop: { name: string };
   };
 }
@@ -42,7 +42,7 @@ export interface ReservationRecord {
   reservedAt: Date;
   status: ReservationStatus;
   proposal: {
-    totalPrice: number;
+    totalPrice: number | null;
     shop: { name: string };
     request: { nailType: string; removalType: string };
   };
@@ -53,7 +53,7 @@ export interface ReservationDetailRecord {
   reservedAt: Date;
   status: ReservationStatus;
   proposal: {
-    totalPrice: number;
+    totalPrice: number | null;
     basePrice: number | null;
     removalPrice: number | null;
     extraPrice: number | null;
@@ -81,7 +81,7 @@ export interface CancelledReservationRecord {
 
 export interface ProposalRecord {
   id: number;
-  totalPrice: number;
+  totalPrice: number | null;
   shop: { name: string };
 }
 
