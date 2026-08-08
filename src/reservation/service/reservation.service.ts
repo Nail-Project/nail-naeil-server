@@ -125,6 +125,7 @@ export class ReservationService {
         totalPrice: r.proposal.totalPrice,
         nailType: r.proposal.request.nailType,
         removalType: r.proposal.request.removalType,
+        designName: r.proposal.request.design?.title ?? null,
       })),
       pageInfo: { nextCursor, hasNext },
     };
@@ -146,6 +147,8 @@ export class ReservationService {
       shopPhoneNumber: shop.phoneNumber,
       address: shop.addressDetail ? `${shop.address} ${shop.addressDetail}` : shop.address,
       addressDetail: shop.addressDetail,
+      latitude: shop.latitude.toNumber(),
+      longitude: shop.longitude.toNumber(),
       reservedAt: reservation.reservedAt,
       basePrice: reservation.proposal.basePrice,
       removalPrice: reservation.proposal.removalPrice,

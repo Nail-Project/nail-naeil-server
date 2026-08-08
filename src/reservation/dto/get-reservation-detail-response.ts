@@ -9,6 +9,9 @@ export interface GetReservationDetailResponse {
   // 기존 소비자와의 호환을 위해 address(합친 문자열)는 유지하고, 상세 주소만 따로도 내려준다.
   address: string;
   addressDetail: string | null;
+  // 지도 표시/길찾기 연동용 샵 좌표.
+  latitude: number;
+  longitude: number;
   reservedAt: Date;
   // 견적서 세부내역 - EstimateResponse에 이미 저장돼 있던 값을 그대로 노출한다.
   // Figma의 "디자인 추가"/"옵션 추가" 라벨과 정확히 어떤 필드가 대응하는지는
