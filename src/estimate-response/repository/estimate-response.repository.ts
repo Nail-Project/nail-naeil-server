@@ -20,10 +20,13 @@ export interface SmsParsingContext {
 }
 
 export interface SaveParsedEstimateResponseInput {
-  totalPrice: number;
-  basePrice: number;
-  removalPrice: number;
-  extraPrice: number;
+  canProvideService: boolean;
+  estimatedDurationMinutes: number;
+  isRemovalIncluded: boolean;
+  totalPrice: number | null;
+  basePrice: number | null;
+  removalPrice: number | null;
+  extraPrice: number | null;
   memo: string | null;
   proposalDateTimes: Date[];
 }
@@ -32,10 +35,13 @@ export interface EstimateResponseDetail {
   id: number;
   requestId: number;
   shopId: number;
-  totalPrice: number;
-  basePrice: number;
-  removalPrice: number;
-  extraPrice: number;
+  totalPrice: number | null;
+  basePrice: number | null;
+  removalPrice: number | null;
+  extraPrice: number | null;
+  estimatedDurationMinutes: number;
+  canProvideService: boolean;
+  isRemovalIncluded: boolean;
   memo: string | null;
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   createdAt: Date;
@@ -45,19 +51,33 @@ export interface EstimateResponseDetail {
     phoneNumber: string | null;
     address: string;
     addressDetail: string | null;
+    latitude: { toNumber(): number };
+    longitude: { toNumber(): number };
+    rating: { toNumber(): number };
+    reviewCount: number;
+    businessHours: Prisma.JsonValue | null;
+    closedDays: Prisma.JsonValue | null;
   };
   proposalTimes: { proposalDatetime: Date }[];
 }
 
 export interface EstimateResponseListRecord {
   id: number;
-  totalPrice: number;
+  totalPrice: number | null;
+  removalPrice: number | null;
+  estimatedDurationMinutes: number;
+  canProvideService: boolean;
+  isRemovalIncluded: boolean;
   status: 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
   createdAt: Date;
   shop: {
     id: number;
     name: string;
     address: string;
+    latitude: { toNumber(): number };
+    longitude: { toNumber(): number };
+    rating: { toNumber(): number };
+    reviewCount: number;
   };
   proposalTimes: { proposalDatetime: Date }[];
 }
@@ -73,6 +93,8 @@ export interface EstimateResponseRepository {
   findRequestOwner(requestId: number): Promise<{ userId: number } | null>;
   findDetail(responseId: number): Promise<EstimateResponseDetail | null>;
   findList(requestId: number): Promise<EstimateResponseListRecord[]>;
+  findRequestContext(requestId: number): Promise<EstimateRequestContext | null>;
+  findAverageResponseMinutes(shopIds: number[]): Promise<Map<number, number>>;
   findSmsParsingContext(requestId: number, shopId: number): Promise<SmsParsingContext | null>;
   saveParsedEstimateResponse(
     smsMessageId: number,
@@ -86,6 +108,16 @@ export interface EstimateResponseRepository {
     errorMessage: string | null,
   ): Promise<CreatedSmsMessage>;
   findProposalTimes(responseId: number): Promise<ProposalTimeRecord[] | null>;
+}
+
+export interface EstimateRequestContext {
+  userId: number;
+  latitude: { toNumber(): number } | null;
+  longitude: { toNumber(): number } | null;
+  createdAt: Date;
+  targetShops: Array<{
+    shop: { id: number; name: string };
+  }>;
 }
 
 const buildPhoneCandidates = (phoneNumber: string): string[] => {
@@ -198,6 +230,9 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
         basePrice: true,
         removalPrice: true,
         extraPrice: true,
+        estimatedDurationMinutes: true,
+        canProvideService: true,
+        isRemovalIncluded: true,
         memo: true,
         status: true,
         createdAt: true,
@@ -208,6 +243,12 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
             phoneNumber: true,
             address: true,
             addressDetail: true,
+            latitude: true,
+            longitude: true,
+            rating: true,
+            reviewCount: true,
+            businessHours: true,
+            closedDays: true,
           },
         },
         proposalTimes: {
@@ -224,6 +265,10 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
       select: {
         id: true,
         totalPrice: true,
+        removalPrice: true,
+        estimatedDurationMinutes: true,
+        canProvideService: true,
+        isRemovalIncluded: true,
         status: true,
         createdAt: true,
         shop: {
@@ -231,6 +276,10 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
             id: true,
             name: true,
             address: true,
+            latitude: true,
+            longitude: true,
+            rating: true,
+            reviewCount: true,
           },
         },
         proposalTimes: {
@@ -240,6 +289,44 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async findRequestContext(requestId: number): Promise<EstimateRequestContext | null> {
+    return getPrisma().estimateRequest.findUnique({
+      where: { id: requestId },
+      select: {
+        userId: true,
+        latitude: true,
+        longitude: true,
+        createdAt: true,
+        targetShops: { select: { shop: { select: { id: true, name: true } } } },
+      },
+    });
+  }
+
+  async findAverageResponseMinutes(shopIds: number[]): Promise<Map<number, number>> {
+    if (shopIds.length === 0) return new Map();
+
+    const rows = await getPrisma().estimateResponse.findMany({
+      where: { shopId: { in: shopIds } },
+      select: { shopId: true, createdAt: true, request: { select: { createdAt: true } } },
+    });
+    const samples = new Map<number, number[]>();
+    for (const row of rows) {
+      const minutes = Math.max(
+        1,
+        Math.round((row.createdAt.getTime() - row.request.createdAt.getTime()) / 60_000),
+      );
+      const values = samples.get(row.shopId) ?? [];
+      values.push(minutes);
+      samples.set(row.shopId, values);
+    }
+    return new Map(
+      [...samples].map(([shopId, values]) => [
+        shopId,
+        Math.round(values.reduce((sum, value) => sum + value, 0) / values.length),
+      ]),
+    );
   }
 
   async findSmsParsingContext(
@@ -278,6 +365,12 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
     input: SaveParsedEstimateResponseInput,
   ): Promise<CreatedSmsMessage> {
     return getPrisma().$transaction(async (prisma) => {
+      const existingResponse = await prisma.estimateResponse.findUnique({
+        where: { requestId_shopId: { requestId, shopId } },
+        select: { status: true },
+      });
+      const parsedStatus = input.canProvideService ? 'SUBMITTED' : 'REJECTED';
+
       const estimateResponse = await prisma.estimateResponse.upsert({
         where: { requestId_shopId: { requestId, shopId } },
         create: {
@@ -288,6 +381,10 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           removalPrice: input.removalPrice,
           extraPrice: input.extraPrice,
           memo: input.memo,
+          estimatedDurationMinutes: input.estimatedDurationMinutes,
+          canProvideService: input.canProvideService,
+          isRemovalIncluded: input.isRemovalIncluded,
+          status: parsedStatus,
         },
         update: {
           totalPrice: input.totalPrice,
@@ -295,6 +392,10 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           removalPrice: input.removalPrice,
           extraPrice: input.extraPrice,
           memo: input.memo,
+          estimatedDurationMinutes: input.estimatedDurationMinutes,
+          canProvideService: input.canProvideService,
+          isRemovalIncluded: input.isRemovalIncluded,
+          status: existingResponse?.status === 'ACCEPTED' ? 'ACCEPTED' : parsedStatus,
         },
         select: { id: true },
       });

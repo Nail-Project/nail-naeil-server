@@ -5,6 +5,6 @@ export interface CreateReservationResponse {
   reservationId: number;
   shopName: string;
   reservedAt: Date;
-  totalPrice: number;
+  totalPrice: number | null;
   status: ReservationStatus;
 }

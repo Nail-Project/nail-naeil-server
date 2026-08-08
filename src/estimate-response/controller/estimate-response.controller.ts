@@ -3,6 +3,7 @@ import { success } from '../../common/responses/api-response';
 import { createSmsMessageRequestSchema } from '../dto/request/create-sms-message-request';
 import { InvalidEstimateResponseError } from '../errors/estimate-response.error';
 import type { EstimateResponseService } from '../service/estimate-response.service';
+import { GetEstimateResultsRequestSchema } from '../dto/request/get-estimate-results-request';
 
 export class EstimateResponseController {
   constructor(private readonly service: EstimateResponseService) {}
@@ -36,8 +37,14 @@ export class EstimateResponseController {
   getList = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const requestId = this.parsePositiveInteger(req.params.request_id, 'request_id');
+      const query = GetEstimateResultsRequestSchema.safeParse(req.query);
+      if (!query.success) {
+        throw new InvalidEstimateResponseError({ issues: query.error.issues });
+      }
       // auth 미들웨어가 JWT에서 추출한 userId로 본인 견적인지 확인한다.
-      res.status(200).json(success(await this.service.getList(requestId, req.userId)));
+      res
+        .status(200)
+        .json(success(await this.service.getList(requestId, req.userId, query.data.sort)));
     } catch (error) {
       next(error);
     }

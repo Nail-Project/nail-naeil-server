@@ -22,6 +22,14 @@ const estimateResponseRouter = Router();
  *         name: request_id
  *         required: true
  *         schema: { type: integer }
+ *       - in: query
+ *         name: sort
+ *         required: false
+ *         description: 추천순, 최저가순, 가까운순, 가장 빠른 예약 가능 시간순 정렬
+ *         schema:
+ *           type: string
+ *           enum: [RECOMMENDED, LOWEST_PRICE, NEAREST, EARLIEST_AVAILABLE]
+ *           default: RECOMMENDED
  *     responses:
  *       200:
  *         description: 견적 결과 목록 조회 성공
@@ -58,9 +66,44 @@ const estimateResponseRouter = Router();
  *                                 type: string
  *                               address:
  *                                 type: string
+ *                               latitude:
+ *                                 type: number
+ *                                 example: 37.4979
+ *                               longitude:
+ *                                 type: number
+ *                                 example: 127.0276
+ *                               rating:
+ *                                 type: number
+ *                                 example: 4.8
+ *                               reviewCount:
+ *                                 type: integer
+ *                                 example: 120
  *                           totalPrice:
  *                             type: integer
+ *                             nullable: true
+ *                             description: 시술 불가 응답이면 null
  *                             example: 55000
+ *                           distanceMeters:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: 견적 요청 당시 좌표가 없으면 null
+ *                           isLowestPrice:
+ *                             type: boolean
+ *                           isRemovalIncluded:
+ *                             type: boolean
+ *                             description: 샵이 제거비가 총액에 포함됐다고 명시한 경우 true
+ *                           removalPrice:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: 샵이 제거 금액을 별도로 명시한 경우에만 제공
+ *                             example: null
+ *                           estimatedDurationMinutes:
+ *                             type: integer
+ *                             description: 예상 시술 소요 시간. 샵이 명시하지 않으면 60분
+ *                             example: 60
+ *                           canProvideService:
+ *                             type: boolean
+ *                             description: 시술 가능 여부
  *                           status:
  *                             type: string
  *                             enum: [SUBMITTED, ACCEPTED, REJECTED]
@@ -72,6 +115,22 @@ const estimateResponseRouter = Router();
  *                           createdAt:
  *                             type: string
  *                             format: date-time
+ *                     waitingShops:
+ *                       type: array
+ *                       description: 아직 견적 응답을 보내지 않은 요청 대상 매장
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           shopId:
+ *                             type: integer
+ *                           name:
+ *                             type: string
+ *                           averageResponseMinutes:
+ *                             type: integer
+ *                             description: 해당 매장의 과거 평균 응답 시간. 이력이 없으면 60분
+ *                           expectedResponseMinutes:
+ *                             type: integer
+ *                             description: 예상 응답 시간. 이력이 없으면 60분
  *       400:
  *         description: 잘못된 견적 요청 식별자
  *         content:
@@ -151,11 +210,26 @@ const estimateResponseRouter = Router();
  *               messageId: { type: string, example: "android-sms-1042" }
  *               rawPayload:
  *                 type: object
+ *                 required: [address, body, receivedAt]
  *                 additionalProperties: true
- *                 example:
- *                   address: "01012345678"
- *                   body: "젤 제거 포함 55000원, 7월 20일 오후 2시 가능해요."
- *                   receivedAt: "2026-07-18T13:20:38+09:00"
+ *                 properties:
+ *                   address:
+ *                     type: string
+ *                     minLength: 1
+ *                     maxLength: 30
+ *                     description: SMS 발신 번호
+ *                     example: "01012345678"
+ *                   body:
+ *                     type: string
+ *                     minLength: 1
+ *                     maxLength: 10000
+ *                     description: 가격과 예약 가능 시간이 포함된 SMS 원문
+ *                     example: "총 55000원, 7월 20일 오후 2시 가능해요."
+ *                   receivedAt:
+ *                     type: string
+ *                     format: date-time
+ *                     description: UTC offset을 포함한 SMS 수신 시각
+ *                     example: "2026-07-18T13:20:38+09:00"
  *     responses:
  *       202:
  *         description: 견적 응답 문자 접수 성공
@@ -357,21 +431,66 @@ const estimateResponseRouter = Router();
  *                         addressDetail:
  *                           type: string
  *                           nullable: true
+ *                         latitude:
+ *                           type: number
+ *                         longitude:
+ *                           type: number
+ *                         rating:
+ *                           type: number
+ *                         reviewCount:
+ *                           type: integer
+ *                         businessHours:
+ *                           type: object
+ *                           nullable: true
+ *                           additionalProperties:
+ *                             type: string
+ *                           description: 요일별 영업시간. 정보가 없으면 null
+ *                           example: { MON: "10:00-20:00", TUE: "10:00-20:00" }
+ *                         closedDays:
+ *                           type: array
+ *                           nullable: true
+ *                           items:
+ *                             type: string
+ *                           description: 정기 휴무일. 정보가 없으면 null
+ *                           example: [SUN]
  *                     price:
  *                       type: object
+ *                       required: [totalPrice]
+ *                       description: 시술 가능한 견적의 총액은 필수이며, 시술 불가 응답에서는 totalPrice가 null이다. 상세 금액은 샵이 문자에 명시한 경우에만 제공한다.
+ *                       example: { totalPrice: 55000, basePrice: null, removalPrice: null, extraPrice: null }
  *                       properties:
  *                         totalPrice:
  *                           type: integer
+ *                           nullable: true
  *                           example: 55000
  *                         basePrice:
  *                           type: integer
+ *                           nullable: true
+ *                           description: 샵이 기본 가격을 명시한 경우에만 제공
+ *                           example: null
  *                         removalPrice:
  *                           type: integer
+ *                           nullable: true
+ *                           description: 샵이 제거 금액을 별도로 명시한 경우에만 제공
+ *                           example: null
  *                         extraPrice:
  *                           type: integer
+ *                           nullable: true
+ *                           description: 샵이 추가 금액을 명시한 경우에만 합산 금액으로 제공하며 세부 항목은 memo에 포함
+ *                           example: null
  *                     memo:
  *                       type: string
  *                       nullable: true
+ *                     estimatedDurationMinutes:
+ *                       type: integer
+ *                       description: 예상 시술 소요 시간. 샵이 명시하지 않으면 60분
+ *                       example: 60
+ *                     canProvideService:
+ *                       type: boolean
+ *                       description: 시술 가능 여부
+ *                     isRemovalIncluded:
+ *                       type: boolean
+ *                       description: 샵이 제거비가 총액에 포함됐다고 명시한 경우 true
  *                     status:
  *                       type: string
  *                       enum: [SUBMITTED, ACCEPTED, REJECTED]
