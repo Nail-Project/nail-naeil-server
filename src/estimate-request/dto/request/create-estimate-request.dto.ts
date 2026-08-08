@@ -2,47 +2,66 @@
 // zod로 런타임 검증 후 타입을 추론해 controller → service → repository에서 그대로 사용한다.
 import { z } from 'zod';
 
-export const CreateEstimateRequestSchema = z.object({
-  // 네일 종류: 손(HAND), 발(PEDICURE), 손+발(BOTH)
-  nailType: z.enum(['HAND', 'PEDICURE', 'BOTH']),
+export const CreateEstimateRequestSchema = z
+  .object({
+    // 네일 종류: 손(HAND), 발(PEDICURE), 손+발(BOTH)
+    nailType: z.enum(['HAND', 'PEDICURE', 'BOTH']),
 
-  // 제거 종류: 연장(EXTENSION), 부분(PARTS), 기본(BASIC), 없음(NONE)
-  removalType: z.enum(['EXTENSION', 'PARTS', 'BASIC', 'NONE']),
+    // 제거 종류: 연장(EXTENSION), 부분(PARTS), 기본(BASIC), 없음(NONE)
+    removalType: z.enum(['EXTENSION', 'PARTS', 'BASIC', 'NONE']),
 
-  // 희망 시술 기간 - YYYY-MM-DD 형식만 허용, DB 저장 시 Date로 변환
-  // endDate는 startDate 이후여야 한다 (같은 날은 허용).
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.'),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.'),
+    // 희망 시술 기간 - YYYY-MM-DD 형식만 허용, DB 저장 시 Date로 변환
+    // endDate는 startDate 이후여야 한다 (같은 날은 허용).
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.'),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.'),
 
-  // 선호 시간대: 오전(AM), 오후(PM), 저녁(EVENING), 무관(ANY)
-  preferredTime: z.enum(['AM', 'PM', 'EVENING', 'ANY']),
+    // 선호 시간대: 오전(AM), 오후(PM), 저녁(EVENING), 무관(ANY)
+    preferredTime: z.enum(['AM', 'PM', 'EVENING', 'ANY']),
 
-  // 샵 추천 기준: 균형(BALANCED), 가까운 순(CLOSE), 넓은 범위(WIDE), 저렴한 순(CHEAP)
-  recommendType: z.enum(['BALANCED', 'CLOSE', 'WIDE', 'CHEAP']),
+    // 샵 추천 기준: 균형(BALANCED), 가까운 순(CLOSE), 넓은 범위(WIDE), 저렴한 순(CHEAP)
+    recommendType: z.enum(['BALANCED', 'CLOSE', 'WIDE', 'CHEAP']),
 
-  // 추가 요청 사항 (선택)
-  description: z.string().optional(),
+    // 추가 요청 사항 (선택)
+    description: z.string().optional(),
 
-  // 디자인 이미지 URL 목록 - image 도메인에서 미리 업로드 후 URL을 받아 전달한다.
-  // 최대 3장까지 허용 (SMS 발송은 첫 번째 이미지 1장만 전송, 추후 기획 확정 후 조정)
-  // 빈 배열로 기본값을 설정해 프론트가 필드를 생략해도 정상 처리되도록 한다.
-  // S3 URL 형식만 허용: https://{bucket}.s3.{region}.amazonaws.com/images/YYYY-MM-DD/{uuid}.{ext}
-  // 서비스의 isAllowedS3ImageUrl() 검증 정책과 일치시킨다.
-  images: z.array(
-    z.string().regex(
-      /^https:\/\/[^/]+\.s3\.[^/]+\.amazonaws\.com\/images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/,
-      '올바른 S3 이미지 URL이 아닙니다.',
-    )
-  ).max(3, '이미지는 최대 3장까지 첨부할 수 있습니다.').optional().default([]),
+    // 거리 계산에는 견적 요청 당시 위치를 사용한다. 기존 클라이언트 호환을 위해 선택값이다.
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
 
-  // 견적을 보낼 샵 ID 목록 - 주변 샵 조회 API에서 받은 shopId 목록을 전달한다.
-  // 빈 배열이면 NO_SHOPS_SELECTED(400) 에러를 반환한다.
-  // 최대 20개로 제한 - 대량 문자 발송 비용 남용 방지 (추후 샵 탐색 API 설계 시 재검토)
-  shopIds: z.array(z.number().int().positive()).min(1, '견적 요청할 샵이 없습니다.').max(20, '한 번에 요청할 수 있는 샵 수를 초과했습니다.'),
-}).refine((data) => data.endDate >= data.startDate, {
-  // endDate가 startDate보다 앞이면 400 반환
-  message: '종료일은 시작일 이후여야 합니다.',
-  path: ['endDate'],
-});
+    // 디자인 이미지 URL 목록 - image 도메인에서 미리 업로드 후 URL을 받아 전달한다.
+    // 최대 3장까지 허용 (SMS 발송은 첫 번째 이미지 1장만 전송, 추후 기획 확정 후 조정)
+    // 빈 배열로 기본값을 설정해 프론트가 필드를 생략해도 정상 처리되도록 한다.
+    // S3 URL 형식만 허용: https://{bucket}.s3.{region}.amazonaws.com/images/YYYY-MM-DD/{uuid}.{ext}
+    // 서비스의 isAllowedS3ImageUrl() 검증 정책과 일치시킨다.
+    images: z
+      .array(
+        z
+          .string()
+          .regex(
+            /^https:\/\/[^/]+\.s3\.[^/]+\.amazonaws\.com\/images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/,
+            '올바른 S3 이미지 URL이 아닙니다.',
+          ),
+      )
+      .max(3, '이미지는 최대 3장까지 첨부할 수 있습니다.')
+      .optional()
+      .default([]),
+
+    // 견적을 보낼 샵 ID 목록 - 주변 샵 조회 API에서 받은 shopId 목록을 전달한다.
+    // 빈 배열이면 NO_SHOPS_SELECTED(400) 에러를 반환한다.
+    // 최대 20개로 제한 - 대량 문자 발송 비용 남용 방지 (추후 샵 탐색 API 설계 시 재검토)
+    shopIds: z
+      .array(z.number().int().positive())
+      .min(1, '견적 요청할 샵이 없습니다.')
+      .max(20, '한 번에 요청할 수 있는 샵 수를 초과했습니다.'),
+  })
+  .refine((data) => data.endDate >= data.startDate, {
+    // endDate가 startDate보다 앞이면 400 반환
+    message: '종료일은 시작일 이후여야 합니다.',
+    path: ['endDate'],
+  })
+  .refine((data) => (data.latitude === undefined) === (data.longitude === undefined), {
+    message: '위도와 경도는 함께 입력해야 합니다.',
+    path: ['latitude'],
+  });
 
 export type CreateEstimateRequestDto = z.infer<typeof CreateEstimateRequestSchema>;

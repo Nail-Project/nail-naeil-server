@@ -54,9 +54,9 @@ export interface ReservationDetailRecord {
   status: ReservationStatus;
   proposal: {
     totalPrice: number;
-    basePrice: number;
-    removalPrice: number;
-    extraPrice: number;
+    basePrice: number | null;
+    removalPrice: number | null;
+    extraPrice: number | null;
     memo: string | null;
     shop: {
       name: string;
