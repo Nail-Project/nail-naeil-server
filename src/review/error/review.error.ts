@@ -1,18 +1,18 @@
 import { AppError } from '../../common/errors/app.error';
 
-// POST /:reservationId/review - 유효하지 않은 예약 id (path variable)
-export class InvalidReviewReservationIdError extends AppError {
+// 리뷰 도메인 공통 - path/query 값(reviewId, shopId, cursor, size 등) 검증 실패
+export class InvalidReviewRequestError extends AppError {
   constructor(data?: unknown) {
     super({
-      code: 'INVALID_REVIEW_RESERVATION_ID',
+      code: 'INVALID_REVIEW_REQUEST',
       statusCode: 400,
-      message: '유효하지 않은 예약 id입니다.',
+      message: '요청 값을 확인해주세요.',
       data,
     });
   }
 }
 
-// POST /:reservationId/review - 별점/내용 값 검증 실패
+// POST /api/v1/reviews, PATCH /api/v1/reviews/:reviewId - body(rating/content 등) 검증 실패
 export class ReviewValidationError extends AppError {
   constructor(data?: unknown) {
     super({
@@ -24,7 +24,7 @@ export class ReviewValidationError extends AppError {
   }
 }
 
-// POST /:reservationId/review - 존재하지 않거나 본인 소유가 아닌 예약
+// POST /api/v1/reviews - 존재하지 않거나 본인 소유가 아닌 예약
 export class ReviewReservationNotFoundError extends AppError {
   constructor(data?: unknown) {
     super({
@@ -36,7 +36,31 @@ export class ReviewReservationNotFoundError extends AppError {
   }
 }
 
-// POST /:reservationId/review - 시술이 완료된 예약만 리뷰 작성 가능
+// PATCH·DELETE /api/v1/reviews/:reviewId - 존재하지 않거나 본인이 작성한 리뷰가 아님
+export class ReviewNotFoundError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'REVIEW_NOT_FOUND',
+      statusCode: 404,
+      message: '존재하지 않는 리뷰입니다.',
+      data,
+    });
+  }
+}
+
+// GET /api/v1/shops/:shopId/reviews - 존재하지 않는 샵
+export class ReviewShopNotFoundError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'REVIEW_SHOP_NOT_FOUND',
+      statusCode: 404,
+      message: '존재하지 않는 샵입니다.',
+      data,
+    });
+  }
+}
+
+// POST /api/v1/reviews - 시술이 완료된 예약만 리뷰 작성 가능
 export class ReviewNotAllowedError extends AppError {
   constructor(data?: unknown) {
     super({
@@ -48,7 +72,7 @@ export class ReviewNotAllowedError extends AppError {
   }
 }
 
-// POST /:reservationId/review - 예약 1건당 리뷰는 1개까지만 작성 가능
+// POST /api/v1/reviews - 예약 1건당 리뷰는 1개까지만 작성 가능
 export class ReviewAlreadyExistsError extends AppError {
   constructor(data?: unknown) {
     super({

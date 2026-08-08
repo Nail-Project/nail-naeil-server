@@ -2,12 +2,14 @@ import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { errorHandler } from '../../src/common/middlewares/error-handler.middleware';
-import { createReviewRouter } from '../../src/review/review.route';
+import { createReviewRouter, createShopReviewsRouter } from '../../src/review/review.route';
 import type { ReviewService } from '../../src/review/service/review.service';
 import {
   ReviewNotAllowedError,
   ReviewAlreadyExistsError,
   ReviewReservationNotFoundError,
+  ReviewNotFoundError,
+  ReviewShopNotFoundError,
 } from '../../src/review/error/review.error';
 
 // 라우트 테스트에서는 JWT 검증 없이 userId만 주입되면 충분하므로 미들웨어를 mock으로 대체한다.
@@ -31,23 +33,46 @@ const createApp = () => {
       content: '시술이 꼼꼼하고 만족스러웠어요!',
       createdAt: new Date('2026-08-08T10:00:00.000Z'),
     }),
+    updateReview: vi.fn().mockResolvedValue({
+      reviewId: 100,
+      reservationId: 1,
+      shopId: 5,
+      rating: 4,
+      content: '다시 생각해보니 조금 아쉬운 점도 있었어요.',
+      updatedAt: new Date('2026-08-09T10:00:00.000Z'),
+    }),
+    deleteReview: vi.fn().mockResolvedValue({ reviewId: 100 }),
+    getShopReviews: vi.fn().mockResolvedValue({
+      reviews: [
+        {
+          reviewId: 100,
+          userId: 1,
+          nickname: '네일러버',
+          rating: 5,
+          content: '시술이 꼼꼼하고 만족스러웠어요!',
+          createdAt: new Date('2026-08-08T10:00:00.000Z'),
+        },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    }),
   };
   const app = express();
 
   app.use(express.json());
-  app.use('/api/v1/reserve', createReviewRouter(service as unknown as ReviewService));
+  app.use('/api/v1/reviews', createReviewRouter(service as unknown as ReviewService));
+  app.use('/api/v1/shops', createShopReviewsRouter(service as unknown as ReviewService));
   app.use(errorHandler);
 
   return { app, service };
 };
 
-describe('POST /api/v1/reserve/:reservationId/review', () => {
+describe('POST /api/v1/reviews', () => {
   it('정상 요청은 201로 응답하고 서비스에 파싱된 값과 인증된 userId를 전달한다', async () => {
     const { app, service } = createApp();
 
     const response = await request(app)
-      .post('/api/v1/reserve/1/review')
-      .send({ rating: 5, content: '시술이 꼼꼼하고 만족스러웠어요!' });
+      .post('/api/v1/reviews')
+      .send({ reservationId: 1, rating: 5, content: '시술이 꼼꼼하고 만족스러웠어요!' });
 
     expect(response.status).toBe(201);
     expect(response.body.success).toEqual({
@@ -64,15 +89,15 @@ describe('POST /api/v1/reserve/:reservationId/review', () => {
     });
   });
 
-  it('숫자가 아닌 예약 id는 400으로 응답하고 서비스를 호출하지 않는다', async () => {
+  it('reservationId가 없거나 숫자가 아니면 400으로 응답하고 서비스를 호출하지 않는다', async () => {
     const { app, service } = createApp();
 
     const response = await request(app)
-      .post('/api/v1/reserve/not-a-number/review')
+      .post('/api/v1/reviews')
       .send({ rating: 5, content: '좋아요' });
 
     expect(response.status).toBe(400);
-    expect(response.body.error.code).toBe('INVALID_REVIEW_RESERVATION_ID');
+    expect(response.body.error.code).toBe('REVIEW_VALIDATION_FAILED');
     expect(service.createReview).not.toHaveBeenCalled();
   });
 
@@ -80,8 +105,8 @@ describe('POST /api/v1/reserve/:reservationId/review', () => {
     const { app, service } = createApp();
 
     const response = await request(app)
-      .post('/api/v1/reserve/1/review')
-      .send({ rating: 6, content: '좋아요' });
+      .post('/api/v1/reviews')
+      .send({ reservationId: 1, rating: 6, content: '좋아요' });
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('REVIEW_VALIDATION_FAILED');
@@ -92,8 +117,8 @@ describe('POST /api/v1/reserve/:reservationId/review', () => {
     const { app, service } = createApp();
 
     const response = await request(app)
-      .post('/api/v1/reserve/1/review')
-      .send({ rating: 5, content: '   ' });
+      .post('/api/v1/reviews')
+      .send({ reservationId: 1, rating: 5, content: '   ' });
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('REVIEW_VALIDATION_FAILED');
@@ -105,8 +130,8 @@ describe('POST /api/v1/reserve/:reservationId/review', () => {
     service.createReview.mockRejectedValueOnce(new ReviewReservationNotFoundError());
 
     const response = await request(app)
-      .post('/api/v1/reserve/999/review')
-      .send({ rating: 5, content: '좋아요' });
+      .post('/api/v1/reviews')
+      .send({ reservationId: 999, rating: 5, content: '좋아요' });
 
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe('REVIEW_RESERVATION_NOT_FOUND');
@@ -117,8 +142,8 @@ describe('POST /api/v1/reserve/:reservationId/review', () => {
     service.createReview.mockRejectedValueOnce(new ReviewNotAllowedError());
 
     const response = await request(app)
-      .post('/api/v1/reserve/1/review')
-      .send({ rating: 5, content: '좋아요' });
+      .post('/api/v1/reviews')
+      .send({ reservationId: 1, rating: 5, content: '좋아요' });
 
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('REVIEW_NOT_ALLOWED');
@@ -129,10 +154,145 @@ describe('POST /api/v1/reserve/:reservationId/review', () => {
     service.createReview.mockRejectedValueOnce(new ReviewAlreadyExistsError());
 
     const response = await request(app)
-      .post('/api/v1/reserve/1/review')
-      .send({ rating: 5, content: '좋아요' });
+      .post('/api/v1/reviews')
+      .send({ reservationId: 1, rating: 5, content: '좋아요' });
 
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('REVIEW_ALREADY_EXISTS');
+  });
+});
+
+describe('PATCH /api/v1/reviews/:reviewId', () => {
+  it('정상 요청은 200으로 응답하고 서비스에 파싱된 값을 전달한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).patch('/api/v1/reviews/100').send({ rating: 4 });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toEqual({
+      reviewId: 100,
+      reservationId: 1,
+      shopId: 5,
+      rating: 4,
+      content: '다시 생각해보니 조금 아쉬운 점도 있었어요.',
+      updatedAt: '2026-08-09T10:00:00.000Z',
+    });
+    expect(service.updateReview).toHaveBeenCalledWith(100, TEMP_USER_ID, { rating: 4 });
+  });
+
+  it('숫자가 아닌 reviewId는 400으로 응답한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).patch('/api/v1/reviews/not-a-number').send({ rating: 4 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_REVIEW_REQUEST');
+    expect(service.updateReview).not.toHaveBeenCalled();
+  });
+
+  it('수정할 필드가 하나도 없으면 400으로 응답한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).patch('/api/v1/reviews/100').send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('REVIEW_VALIDATION_FAILED');
+    expect(service.updateReview).not.toHaveBeenCalled();
+  });
+
+  it('서비스가 404를 던지면 그대로 404로 응답한다', async () => {
+    const { app, service } = createApp();
+    service.updateReview.mockRejectedValueOnce(new ReviewNotFoundError());
+
+    const response = await request(app).patch('/api/v1/reviews/999').send({ rating: 4 });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('REVIEW_NOT_FOUND');
+  });
+});
+
+describe('DELETE /api/v1/reviews/:reviewId', () => {
+  it('정상 요청은 200으로 응답한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).delete('/api/v1/reviews/100');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toEqual({ reviewId: 100 });
+    expect(service.deleteReview).toHaveBeenCalledWith(100, TEMP_USER_ID);
+  });
+
+  it('숫자가 아닌 reviewId는 400으로 응답한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).delete('/api/v1/reviews/not-a-number');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_REVIEW_REQUEST');
+    expect(service.deleteReview).not.toHaveBeenCalled();
+  });
+
+  it('서비스가 404를 던지면 그대로 404로 응답한다', async () => {
+    const { app, service } = createApp();
+    service.deleteReview.mockRejectedValueOnce(new ReviewNotFoundError());
+
+    const response = await request(app).delete('/api/v1/reviews/999');
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('REVIEW_NOT_FOUND');
+  });
+});
+
+describe('GET /api/v1/shops/:shopId/reviews', () => {
+  it('정상 요청은 200으로 응답한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).get('/api/v1/shops/5/reviews');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toEqual({
+      reviews: [
+        {
+          reviewId: 100,
+          userId: 1,
+          nickname: '네일러버',
+          rating: 5,
+          content: '시술이 꼼꼼하고 만족스러웠어요!',
+          createdAt: '2026-08-08T10:00:00.000Z',
+        },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+    expect(service.getShopReviews).toHaveBeenCalledWith(5, undefined, 10);
+  });
+
+  it('숫자가 아닌 shopId는 400으로 응답한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).get('/api/v1/shops/not-a-number/reviews');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_REVIEW_REQUEST');
+    expect(service.getShopReviews).not.toHaveBeenCalled();
+  });
+
+  it('유효하지 않은 cursor는 400으로 응답한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).get('/api/v1/shops/5/reviews?cursor=not-base64');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_REVIEW_REQUEST');
+    expect(service.getShopReviews).not.toHaveBeenCalled();
+  });
+
+  it('서비스가 404를 던지면 그대로 404로 응답한다', async () => {
+    const { app, service } = createApp();
+    service.getShopReviews.mockRejectedValueOnce(new ReviewShopNotFoundError());
+
+    const response = await request(app).get('/api/v1/shops/999/reviews');
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('REVIEW_SHOP_NOT_FOUND');
   });
 });
