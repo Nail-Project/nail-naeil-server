@@ -26,6 +26,7 @@ model Shop {
   longitude              Decimal               @db.Decimal(10, 7)
   locationGuide          String?               @map("location_guide") @db.VarChar(255)
   parkingInfo            String?               @map("parking_info") @db.VarChar(255)
+  thumbnailImageUrl      String?               @map("thumbnail_image_url") @db.VarChar(500)
   rating                 Decimal               @default(0) @db.Decimal(2, 1)
   reviewCount            Int                   @default(0) @map("review_count")
   businessHours          Json?                 @map("business_hours")
@@ -37,6 +38,8 @@ model Shop {
   estimateResponses      EstimateResponse[]
   smsMessages            SmsMessage[]
   estimateRequestTargets EstimateRequestShop[]
+  wishes                 WishShop[]
+  reviews                ShopReview[]
 
   @@unique([dataSource, externalStoreId])
   @@index([provinceCode, districtCode, adminDongCode])
@@ -72,8 +75,39 @@ model User {
   deviceTokens    DeviceToken[]
   reservations    Reservation[]
   wishDesigns     WishDesign[]
+  wishShops       WishShop[]
+  shopReviews     ShopReview[]
 
   @@map("users")
+}
+
+model WishShop {
+  id        Int      @id @default(autoincrement())
+  shopId    Int      @map("shop_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, userId])
+  @@index([userId, createdAt, id])
+  @@map("wish_shops")
+}
+
+model ShopReview {
+  id        Int      @id @default(autoincrement())
+  shopId    Int      @map("shop_id")
+  userId    Int      @map("user_id")
+  rating    Int
+  content   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, userId])
+  @@index([shopId, createdAt, id])
+  @@map("shop_reviews")
 }
 
 // 로컬/소셜 인증 수단을 User와 분리해 관리한다.

@@ -73,6 +73,10 @@ const shopMatchingRouter = Router();
  *                       distanceMeters:
  *                         type: number
  *                         example: 350.5
+ *                       averagePrice:
+ *                         type: number
+ *                         nullable: true
+ *                         description: CHEAP 탐색 시 견적 응답의 평균 총액. 가격 데이터가 없으면 null
  *       400:
  *         description: 잘못된 좌표 또는 지원하지 않는 탐색 방식
  *         content:
@@ -84,8 +88,6 @@ const shopMatchingRouter = Router();
  *                 value: { resultType: FAIL, error: { code: INVALID_SHOP_MATCH_REQUEST, message: 샵 탐색 요청을 확인해주세요., data: null }, success: null }
  *               invalidLocation:
  *                 value: { resultType: FAIL, error: { code: INVALID_SHOP_LOCATION, message: 샵을 탐색할 위치를 확인해주세요., data: null }, success: null }
- *               unsupportedRecommendType:
- *                 value: { resultType: FAIL, error: { code: UNSUPPORTED_SHOP_RECOMMEND_TYPE, message: 아직 지원하지 않는 샵 탐색 방식입니다., data: null }, success: null }
  */
 shopMatchingRouter.get('/matches', controller.match);
 

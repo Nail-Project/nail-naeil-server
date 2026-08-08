@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ShopQueryController } from './controller/shop-query.controller';
 import { PrismaShopQueryRepository } from './repository/shop-query.repository';
 import { ShopQueryService } from './service/shop-query.service';
+import { authMiddleware } from '../common/middlewares/auth.middleware';
 
 const repository = new PrismaShopQueryRepository();
 const service = new ShopQueryService(repository);
@@ -13,6 +14,7 @@ const shopQueryRouter = Router();
  * /api/v1/shops:
  *   get:
  *     summary: 샵 목록 조회
+ *     security: [{ bearerAuth: [] }]
  *     tags: [Shop]
  *     parameters:
  *       - in: query
@@ -21,6 +23,14 @@ const shopQueryRouter = Router();
  *       - in: query
  *         name: limit
  *         schema: { type: integer, default: 20, maximum: 50 }
+ *       - in: query
+ *         name: latitude
+ *         description: 거리 계산용 위도. longitude와 함께 전달
+ *         schema: { type: number, format: double, minimum: -90, maximum: 90 }
+ *       - in: query
+ *         name: longitude
+ *         description: 거리 계산용 경도. latitude와 함께 전달
+ *         schema: { type: number, format: double, minimum: -180, maximum: 180 }
  *     responses:
  *       200:
  *         description: 샵 목록 조회 성공
@@ -41,29 +51,7 @@ const shopQueryRouter = Router();
  *                     shops:
  *                       type: array
  *                       items:
- *                         type: object
- *                         properties:
- *                           shopId:
- *                             type: integer
- *                             example: 1
- *                           name:
- *                             type: string
- *                             example: 네일샵이름
- *                           address:
- *                             type: string
- *                           addressDetail:
- *                             type: string
- *                             nullable: true
- *                           districtName:
- *                             type: string
- *                             nullable: true
- *                           adminDongName:
- *                             type: string
- *                             nullable: true
- *                           latitude:
- *                             type: number
- *                           longitude:
- *                             type: number
+ *                         $ref: '#/components/schemas/ShopSummary'
  *                     nextCursor:
  *                       type: integer
  *                       nullable: true
@@ -92,13 +80,14 @@ const shopQueryRouter = Router();
  *                   nullable: true
  *                   example: null
  */
-shopQueryRouter.get('/', controller.getList);
+shopQueryRouter.get('/', authMiddleware, controller.getList);
 
 /**
  * @openapi
  * /api/v1/shops/search:
  *   get:
  *     summary: 샵 이름 또는 주소 검색
+ *     security: [{ bearerAuth: [] }]
  *     tags: [Shop]
  *     parameters:
  *       - in: query
@@ -111,6 +100,12 @@ shopQueryRouter.get('/', controller.getList);
  *       - in: query
  *         name: limit
  *         schema: { type: integer, default: 20, maximum: 50 }
+ *       - in: query
+ *         name: latitude
+ *         schema: { type: number, format: double, minimum: -90, maximum: 90 }
+ *       - in: query
+ *         name: longitude
+ *         schema: { type: number, format: double, minimum: -180, maximum: 180 }
  *     responses:
  *       200:
  *         description: 샵 검색 성공
@@ -131,28 +126,7 @@ shopQueryRouter.get('/', controller.getList);
  *                     shops:
  *                       type: array
  *                       items:
- *                         type: object
- *                         properties:
- *                           shopId:
- *                             type: integer
- *                             example: 1
- *                           name:
- *                             type: string
- *                           address:
- *                             type: string
- *                           addressDetail:
- *                             type: string
- *                             nullable: true
- *                           districtName:
- *                             type: string
- *                             nullable: true
- *                           adminDongName:
- *                             type: string
- *                             nullable: true
- *                           latitude:
- *                             type: number
- *                           longitude:
- *                             type: number
+ *                         $ref: '#/components/schemas/ShopSummary'
  *                     nextCursor:
  *                       type: integer
  *                       nullable: true
@@ -181,19 +155,100 @@ shopQueryRouter.get('/', controller.getList);
  *                   nullable: true
  *                   example: null
  */
-shopQueryRouter.get('/search', controller.search);
+shopQueryRouter.get('/search', authMiddleware, controller.search);
 
 /**
  * @openapi
- * /api/v1/shops/{shopId}:
+ * /api/v1/shops/wishlist:
  *   get:
- *     summary: 샵 상세 조회
+ *     summary: 찜한 매장 목록 조회
+ *     security: [{ bearerAuth: [] }]
+ *     tags: [Shop]
+ *     parameters:
+ *       - in: query
+ *         name: cursor
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20, maximum: 50 }
+ *       - in: query
+ *         name: latitude
+ *         schema: { type: number, format: double }
+ *       - in: query
+ *         name: longitude
+ *         schema: { type: number, format: double }
+ *     responses:
+ *       200:
+ *         description: 찜한 매장 목록 조회 성공
+ */
+shopQueryRouter.get('/wishlist', authMiddleware, controller.getWishlist);
+
+/**
+ * @openapi
+ * /api/v1/shops/{shopId}/wish:
+ *   post:
+ *     summary: 매장 찜 추가
+ *     security: [{ bearerAuth: [] }]
  *     tags: [Shop]
  *     parameters:
  *       - in: path
  *         name: shopId
  *         required: true
  *         schema: { type: integer }
+ *     responses: { 200: { description: 매장 찜 추가 성공 } }
+ *   delete:
+ *     summary: 매장 찜 해제
+ *     security: [{ bearerAuth: [] }]
+ *     tags: [Shop]
+ *     parameters:
+ *       - in: path
+ *         name: shopId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses: { 200: { description: 매장 찜 해제 성공 } }
+ */
+shopQueryRouter.post('/:shopId/wish', authMiddleware, controller.createWish);
+shopQueryRouter.delete('/:shopId/wish', authMiddleware, controller.deleteWish);
+
+/**
+ * @openapi
+ * /api/v1/shops/{shopId}/reviews:
+ *   get:
+ *     summary: 매장 리뷰 목록 조회
+ *     tags: [Shop]
+ *     parameters:
+ *       - in: path
+ *         name: shopId
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: cursor
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20, maximum: 50 }
+ *     responses: { 200: { description: 매장 리뷰 목록 조회 성공 } }
+ */
+shopQueryRouter.get('/:shopId/reviews', controller.getReviews);
+
+/**
+ * @openapi
+ * /api/v1/shops/{shopId}:
+ *   get:
+ *     summary: 샵 상세 조회
+ *     security: [{ bearerAuth: [] }]
+ *     tags: [Shop]
+ *     parameters:
+ *       - in: path
+ *         name: shopId
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: latitude
+ *         schema: { type: number, format: double }
+ *       - in: query
+ *         name: longitude
+ *         schema: { type: number, format: double }
  *     responses:
  *       200:
  *         description: 샵 상세 조회 성공
@@ -243,6 +298,22 @@ shopQueryRouter.get('/search', controller.search);
  *                     parkingInfo:
  *                       type: string
  *                       nullable: true
+ *                     thumbnailImageUrl:
+ *                       type: string
+ *                       nullable: true
+ *                     businessHours:
+ *                       nullable: true
+ *                     closedDays:
+ *                       nullable: true
+ *                     rating:
+ *                       type: number
+ *                     reviewCount:
+ *                       type: integer
+ *                     distanceMeters:
+ *                       type: integer
+ *                       nullable: true
+ *                     isWished:
+ *                       type: boolean
  *       400:
  *         description: 잘못된 샵 ID
  *         content:
@@ -292,6 +363,6 @@ shopQueryRouter.get('/search', controller.search);
  *                   nullable: true
  *                   example: null
  */
-shopQueryRouter.get('/:shopId', controller.getDetail);
+shopQueryRouter.get('/:shopId', authMiddleware, controller.getDetail);
 
 export default shopQueryRouter;

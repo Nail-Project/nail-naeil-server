@@ -14,6 +14,11 @@ const createApp = () => {
   const controller = new ShopQueryController(service as unknown as ShopQueryService);
   const app = express();
 
+  app.use((req, _res, next) => {
+    req.userId = 1;
+    next();
+  });
+
   app.get('/api/v1/shops', controller.getList);
   app.get('/api/v1/shops/search', controller.search);
   app.get('/api/v1/shops/:shopId', controller.getDetail);
@@ -29,7 +34,7 @@ describe('shop query routes', () => {
     const response = await request(app).get('/api/v1/shops?cursor=10&limit=5');
 
     expect(response.status).toBe(200);
-    expect(service.getList).toHaveBeenCalledWith({ cursor: 10, limit: 5 });
+    expect(service.getList).toHaveBeenCalledWith({ cursor: 10, limit: 5 }, 1);
   });
 
   it('샵을 키워드로 검색한다', async () => {
@@ -38,7 +43,7 @@ describe('shop query routes', () => {
     const response = await request(app).get('/api/v1/shops/search?keyword=상도&limit=10');
 
     expect(response.status).toBe(200);
-    expect(service.search).toHaveBeenCalledWith({ keyword: '상도', limit: 10 });
+    expect(service.search).toHaveBeenCalledWith({ keyword: '상도', limit: 10 }, 1);
   });
 
   it('샵 상세를 ID로 조회한다', async () => {
@@ -47,7 +52,7 @@ describe('shop query routes', () => {
     const response = await request(app).get('/api/v1/shops/1');
 
     expect(response.status).toBe(200);
-    expect(service.getDetail).toHaveBeenCalledWith(1);
+    expect(service.getDetail).toHaveBeenCalledWith(1, 1, undefined, undefined);
   });
 
   it.each([
