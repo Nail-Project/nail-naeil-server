@@ -29,6 +29,83 @@ const swaggerSpec = swaggerJsdoc({
         },
       },
       schemas: {
+        ShopSummary: {
+          type: 'object',
+          required: [
+            'shopId',
+            'name',
+            'address',
+            'latitude',
+            'longitude',
+            'rating',
+            'reviewCount',
+            'isWished',
+          ],
+          properties: {
+            shopId: { type: 'integer', example: 1 },
+            name: { type: 'string', example: '네일내일' },
+            address: { type: 'string' },
+            addressDetail: { type: 'string', nullable: true },
+            districtName: { type: 'string', nullable: true },
+            adminDongName: { type: 'string', nullable: true },
+            latitude: { type: 'number', format: 'double' },
+            longitude: { type: 'number', format: 'double' },
+            thumbnailImageUrl: { type: 'string', format: 'uri', nullable: true },
+            businessHours: {
+              nullable: true,
+              description: '요일별 영업시간 JSON. 데이터가 없으면 null',
+            },
+            closedDays: {
+              nullable: true,
+              description: '휴무일 JSON. 데이터가 없으면 null',
+            },
+            rating: { type: 'number', format: 'double', example: 4.8 },
+            reviewCount: { type: 'integer', example: 24 },
+            distanceMeters: {
+              type: 'integer',
+              nullable: true,
+              description: '사용자 위도·경도를 함께 전달한 경우만 계산',
+            },
+            isWished: { type: 'boolean', example: true },
+          },
+        },
+        ShopListSuccess: {
+          type: 'object',
+          properties: {
+            shops: { type: 'array', items: { $ref: '#/components/schemas/ShopSummary' } },
+            nextCursor: { type: 'integer', nullable: true },
+          },
+        },
+        ShopWishResponse: {
+          type: 'object',
+          required: ['shopId', 'isWished'],
+          properties: {
+            shopId: { type: 'integer', example: 1 },
+            isWished: { type: 'boolean', example: true },
+          },
+        },
+        ShopReviewListResponse: {
+          type: 'object',
+          required: ['reviews', 'nextCursor'],
+          properties: {
+            reviews: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['reviewId', 'rating', 'createdAt'],
+                properties: {
+                  reviewId: { type: 'integer', example: 1 },
+                  nickname: { type: 'string', nullable: true },
+                  profileImageUrl: { type: 'string', format: 'uri', nullable: true },
+                  rating: { type: 'integer', minimum: 1, maximum: 5, example: 5 },
+                  content: { type: 'string', nullable: true },
+                  createdAt: { type: 'string', format: 'date-time' },
+                },
+              },
+            },
+            nextCursor: { type: 'integer', nullable: true },
+          },
+        },
         ApiErrorResponse: {
           type: 'object',
           required: ['resultType', 'error', 'success'],
