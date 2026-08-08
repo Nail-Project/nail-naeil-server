@@ -321,14 +321,20 @@ model EstimateRequest {
   longitude     Decimal?              @db.Decimal(10, 7)
   status        EstimateStatus        @default(MATCHING)
   // TODO: [yej] User 모델 추가 후 @relation 연결
-  userId        Int                   @map("user_id")
-  createdAt     DateTime              @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime              @updatedAt @map("updated_at") @db.DateTime(3)
+  userId        Int                @map("user_id")
+  // 카탈로그 디자인을 그대로 견적받은 경우에만 채워진다. 사용자가 직접 사진을
+  // 올려 요청한 경우 null이며, 참조 디자인이 삭제돼도 요청 기록은 남아야 하므로
+  // SetNull로 둔다.
+  designId      Int?               @map("design_id")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
+  design        Design?            @relation(fields: [designId], references: [id], onDelete: SetNull)
   images        RequestImage[]
   proposals     EstimateResponse[]
   smsMessages   SmsMessage[]
   targetShops   EstimateRequestShop[]
 
+  @@index([designId])
   @@map("estimate_requests")
 }
 
@@ -403,6 +409,7 @@ model Design {
   images           DesignImage[]
   wishes           WishDesign[]
   tags             DesignTag[]
+  estimateRequests EstimateRequest[]
 
   // 피드 정렬(createdAt desc)이 데이터 증가 시 풀 테이블 스캔이 되지 않도록 인덱스를 둔다.
   @@index([createdAt])

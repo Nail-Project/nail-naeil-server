@@ -11,6 +11,7 @@ import { CreateEstimateResponseDto } from '../dto/response/create-estimate-respo
 import { GetEstimatesPageResponse } from '../dto/response/get-estimates-response.dto';
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
 import { encodeCursor } from '../../common/pagination/cursor';
+import { EstimateRequestDesignNotFoundError } from '../error/estimate-request.error';
 
 // ─── SMS 설정 ───────────────────────────────────────────────────────────────────
 const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
@@ -21,7 +22,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`SMS 타임아웃: ${ms}ms 초과`)), ms)
+      setTimeout(() => reject(new Error(`SMS 타임아웃: ${ms}ms 초과`)), ms),
     ),
   ]);
 }
@@ -54,7 +55,9 @@ function isAllowedS3ImageUrl(imageUrl: string): boolean {
     if (urlObj.hostname !== `${bucket}.s3.${region}.amazonaws.com`) return false;
     const key = urlObj.pathname.replace(/^\//, '');
     // UUID 형식 엄격 검사: 8-4-4-4-12 하이픈 위치까지 확인
-    return /^images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/.test(key);
+    return /^images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/.test(
+      key,
+    );
   } catch {
     return false;
   }
@@ -111,7 +114,10 @@ class SmsService {
         await fsp.writeFile(tmpPath, buffer);
 
         // Solapi에 임시 파일 업로드
-        const { fileId } = (await withTimeout(this.client.uploadFile(tmpPath, 'MMS'), SMS_TIMEOUT_MS)) as { fileId: string };
+        const { fileId } = (await withTimeout(
+          this.client.uploadFile(tmpPath, 'MMS'),
+          SMS_TIMEOUT_MS,
+        )) as { fileId: string };
         fileIds.push(fileId);
       } catch (error) {
         console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${key}`, error);
@@ -224,7 +230,15 @@ export class EstimateRequestService {
   // ① SMS 발송 — 실패 시 DB 저장 없이 EstimateRequestFailedError + 실패 이유 반환
   // ② SMS 성공 후 DB 저장
   // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller가 전달한다.
-  async createEstimateRequest(dto: CreateEstimateRequestDto, userId: number): Promise<CreateEstimateResponseDto> {
+  async createEstimateRequest(
+    dto: CreateEstimateRequestDto,
+    userId: number,
+  ): Promise<CreateEstimateResponseDto> {
+    // designId가 존재하지 않는 디자인을 가리키면 SMS 발송 전에 걸러낸다.
+    if (dto.designId !== undefined && !(await this.repository.designExists(dto.designId))) {
+      throw new EstimateRequestDesignNotFoundError();
+    }
+
     // ① SMS 발송 (실패 시 DB 저장 없이 즉시 에러 반환)
     try {
       const smsText = formatSmsText(dto);
@@ -253,6 +267,7 @@ export class EstimateRequestService {
         recommendType: result.recommendType,
         description: result.description ?? null,
         status: result.status,
+        designId: result.designId ?? null,
         images: result.images.map((img) => ({
           imageId: img.id,
           imageUrl: img.imageUrl,

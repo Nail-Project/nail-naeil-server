@@ -125,6 +125,8 @@ export class ReservationService {
         totalPrice: r.proposal.totalPrice,
         nailType: r.proposal.request.nailType,
         removalType: r.proposal.request.removalType,
+        designName: r.proposal.request.design?.title ?? null,
+        designTags: r.proposal.request.design?.tags.map((t) => t.tag.name) ?? [],
       })),
       pageInfo: { nextCursor, hasNext },
     };
@@ -146,6 +148,8 @@ export class ReservationService {
       shopPhoneNumber: shop.phoneNumber,
       address: shop.addressDetail ? `${shop.address} ${shop.addressDetail}` : shop.address,
       addressDetail: shop.addressDetail,
+      latitude: shop.latitude.toNumber(),
+      longitude: shop.longitude.toNumber(),
       reservedAt: reservation.reservedAt,
       basePrice: reservation.proposal.basePrice,
       removalPrice: reservation.proposal.removalPrice,
@@ -156,8 +160,7 @@ export class ReservationService {
       removalType: reservation.proposal.request.removalType,
       images: reservation.proposal.request.images.map((image) => image.imageUrl),
       status: reservation.status,
-      // TODO: [malibu] Design 모델 추가 후 연결 예정
-      designName: null,
+      designName: reservation.proposal.request.design?.title ?? null,
     };
   }
 
