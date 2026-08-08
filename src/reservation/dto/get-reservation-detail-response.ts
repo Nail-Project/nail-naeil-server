@@ -6,6 +6,9 @@ export interface GetReservationDetailResponse {
   shopName: string;
   // 예약 변경은 별도 API 없이 프론트에서 이 번호로 안내 팝업을 띄워 처리한다(Figma 기준).
   shopPhoneNumber: string | null;
+  // 리뷰가 하나도 없으면 0. Review 생성 시 재계산되는 Shop.rating/reviewCount를 그대로 노출한다.
+  shopRating: number;
+  shopReviewCount: number;
   // 기존 소비자와의 호환을 위해 address(합친 문자열)는 유지하고, 상세 주소만 따로도 내려준다.
   address: string;
   addressDetail: string | null;

@@ -146,6 +146,8 @@ export class ReservationService {
       shopPhoneNumber: shop.phoneNumber,
       address: shop.addressDetail ? `${shop.address} ${shop.addressDetail}` : shop.address,
       addressDetail: shop.addressDetail,
+      shopRating: shop.rating.toNumber(),
+      shopReviewCount: shop.reviewCount,
       reservedAt: reservation.reservedAt,
       basePrice: reservation.proposal.basePrice,
       removalPrice: reservation.proposal.removalPrice,
