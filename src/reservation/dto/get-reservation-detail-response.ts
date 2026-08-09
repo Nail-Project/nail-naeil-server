@@ -15,6 +15,9 @@ export interface GetReservationDetailResponse {
   // 지도 표시/길찾기 연동용 샵 좌표.
   latitude: number;
   longitude: number;
+  shopThumbnailUrl: string | null;
+  shopBusinessHours: unknown;
+  shopClosedDays: unknown;
   reservedAt: Date;
   // 견적서 세부내역 - EstimateResponse에 이미 저장돼 있던 값을 그대로 노출한다.
   // Figma의 "디자인 추가"/"옵션 추가" 라벨과 정확히 어떤 필드가 대응하는지는

@@ -7,7 +7,6 @@ export interface ReservationListItem {
   reservedAt: Date;
   status: ReservationStatus;
   shopName: string;
-  // TODO: [malibu] Shop 도메인(B8) 개발 후 실제 컬럼으로 연결 예정
   shopThumbnailUrl: string | null;
   totalPrice: number | null;
   // 시술 부위 - EstimateRequest.nailType (HAND/PEDICURE/BOTH)
