@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { CreateEstimateRequestSchema } from '../../src/estimate-request/dto/request/create-estimate-request.dto';
 
 // 서울(Asia/Seoul) 기준 오늘 날짜 + offsetDays를 YYYY-MM-DD로 반환
+// UTC 타임스탬프에 정확히 offsetDays × 86400초를 더해 환경 시간대 영향을 받지 않도록 한다.
 function getSeoulDate(offsetDays = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
+  const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
