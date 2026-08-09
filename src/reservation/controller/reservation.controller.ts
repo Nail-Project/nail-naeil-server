@@ -57,7 +57,8 @@ export class ReservationController {
   // GET /api/v1/reserve/:reservationId
   getReservationDetail = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const parsed = GetReservationDetailRequest.safeParse(req.params);
+      // 경로의 reservationId가 쿼리 값보다 우선하도록 병합 순서를 둔다.
+      const parsed = GetReservationDetailRequest.safeParse({ ...req.query, ...req.params });
 
       if (!parsed.success) {
         throw new InvalidReservationIdError(parsed.error.flatten());
@@ -66,6 +67,8 @@ export class ReservationController {
       const result = await this.reservationService.getReservationDetail(
         BigInt(parsed.data.reservationId),
         req.userId,
+        parsed.data.latitude,
+        parsed.data.longitude,
       );
       res.status(200).json(success(result));
     } catch (error) {

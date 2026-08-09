@@ -64,7 +64,8 @@ describe('OpenAiEstimateResponseParser', () => {
                     totalPrice: 55_000,
                     basePrice: 55_000,
                     removalPrice: 0,
-                    extraPrice: 0,
+                    designExtraPrice: 0,
+                    optionExtraPrice: 0,
                     memo: '제거 포함',
                     proposalDateTimes: ['2026-08-03T14:00:00+09:00'],
                   }),
@@ -117,7 +118,8 @@ describe('OpenAiEstimateResponseParser', () => {
                   totalPrice: 55_000,
                   basePrice: null,
                   removalPrice: null,
-                  extraPrice: null,
+                  designExtraPrice: null,
+                  optionExtraPrice: null,
                   memo: null,
                   proposalDateTimes: ['2026-08-03T14:00:00+09:00'],
                 }),
@@ -141,7 +143,8 @@ describe('OpenAiEstimateResponseParser', () => {
       totalPrice: 55_000,
       basePrice: null,
       removalPrice: null,
-      extraPrice: null,
+      designExtraPrice: null,
+      optionExtraPrice: null,
     });
   });
 });

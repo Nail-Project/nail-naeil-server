@@ -13,7 +13,8 @@ const parsedEstimateResponseSchema = z.object({
   totalPrice: z.number().int().nonnegative().nullable(),
   basePrice: z.number().int().nonnegative().nullable(),
   removalPrice: z.number().int().nonnegative().nullable(),
-  extraPrice: z.number().int().nonnegative().nullable(),
+  designExtraPrice: z.number().int().nonnegative().nullable(),
+  optionExtraPrice: z.number().int().nonnegative().nullable(),
   memo: z.string().nullable(),
   proposalDateTimes: z.array(z.iso.datetime({ offset: true })),
 });
@@ -48,7 +49,8 @@ const OUTPUT_SCHEMA = {
     totalPrice: { type: ['integer', 'null'] },
     basePrice: { type: ['integer', 'null'] },
     removalPrice: { type: ['integer', 'null'] },
-    extraPrice: { type: ['integer', 'null'] },
+    designExtraPrice: { type: ['integer', 'null'] },
+    optionExtraPrice: { type: ['integer', 'null'] },
     memo: { type: ['string', 'null'] },
     proposalDateTimes: {
       type: 'array',
@@ -62,7 +64,8 @@ const OUTPUT_SCHEMA = {
     'totalPrice',
     'basePrice',
     'removalPrice',
-    'extraPrice',
+    'designExtraPrice',
+    'optionExtraPrice',
     'memo',
     'proposalDateTimes',
   ],
@@ -94,7 +97,7 @@ export class OpenAiEstimateResponseParser implements EstimateResponseParser {
         {
           role: 'system',
           content:
-            '당신은 네일샵의 한국어 문자 답장에서 견적 정보를 추출한다. 상대 날짜는 Asia/Seoul 기준 수신 시각으로 계산한다. 총 가격만 명시된 경우 totalPrice만 추출하고 basePrice, removalPrice, extraPrice는 null로 둔다. 각 상세 금액은 문자에 명시된 경우에만 추출한다. 정확한 총 가격이나 예약 날짜와 시간이 없으면 null 또는 빈 배열을 반환한다. 예상 소요 시간이 명시되지 않으면 estimatedDurationMinutes는 60으로 둔다. 제거비가 총액에 포함됐다고 명시된 경우에만 isRemovalIncluded를 true로 둔다. memo에는 가격과 예약 시간을 제외한 샵의 안내를 간결히 합친다.',
+            '당신은 네일샵의 한국어 문자 답장에서 견적 정보를 추출한다. 상대 날짜는 Asia/Seoul 기준 수신 시각으로 계산한다. 총 가격만 명시된 경우 totalPrice만 추출하고 basePrice, removalPrice, designExtraPrice, optionExtraPrice는 null로 둔다. designExtraPrice는 디자인(아트, 그림, 프렌치 등) 관련 추가 비용이고, optionExtraPrice는 그 외 옵션(젤, 파츠 등) 관련 추가 비용이다 - 문자에 구분 없이 "추가 비용"만 있으면 designExtraPrice에 담는다. 각 상세 금액은 문자에 명시된 경우에만 추출한다. 정확한 총 가격이나 예약 날짜와 시간이 없으면 null 또는 빈 배열을 반환한다. 예상 소요 시간이 명시되지 않으면 estimatedDurationMinutes는 60으로 둔다. 제거비가 총액에 포함됐다고 명시된 경우에만 isRemovalIncluded를 true로 둔다. memo에는 가격과 예약 시간을 제외한 샵의 안내를 간결히 합친다.',
         },
         {
           role: 'user',

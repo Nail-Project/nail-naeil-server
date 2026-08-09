@@ -406,7 +406,8 @@ describe('ReservationService.getReservationDetail', () => {
         totalPrice: 55_000,
         basePrice: 40_000,
         removalPrice: 5_000,
-        extraPrice: 10_000,
+        designExtraPrice: 6_000,
+        optionExtraPrice: 4_000,
         memo: '깔끔하게 해드릴게요',
         shop: {
           name: '영찬 네일 강남점',
@@ -446,7 +447,9 @@ describe('ReservationService.getReservationDetail', () => {
       distanceMeters: null,
       basePrice: 40_000,
       removalPrice: 5_000,
-      extraPrice: 10_000,
+      designExtraPrice: 6_000,
+      optionExtraPrice: 4_000,
+      couponDiscount: 0,
       totalPrice: 55_000,
       shopComment: '깔끔하게 해드릴게요',
       nailType: 'HAND',
@@ -454,6 +457,80 @@ describe('ReservationService.getReservationDetail', () => {
       images: ['https://example.com/a.jpg'],
       status: 'CONFIRMED',
     });
+  });
+
+  it('위도/경도가 함께 전달되면 샵과의 거리를 계산해 반환한다', async () => {
+    repository.detailResult = {
+      id: 1n,
+      reservedAt: TOMORROW,
+      status: 'CONFIRMED',
+      proposal: {
+        totalPrice: 55_000,
+        basePrice: 40_000,
+        removalPrice: 5_000,
+        designExtraPrice: 6_000,
+        optionExtraPrice: 4_000,
+        memo: null,
+        shop: {
+          name: '영찬 네일 강남점',
+          phoneNumber: null,
+          address: '서울시 강남구',
+          addressDetail: null,
+          rating: { toNumber: () => 4.5 },
+          reviewCount: 12,
+          latitude: { toNumber: () => 37.4979 },
+          longitude: { toNumber: () => 127.0276 },
+          thumbnailImageUrl: null,
+          businessHours: null,
+          closedDays: null,
+        },
+        request: { nailType: 'HAND', removalType: 'NONE', images: [], design: null },
+      },
+    };
+
+    // 같은 좌표면 거리는 0
+    await expect(
+      service.getReservationDetail(1n, userId, 37.4979, 127.0276),
+    ).resolves.toMatchObject({ distanceMeters: 0 });
+
+    // 다른 좌표면 0보다 큰 거리가 나온다
+    const result = await service.getReservationDetail(1n, userId, 37.5, 127.0);
+    expect(result.distanceMeters).not.toBeNull();
+    expect(result.distanceMeters).toBeGreaterThan(0);
+  });
+
+  it('위도만 전달되고 경도가 없으면 거리를 계산하지 않는다', async () => {
+    repository.detailResult = {
+      id: 1n,
+      reservedAt: TOMORROW,
+      status: 'CONFIRMED',
+      proposal: {
+        totalPrice: 55_000,
+        basePrice: 40_000,
+        removalPrice: 5_000,
+        designExtraPrice: 6_000,
+        optionExtraPrice: 4_000,
+        memo: null,
+        shop: {
+          name: '영찬 네일 강남점',
+          phoneNumber: null,
+          address: '서울시 강남구',
+          addressDetail: null,
+          rating: { toNumber: () => 4.5 },
+          reviewCount: 12,
+          latitude: { toNumber: () => 37.4979 },
+          longitude: { toNumber: () => 127.0276 },
+          thumbnailImageUrl: null,
+          businessHours: null,
+          closedDays: null,
+        },
+        request: { nailType: 'HAND', removalType: 'NONE', images: [], design: null },
+      },
+    };
+
+    await expect(
+      service.getReservationDetail(1n, userId, 37.4979, undefined),
+    ).resolves.toMatchObject({ distanceMeters: null });
   });
 
   it('상세 주소가 없으면 기본 주소만 반환한다', async () => {
@@ -465,7 +542,8 @@ describe('ReservationService.getReservationDetail', () => {
         totalPrice: 55_000,
         basePrice: 40_000,
         removalPrice: 5_000,
-        extraPrice: 10_000,
+        designExtraPrice: 6_000,
+        optionExtraPrice: 4_000,
         memo: null,
         shop: {
           name: '영찬 네일 강남점',
@@ -585,7 +663,8 @@ describe('ReservationService.cancelReservation', () => {
         totalPrice: 55_000,
         basePrice: 40_000,
         removalPrice: 5_000,
-        extraPrice: 10_000,
+        designExtraPrice: 6_000,
+        optionExtraPrice: 4_000,
         memo: null,
         shop: {
           name: '영찬 네일 강남점',
@@ -623,7 +702,8 @@ describe('ReservationService.cancelReservation', () => {
         totalPrice: 55_000,
         basePrice: 40_000,
         removalPrice: 5_000,
-        extraPrice: 10_000,
+        designExtraPrice: 6_000,
+        optionExtraPrice: 4_000,
         memo: null,
         shop: {
           name: '영찬 네일 강남점',

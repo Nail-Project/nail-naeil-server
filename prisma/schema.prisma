@@ -279,7 +279,10 @@ model EstimateResponse {
   totalPrice               Int?                   @map("total_price")
   basePrice                Int?                   @map("base_price")
   removalPrice             Int?                   @map("removal_price")
-  extraPrice               Int?                   @map("extra_price")
+  // Figma 가격 세부내역의 "디자인 추가"/"옵션 추가" 두 줄에 대응시키려고 기존 extraPrice를
+  // 쪼갠 컬럼(2026-08-09). designExtraPrice는 기존 extraPrice 값을 그대로 이어받는다.
+  designExtraPrice         Int?                   @map("design_extra_price")
+  optionExtraPrice         Int?                   @map("option_extra_price")
   memo                     String?                @db.Text
   estimatedDurationMinutes Int                    @default(60) @map("estimated_duration_minutes")
   canProvideService        Boolean                @default(true) @map("can_provide_service")
