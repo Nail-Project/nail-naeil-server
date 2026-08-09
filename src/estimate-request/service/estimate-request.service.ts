@@ -12,6 +12,10 @@ import { GetEstimatesPageResponse } from '../dto/response/get-estimates-response
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
 import { encodeCursor } from '../../common/pagination/cursor';
 import { EstimateRequestDesignNotFoundError } from '../error/estimate-request.error';
+import { Prisma } from '../../generated/prisma/client';
+
+const isDesignForeignKeyError = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
 
 // ─── SMS 설정 ───────────────────────────────────────────────────────────────────
 const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
@@ -235,8 +239,14 @@ export class EstimateRequestService {
     userId: number,
   ): Promise<CreateEstimateResponseDto> {
     // designId가 존재하지 않는 디자인을 가리키면 SMS 발송 전에 걸러낸다.
-    if (dto.designId !== undefined && !(await this.repository.designExists(dto.designId))) {
-      throw new EstimateRequestDesignNotFoundError();
+    if (dto.designId !== undefined) {
+      let designExists: boolean;
+      try {
+        designExists = await this.repository.designExists(dto.designId);
+      } catch {
+        throw new EstimateRequestFailedError();
+      }
+      if (!designExists) throw new EstimateRequestDesignNotFoundError();
     }
 
     // ① SMS 발송 (실패 시 DB 저장 없이 즉시 에러 반환)
@@ -274,7 +284,9 @@ export class EstimateRequestService {
         })),
         createdAt: result.createdAt,
       };
-    } catch {
+    } catch (error) {
+      // 존재 확인(designExists) 이후 삭제된 경쟁 상태로 FK 제약(P2003) 위반
+      if (isDesignForeignKeyError(error)) throw new EstimateRequestDesignNotFoundError();
       throw new EstimateRequestFailedError();
     }
   }
@@ -288,7 +300,12 @@ export class EstimateRequestService {
     size: number,
   ): Promise<GetEstimatesPageResponse> {
     try {
-      const { estimates, hasNext } = await this.repository.findByStatus(status, userId, cursor, size);
+      const { estimates, hasNext } = await this.repository.findByStatus(
+        status,
+        userId,
+        cursor,
+        size,
+      );
 
       const last = estimates[estimates.length - 1];
       const nextCursor =

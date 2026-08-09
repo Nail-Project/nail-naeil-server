@@ -55,6 +55,7 @@ const estimateRequestRouter = Router();
  *                 type: string
  *               designId:
  *                 type: integer
+ *                 minimum: 1
  *                 description: 디자인 매거진에서 "이 디자인 그대로 견적받기"로 요청한 경우의 카탈로그 디자인 id (직접 사진 업로드 시 생략)
  *                 example: 1
  *               images:
