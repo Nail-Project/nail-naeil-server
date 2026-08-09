@@ -88,13 +88,11 @@ export class EstimateResponseService {
       const parsed = await this.parser.parse({
         messages: context.messages.map((payload) => this.readSmsBody(payload)).filter(Boolean),
         receivedAt,
-        requestStartDate: this.formatSeoulDate(context.requestStartDate),
-        requestEndDate: this.formatSeoulDate(context.requestEndDate),
+        scheduleDates: context.scheduleDates.map((d) => this.formatSeoulDate(d)),
       });
       const proposalDateTimes = this.filterProposalDateTimes(
         parsed.proposalDateTimes,
-        context.requestStartDate,
-        context.requestEndDate,
+        context.scheduleDates,
       );
 
       if (
@@ -370,13 +368,9 @@ export class EstimateResponseService {
     return typeof payload.body === 'string' ? payload.body : '';
   }
 
-  private filterProposalDateTimes(
-    dateTimes: string[],
-    requestStartDate: Date,
-    requestEndDate: Date,
-  ): Date[] {
-    const startDate = this.formatSeoulDate(requestStartDate);
-    const endDate = this.formatSeoulDate(requestEndDate);
+  private filterProposalDateTimes(dateTimes: string[], scheduleDates: Date[]): Date[] {
+    // 사용자가 선택한 날짜만 허용 (범위가 아닌 개별 날짜 집합으로 필터링)
+    const allowedDates = new Set(scheduleDates.map((d) => this.formatSeoulDate(d)));
     const uniqueTimes = new Map<number, Date>();
 
     for (const value of dateTimes) {
@@ -387,7 +381,7 @@ export class EstimateResponseService {
 
       const proposalDate = this.formatSeoulDate(dateTime);
 
-      if (proposalDate >= startDate && proposalDate <= endDate) {
+      if (allowedDates.has(proposalDate)) {
         uniqueTimes.set(dateTime.getTime(), dateTime);
       }
     }

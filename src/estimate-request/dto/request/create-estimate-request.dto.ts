@@ -18,21 +18,36 @@ const calendarDateSchema = z
     );
   }, '유효한 날짜를 입력해야 합니다.');
 
+// 날짜별 희망 시간 항목 스키마
+const scheduleItemSchema = z.object({
+  // 방문 희망 날짜 (YYYY-MM-DD)
+  date: calendarDateSchema,
+  // 해당 날짜의 희망 시간대 (복수 선택 가능): 오전(AM), 오후(PM), 저녁(EVENING), 상관없음(ANY)
+  times: z
+    .array(z.enum(['AM', 'PM', 'EVENING', 'ANY']))
+    .min(1, '시간대를 최소 1개 이상 선택해야 합니다.')
+    .max(4, '시간대는 최대 4개까지 선택할 수 있습니다.'),
+});
+
 export const CreateEstimateRequestSchema = z
   .object({
     // 네일 종류: 손(HAND), 발(PEDICURE), 손+발(BOTH)
     nailType: z.enum(['HAND', 'PEDICURE', 'BOTH']),
 
-    // 제거 종류: 연장(EXTENSION), 부분(PARTS), 기본(BASIC), 없음(NONE)
-    removalType: z.enum(['EXTENSION', 'PARTS', 'BASIC', 'NONE']),
+    // 제거 종류 (복수 선택 가능): 제거 없음(NONE), 젤 제거(BASIC), 아트/파츠 제거(PARTS), 연장 제거(EXTENSION)
+    // 최소 1개 이상 선택 필수, 최대 4개 (전체 선택)
+    removalTypes: z
+      .array(z.enum(['EXTENSION', 'PARTS', 'BASIC', 'NONE']))
+      .min(1, '제거 종류를 최소 1개 이상 선택해야 합니다.')
+      .max(4, '제거 종류는 최대 4개까지 선택할 수 있습니다.'),
 
-    // 희망 시술 기간 - YYYY-MM-DD 형식만 허용, DB 저장 시 Date로 변환
-    // endDate는 startDate 이후여야 한다 (같은 날은 허용).
-    startDate: calendarDateSchema,
-    endDate: calendarDateSchema,
-
-    // 선호 시간대: 오전(AM), 오후(PM), 저녁(EVENING), 무관(ANY)
-    preferredTime: z.enum(['AM', 'PM', 'EVENING', 'ANY']),
+    // 방문 가능 일정 목록 - 날짜별 희망 시간을 함께 전달한다.
+    // 최소 1일 이상 선택 필수, 최대 7일 (오늘~오늘+7일 범위 내)
+    // 같은 날짜 중복 선택 불가
+    schedules: z
+      .array(scheduleItemSchema)
+      .min(1, '방문 가능 일정을 최소 1일 이상 선택해야 합니다.')
+      .max(7, '방문 가능 일정은 최대 7일까지 선택할 수 있습니다.'),
 
     // 샵 추천 기준: 균형(BALANCED), 가까운 순(CLOSE), 넓은 범위(WIDE), 저렴한 순(CHEAP)
     recommendType: z.enum(['BALANCED', 'CLOSE', 'WIDE', 'CHEAP']),
@@ -40,13 +55,13 @@ export const CreateEstimateRequestSchema = z
     // 추가 요청 사항 (선택)
     description: z.string().optional(),
 
-    // 거리 계산에는 견적 요청 당시 위치를 사용한다. 기존 클라이언트 호환을 위해 선택값이다.
-    latitude: z.number().min(-90).max(90).optional(),
-    longitude: z.number().min(-180).max(180).optional(),
+    // 예상 가격 범위 (선택) - DB 미저장, SMS 발송 시 참고용으로만 사용
+    // 슬라이더에서 설정한 최소·최대 금액 (단위: 원)
+    priceMin: z.number().int().nonnegative().optional(),
+    priceMax: z.number().int().positive().optional(),
 
     // 디자인 이미지 URL 목록 - image 도메인에서 미리 업로드 후 URL을 받아 전달한다.
-    // 최대 3장까지 허용 (SMS 발송은 첫 번째 이미지 1장만 전송, 추후 기획 확정 후 조정)
-    // 빈 배열로 기본값을 설정해 프론트가 필드를 생략해도 정상 처리되도록 한다.
+    // 최소 1장 필수, 최대 3장까지 허용 (SMS 발송은 첫 번째 이미지 1장만 전송)
     // S3 URL 형식만 허용: https://{bucket}.s3.{region}.amazonaws.com/images/YYYY-MM-DD/{uuid}.{ext}
     // 서비스의 isAllowedS3ImageUrl() 검증 정책과 일치시킨다.
     images: z
@@ -58,9 +73,8 @@ export const CreateEstimateRequestSchema = z
             '올바른 S3 이미지 URL이 아닙니다.',
           ),
       )
-      .max(3, '이미지는 최대 3장까지 첨부할 수 있습니다.')
-      .optional()
-      .default([]),
+      .min(1, '디자인 이미지를 최소 1장 첨부해야 합니다.')
+      .max(3, '이미지는 최대 3장까지 첨부할 수 있습니다.'),
 
     // 견적을 보낼 샵 ID 목록 - 주변 샵 조회 API에서 받은 shopId 목록을 전달한다.
     // 빈 배열이면 NO_SHOPS_SELECTED(400) 에러를 반환한다.
@@ -70,14 +84,41 @@ export const CreateEstimateRequestSchema = z
       .min(1, '견적 요청할 샵이 없습니다.')
       .max(20, '한 번에 요청할 수 있는 샵 수를 초과했습니다.'),
   })
-  .refine((data) => data.endDate >= data.startDate, {
-    // endDate가 startDate보다 앞이면 400 반환
-    message: '종료일은 시작일 이후여야 합니다.',
-    path: ['endDate'],
+  .refine((data) => {
+    // 각 날짜가 오늘 이후인지 검증
+    const today = new Date().toISOString().split('T')[0];
+    return data.schedules.every((s) => s.date >= today);
+  }, {
+    message: '방문 가능 일정은 오늘 이후 날짜여야 합니다.',
+    path: ['schedules'],
   })
-  .refine((data) => (data.latitude === undefined) === (data.longitude === undefined), {
-    message: '위도와 경도는 함께 입력해야 합니다.',
-    path: ['latitude'],
+  .refine((data) => {
+    // 각 날짜가 오늘로부터 7일 이내인지 검증
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 7);
+    const maxDateStr = maxDate.toISOString().split('T')[0];
+    return data.schedules.every((s) => s.date <= maxDateStr);
+  }, {
+    message: '방문 가능 일정은 오늘부터 7일 이내여야 합니다.',
+    path: ['schedules'],
+  })
+  .refine((data) => {
+    // 중복 날짜 검증
+    const dates = data.schedules.map((s) => s.date);
+    return dates.length === new Set(dates).size;
+  }, {
+    message: '날짜가 중복되었습니다.',
+    path: ['schedules'],
+  })
+  .refine((data) => {
+    // 둘 다 있을 때만 비교 (각각 선택값이므로 한쪽만 있는 경우는 통과)
+    if (data.priceMin !== undefined && data.priceMax !== undefined) {
+      return data.priceMax >= data.priceMin;
+    }
+    return true;
+  }, {
+    message: '최대 가격은 최소 가격 이상이어야 합니다.',
+    path: ['priceMax'],
   });
 
 export type CreateEstimateRequestDto = z.infer<typeof CreateEstimateRequestSchema>;

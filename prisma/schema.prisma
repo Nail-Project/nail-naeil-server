@@ -311,10 +311,6 @@ enum EstimateStatus {
 model EstimateRequest {
   id            Int                   @id @default(autoincrement())
   nailType      NailType              @map("nail_type")
-  removalType   RemovalType           @map("removal_type")
-  startDate     DateTime              @map("start_date") @db.Date
-  endDate       DateTime              @map("end_date") @db.Date
-  preferredTime PreferredTime         @map("preferred_time")
   recommendType RecommendType         @map("recommend_type")
   description   String?               @db.Text
   latitude      Decimal?              @db.Decimal(10, 7)
@@ -328,8 +324,30 @@ model EstimateRequest {
   proposals     EstimateResponse[]
   smsMessages   SmsMessage[]
   targetShops   EstimateRequestShop[]
+  removals      EstimateRequestRemoval[]
+  schedules     EstimateRequestSchedule[]
 
   @@map("estimate_requests")
+}
+
+model EstimateRequestSchedule {
+  requestId   Int             @map("request_id")
+  date        DateTime        @map("date") @db.Date
+  time        PreferredTime   @map("time")
+  request     EstimateRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  // (requestId, date, time) 복합 PK — 같은 날짜에 시간대 복수 선택 지원
+  @@id([requestId, date, time])
+  @@map("estimate_request_schedules")
+}
+
+model EstimateRequestRemoval {
+  requestId   Int             @map("request_id")
+  removalType RemovalType     @map("removal_type")
+  request     EstimateRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@id([requestId, removalType])
+  @@map("estimate_request_removals")
 }
 
 model EstimateRequestShop {

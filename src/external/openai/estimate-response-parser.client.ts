@@ -24,8 +24,7 @@ export interface EstimateResponseParser {
   parse(input: {
     messages: string[];
     receivedAt: string;
-    requestStartDate: string;
-    requestEndDate: string;
+    scheduleDates: string[]; // 사용자가 선택한 방문 가능 날짜 목록 (YYYY-MM-DD)
   }): Promise<ParsedEstimateResponse>;
 }
 
@@ -72,8 +71,7 @@ export class OpenAiEstimateResponseParser implements EstimateResponseParser {
   async parse(input: {
     messages: string[];
     receivedAt: string;
-    requestStartDate: string;
-    requestEndDate: string;
+    scheduleDates: string[];
   }): Promise<ParsedEstimateResponse> {
     const apiKey = process.env.OPENAI_API_KEY?.trim();
     if (!apiKey) {
@@ -100,10 +98,8 @@ export class OpenAiEstimateResponseParser implements EstimateResponseParser {
           role: 'user',
           content: JSON.stringify({
             receivedAt: input.receivedAt,
-            requestPeriod: {
-              startDate: input.requestStartDate,
-              endDate: input.requestEndDate,
-            },
+            // 사용자가 선택한 방문 가능 날짜 목록 — proposalDateTimes는 이 날짜 중에서만 추출한다.
+            scheduleDates: input.scheduleDates,
             messages: input.messages,
           }),
         },
