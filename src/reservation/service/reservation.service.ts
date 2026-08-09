@@ -56,6 +56,10 @@ export class ReservationService {
     const proposal = await this.reservationRepository.findProposalById(proposalId);
     if (!proposal) throw new ProposalNotFoundError();
 
+    // 본인이 요청한 견적이 아니면 404 (IDOR 방지) - 다른 예약 조회/취소와 동일하게
+    // 존재 여부를 굳이 구분해 알려주지 않고 "찾을 수 없음"으로 처리한다.
+    if (proposal.request.userId !== userId) throw new ProposalNotFoundError();
+
     // [malibu][A4] 별도의 "견적 확정(ACCEPTED)" 상태 체크는 두지 않는다.
     // 위 findProposalById()의 존재 여부 체크(404)가 이미 "샵이 응답했는지"를 걸러준다 —
     // 샵이 응답(SMS)하기 전에는 EstimateResponse 자체가 생성되지 않으므로 proposalId가 없고,
