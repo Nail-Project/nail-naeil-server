@@ -23,10 +23,12 @@ const scheduleItemSchema = z.object({
   // 방문 희망 날짜 (YYYY-MM-DD)
   date: calendarDateSchema,
   // 해당 날짜의 희망 시간대 (복수 선택 가능): 오전(AM), 오후(PM), 저녁(EVENING), 상관없음(ANY)
+  // 중복 불가 — 복합 PK (requestId, date, time) 위반 방지
   times: z
     .array(z.enum(['AM', 'PM', 'EVENING', 'ANY']))
     .min(1, '시간대를 최소 1개 이상 선택해야 합니다.')
-    .max(4, '시간대는 최대 4개까지 선택할 수 있습니다.'),
+    .max(4, '시간대는 최대 4개까지 선택할 수 있습니다.')
+    .refine((arr) => new Set(arr).size === arr.length, '시간대에 중복 값이 있습니다.'),
 });
 
 export const CreateEstimateRequestSchema = z
@@ -35,11 +37,12 @@ export const CreateEstimateRequestSchema = z
     nailType: z.enum(['HAND', 'PEDICURE', 'BOTH']),
 
     // 제거 종류 (복수 선택 가능): 제거 없음(NONE), 젤 제거(BASIC), 아트/파츠 제거(PARTS), 연장 제거(EXTENSION)
-    // 최소 1개 이상 선택 필수, 최대 4개 (전체 선택)
+    // 최소 1개 이상 선택 필수, 최대 4개 (전체 선택), 중복 불가
     removalTypes: z
       .array(z.enum(['EXTENSION', 'PARTS', 'BASIC', 'NONE']))
       .min(1, '제거 종류를 최소 1개 이상 선택해야 합니다.')
-      .max(4, '제거 종류는 최대 4개까지 선택할 수 있습니다.'),
+      .max(4, '제거 종류는 최대 4개까지 선택할 수 있습니다.')
+      .refine((arr) => new Set(arr).size === arr.length, '제거 종류에 중복 값이 있습니다.'),
 
     // 방문 가능 일정 목록 - 날짜별 희망 시간을 함께 전달한다.
     // 최소 1일 이상 선택 필수, 최대 7일 (오늘~오늘+7일 범위 내)
