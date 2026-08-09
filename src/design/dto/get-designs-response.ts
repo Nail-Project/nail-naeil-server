@@ -6,6 +6,8 @@ export interface DesignSummaryItem {
   tags: string[];
   viewCount: number;
   wishCount: number;
+  // "상담폭주" 배지 - 최근 일정 기간 견적 요청이 몰린 디자인인지 여부.
+  isHot: boolean;
 }
 
 export interface PageInfo {
