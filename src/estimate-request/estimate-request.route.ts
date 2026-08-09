@@ -28,9 +28,7 @@ const estimateRequestRouter = Router();
  *             required:
  *               - nailType
  *               - removalTypes
- *               - startDate
- *               - endDate
- *               - preferredTime
+ *               - schedules
  *               - recommendType
  *             properties:
  *               nailType:

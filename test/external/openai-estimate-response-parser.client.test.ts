@@ -133,8 +133,7 @@ describe('OpenAiEstimateResponseParser', () => {
       new OpenAiEstimateResponseParser().parse({
         messages: ['총 55,000원입니다.'],
         receivedAt: '2026-08-01T10:00:00+09:00',
-        requestStartDate: '2026-08-02',
-        requestEndDate: '2026-08-07',
+        scheduleDates: ['2026-08-02', '2026-08-07'],
       }),
     ).resolves.toMatchObject({
       totalPrice: 55_000,

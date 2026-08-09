@@ -293,7 +293,7 @@ describe('ReservationService.getReservations', () => {
             },
             request: {
               nailType: 'HAND',
-              removalType: 'NONE',
+              removals: [{ removalType: 'NONE' }],
               design: {
                 title: '도트 프렌치 네일',
                 tags: [{ tag: { name: '프렌치' } }, { tag: { name: '심플' } }],
@@ -317,7 +317,7 @@ describe('ReservationService.getReservations', () => {
           shopThumbnailUrl: 'https://example.com/shop-thumb.jpg',
           totalPrice: 55_000,
           nailType: 'HAND',
-          removalType: 'NONE',
+          removalTypes: ['NONE'],
           designName: '도트 프렌치 네일',
           designTags: ['프렌치', '심플'],
         },
@@ -337,7 +337,7 @@ describe('ReservationService.getReservations', () => {
           proposal: {
             totalPrice: 55_000,
             shop: { name: '영찬 네일 강남점', thumbnailImageUrl: null },
-            request: { nailType: 'HAND', removalType: 'NONE', design: null },
+            request: { nailType: 'HAND', removals: [{ removalType: 'NONE' }], design: null },
           },
         },
       ],
@@ -363,7 +363,7 @@ describe('ReservationService.getReservations', () => {
           proposal: {
             totalPrice: 55_000,
             shop: { name: '영찬 네일 강남점', thumbnailImageUrl: null },
-            request: { nailType: 'HAND', removalType: 'NONE', design: null },
+            request: { nailType: 'HAND', removals: [{ removalType: 'NONE' }], design: null },
           },
         },
       ],
@@ -424,7 +424,7 @@ describe('ReservationService.getReservationDetail', () => {
         },
         request: {
           nailType: 'HAND',
-          removalType: 'PARTS',
+          removals: [{ removalType: 'PARTS' }],
           images: [{ imageUrl: 'https://example.com/a.jpg' }],
           design: null,
         },
@@ -453,7 +453,7 @@ describe('ReservationService.getReservationDetail', () => {
       totalPrice: 55_000,
       shopComment: '깔끔하게 해드릴게요',
       nailType: 'HAND',
-      removalType: 'PARTS',
+      removalTypes: ['PARTS'],
       images: ['https://example.com/a.jpg'],
       status: 'CONFIRMED',
     });
@@ -484,7 +484,7 @@ describe('ReservationService.getReservationDetail', () => {
           businessHours: null,
           closedDays: null,
         },
-        request: { nailType: 'HAND', removalType: 'NONE', images: [], design: null },
+        request: { nailType: 'HAND', removals: [{ removalType: 'NONE' }], images: [], design: null },
       },
     };
 
@@ -524,7 +524,7 @@ describe('ReservationService.getReservationDetail', () => {
           businessHours: null,
           closedDays: null,
         },
-        request: { nailType: 'HAND', removalType: 'NONE', images: [], design: null },
+        request: { nailType: 'HAND', removals: [{ removalType: 'NONE' }], images: [], design: null },
       },
     };
 
@@ -558,7 +558,7 @@ describe('ReservationService.getReservationDetail', () => {
           businessHours: null,
           closedDays: null,
         },
-        request: { nailType: 'PEDICURE', removalType: 'NONE', images: [], design: null },
+        request: { nailType: 'PEDICURE', removals: [{ removalType: 'NONE' }], images: [], design: null },
       },
     };
 
@@ -568,7 +568,7 @@ describe('ReservationService.getReservationDetail', () => {
       shopPhoneNumber: null,
       shopRating: 0,
       shopReviewCount: 0,
-      removalType: 'NONE',
+      removalTypes: ['NONE'],
       shopComment: null,
       images: [],
     });
@@ -681,7 +681,7 @@ describe('ReservationService.cancelReservation', () => {
         },
         request: {
           nailType: 'HAND',
-          removalType: 'NONE',
+          removals: [{ removalType: 'NONE' }],
           images: [],
           design: { title: '도트 프렌치 네일' },
         },
@@ -718,7 +718,7 @@ describe('ReservationService.cancelReservation', () => {
           businessHours: null,
           closedDays: null,
         },
-        request: { nailType: 'HAND', removalType: 'NONE', images: [], design: null },
+        request: { nailType: 'HAND', removals: [{ removalType: 'NONE' }], images: [], design: null },
       },
     };
 

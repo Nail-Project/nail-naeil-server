@@ -35,7 +35,7 @@ const reservationListSelect = {
       request: {
         select: {
           nailType: true,
-          removalType: true,
+          removals: { select: { removalType: true } },
           design: {
             select: {
               title: true,
@@ -58,7 +58,7 @@ export interface ReservationRecord {
     shop: { name: string; thumbnailImageUrl: string | null };
     request: {
       nailType: string;
-      removalType: string;
+      removals: { removalType: string }[];
       design: { title: string; tags: { tag: { name: string } }[] } | null;
     };
   };
@@ -90,7 +90,7 @@ export interface ReservationDetailRecord {
     };
     request: {
       nailType: string;
-      removalType: string;
+      removals: { removalType: string }[];
       images: { imageUrl: string }[];
       design: { title: string } | null;
     };
@@ -296,7 +296,7 @@ export class PrismaReservationRepository implements ReservationRepository {
             request: {
               select: {
                 nailType: true,
-                removalType: true,
+                removals: { select: { removalType: true } },
                 images: { select: { imageUrl: true } },
                 design: { select: { title: true } },
               },
