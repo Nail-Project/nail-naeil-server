@@ -2,6 +2,16 @@
 // zod로 런타임 검증 후 타입을 추론해 controller → service → repository에서 그대로 사용한다.
 import { z } from 'zod';
 
+// 서울(Asia/Seoul) 기준 오늘 날짜를 YYYY-MM-DD 문자열로 반환한다.
+// toISOString()은 UTC 기준이므로 자정 전후 1시간 동안 날짜가 어긋날 수 있어 Intl로 대체한다.
+const getSeoulDateString = (date: Date = new Date()): string =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+
 const calendarDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식은 YYYY-MM-DD여야 합니다.')
@@ -91,18 +101,18 @@ export const CreateEstimateRequestSchema = z
       .max(20, '한 번에 요청할 수 있는 샵 수를 초과했습니다.'),
   })
   .refine((data) => {
-    // 각 날짜가 오늘 이후인지 검증
-    const today = new Date().toISOString().split('T')[0];
+    // 각 날짜가 오늘(서울 기준) 이후인지 검증
+    const today = getSeoulDateString();
     return data.schedules.every((s) => s.date >= today);
   }, {
     message: '방문 가능 일정은 오늘 이후 날짜여야 합니다.',
     path: ['schedules'],
   })
   .refine((data) => {
-    // 각 날짜가 오늘로부터 7일 이내인지 검증
+    // 각 날짜가 오늘(서울 기준)로부터 7일 이내인지 검증
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 7);
-    const maxDateStr = maxDate.toISOString().split('T')[0];
+    const maxDateStr = getSeoulDateString(maxDate);
     return data.schedules.every((s) => s.date <= maxDateStr);
   }, {
     message: '방문 가능 일정은 오늘부터 7일 이내여야 합니다.',
