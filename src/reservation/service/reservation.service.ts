@@ -21,6 +21,7 @@ import {
   ReservationNotFoundError,
 } from '../error/reservation.error';
 import { NotificationService } from '../../notification/service/notification.service';
+import { distanceMeters } from '../../common/utils/distance';
 
 const isUniqueConstraintError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
@@ -155,15 +156,19 @@ export class ReservationService {
     };
   }
 
-  // 예약 상세 조회
+  // 예약 상세 조회 - latitude/longitude는 "지금 사용자 위치" (둘 다 없으면 distanceMeters는 null)
   async getReservationDetail(
     reservationId: bigint,
     userId: number,
+    latitude?: number,
+    longitude?: number,
   ): Promise<GetReservationDetailResponse> {
     const reservation = await this.reservationRepository.findByIdAndUserId(reservationId, userId);
     if (!reservation) throw new ReservationNotFoundError();
 
     const { shop } = reservation.proposal;
+    const shopLatitude = shop.latitude.toNumber();
+    const shopLongitude = shop.longitude.toNumber();
 
     return {
       reservationId: Number(reservation.id),
@@ -173,14 +178,15 @@ export class ReservationService {
       addressDetail: shop.addressDetail,
       shopRating: shop.rating.toNumber(),
       shopReviewCount: shop.reviewCount,
-      latitude: shop.latitude.toNumber(),
-      longitude: shop.longitude.toNumber(),
+      latitude: shopLatitude,
+      longitude: shopLongitude,
       shopThumbnailUrl: shop.thumbnailImageUrl,
       shopBusinessHours: shop.businessHours,
       shopClosedDays: shop.closedDays,
-      // TODO: [malibu] 위도/경도 쿼리 파라미터 설계 후 실제 거리 계산으로 교체 예정.
-      // 관련 이슈/PR 없음(2026-08-09 확인) - 프론트가 필드는 먼저 받아볼 수 있도록 더미 값을 내려준다.
-      distanceMeters: 1_200,
+      distanceMeters:
+        latitude !== undefined && longitude !== undefined
+          ? distanceMeters(latitude, longitude, shopLatitude, shopLongitude)
+          : null,
       reservedAt: reservation.reservedAt,
       basePrice: reservation.proposal.basePrice,
       removalPrice: reservation.proposal.removalPrice,

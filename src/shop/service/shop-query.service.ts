@@ -9,6 +9,7 @@ import type {
 } from '../dto/response/shop-query-response';
 import { ShopNotFoundError } from '../errors/shop.error';
 import type { ShopQueryRepository, ShopSummaryRecord } from '../repository/shop-query.repository';
+import { distanceMeters } from '../../common/utils/distance';
 
 export class ShopQueryService {
   constructor(private readonly repository: ShopQueryRepository) {}
@@ -141,19 +142,9 @@ export class ShopQueryService {
       reviewCount: shop.reviewCount,
       distanceMeters:
         latitude !== undefined && longitude !== undefined
-          ? this.distanceMeters(latitude, longitude, shopLatitude, shopLongitude)
+          ? distanceMeters(latitude, longitude, shopLatitude, shopLongitude)
           : null,
       isWished: shop.wishes.length > 0,
     };
-  }
-
-  private distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const toRad = (value: number) => (value * Math.PI) / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const value =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-    return Math.round(6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value)));
   }
 }

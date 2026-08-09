@@ -159,6 +159,14 @@ const reservationRouter = Router();
  *         required: true
  *         schema:
  *           type: integer
+ *       - in: query
+ *         name: latitude
+ *         description: 샵과의 거리 계산용 현재 위도. longitude와 함께 전달해야 distanceMeters가 채워진다.
+ *         schema: { type: number, format: double, minimum: -90, maximum: 90 }
+ *       - in: query
+ *         name: longitude
+ *         description: 샵과의 거리 계산용 현재 경도. latitude와 함께 전달
+ *         schema: { type: number, format: double, minimum: -180, maximum: 180 }
  *     responses:
  *       200:
  *         description: 예약 상세 조회 성공
