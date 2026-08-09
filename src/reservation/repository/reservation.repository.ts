@@ -1,3 +1,4 @@
+import type { Prisma } from '../../generated/prisma/client';
 import { getPrisma } from '../../infra/prisma';
 import type { ReservationStatus } from '../../generated/prisma/enums';
 import type { ReservationCursor } from '../dto/get-reservations-request';
@@ -30,7 +31,7 @@ const reservationListSelect = {
   proposal: {
     select: {
       totalPrice: true,
-      shop: { select: { name: true } },
+      shop: { select: { name: true, thumbnailImageUrl: true } },
       request: {
         select: {
           nailType: true,
@@ -54,7 +55,7 @@ export interface ReservationRecord {
   status: ReservationStatus;
   proposal: {
     totalPrice: number | null;
-    shop: { name: string };
+    shop: { name: string; thumbnailImageUrl: string | null };
     request: {
       nailType: string;
       removalType: string;
@@ -82,6 +83,9 @@ export interface ReservationDetailRecord {
       reviewCount: number;
       latitude: { toNumber(): number };
       longitude: { toNumber(): number };
+      thumbnailImageUrl: string | null;
+      businessHours: Prisma.JsonValue | null;
+      closedDays: Prisma.JsonValue | null;
     };
     request: {
       nailType: string;
@@ -280,6 +284,9 @@ export class PrismaReservationRepository implements ReservationRepository {
                 reviewCount: true,
                 latitude: true,
                 longitude: true,
+                thumbnailImageUrl: true,
+                businessHours: true,
+                closedDays: true,
               },
             },
             // Reservation → proposal → request → design 체인을 타고 카탈로그 디자인명을 가져온다.
