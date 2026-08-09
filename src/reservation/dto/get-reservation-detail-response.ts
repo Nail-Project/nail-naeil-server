@@ -20,7 +20,8 @@ export interface GetReservationDetailResponse {
   shopBusinessHours: JsonValue | null;
   shopClosedDays: JsonValue | null;
   // "예약 당시 위치"가 아니라 "지금 사용자 위치" 기준 거리라 상세 조회 API에 위도/경도 쿼리
-  // 파라미터를 새로 받는 설계가 필요함(2026-08-09, 미정) - 지금은 필드 자리만 만들어두고 항상 null.
+  // 파라미터를 새로 받는 설계가 필요함(2026-08-09, 미정) - 관련 이슈/PR 없음(확인 완료).
+  // 계산 로직 붙이기 전까지 프론트가 필드는 먼저 받아볼 수 있도록 더미 값을 내려준다.
   distanceMeters: number | null;
   reservedAt: Date;
   // 견적서 세부내역 - EstimateResponse에 이미 저장돼 있던 값을 그대로 노출한다.

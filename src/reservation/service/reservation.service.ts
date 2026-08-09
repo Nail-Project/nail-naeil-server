@@ -178,8 +178,9 @@ export class ReservationService {
       shopThumbnailUrl: shop.thumbnailImageUrl,
       shopBusinessHours: shop.businessHours,
       shopClosedDays: shop.closedDays,
-      // TODO: [malibu] 위도/경도 쿼리 파라미터 설계 후 실제 거리 계산 연결 예정
-      distanceMeters: null,
+      // TODO: [malibu] 위도/경도 쿼리 파라미터 설계 후 실제 거리 계산으로 교체 예정.
+      // 관련 이슈/PR 없음(2026-08-09 확인) - 프론트가 필드는 먼저 받아볼 수 있도록 더미 값을 내려준다.
+      distanceMeters: 1_200,
       reservedAt: reservation.reservedAt,
       basePrice: reservation.proposal.basePrice,
       removalPrice: reservation.proposal.removalPrice,
