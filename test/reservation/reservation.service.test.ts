@@ -443,6 +443,7 @@ describe('ReservationService.getReservationDetail', () => {
       shopThumbnailUrl: 'https://example.com/shop-thumb.jpg',
       shopBusinessHours: { mon: '10:00-20:00' },
       shopClosedDays: ['SUN'],
+      distanceMeters: null,
       basePrice: 40_000,
       removalPrice: 5_000,
       extraPrice: 10_000,
