@@ -220,6 +220,11 @@ export class EstimateRequestService {
   private readonly repository = new EstimateRequestRepository();
   private readonly smsService = new SmsService();
 
+  // 진행 중(샵 매칭 중) 견적 요청 수. 마이페이지 요약(다른 도메인)에서 이 서비스를 통해 호출한다.
+  async countInProgress(userId: number): Promise<number> {
+    return this.repository.countInProgressByUser(userId);
+  }
+
   // 견적 요청 생성
   // ① SMS 발송 — 실패 시 DB 저장 없이 EstimateRequestFailedError + 실패 이유 반환
   // ② SMS 성공 후 DB 저장

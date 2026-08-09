@@ -56,6 +56,18 @@ export class UserController {
    *                     role:
    *                       type: string
    *                       example: CUSTOMER
+   *                     inProgressEstimateCount:
+   *                       type: integer
+   *                       description: 진행 중(샵 매칭 중)인 견적 요청 수
+   *                       example: 2
+   *                     upcomingReservationCount:
+   *                       type: integer
+   *                       description: 다가오는(확정 + 예약 시각 미도래) 예약 수
+   *                       example: 1
+   *                     isNPlus:
+   *                       type: boolean
+   *                       description: NPlus 구독 가입 여부
+   *                       example: false
    *       401:
    *         description: 유효하지 않은 토큰
    *         content:

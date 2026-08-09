@@ -77,8 +77,40 @@ model User {
   wishDesigns     WishDesign[]
   wishShops       WishShop[]
   shopReviews     ShopReview[]
+  subscriptions   Subscription[]
 
   @@map("users")
+}
+
+// NPlus 구독. 결제 연동은 범위 밖(P2)이라 상태와 기간만 관리한다.
+// 마이페이지의 NPlus 가입 여부는 "ACTIVE이면서 만료되지 않은" 구독이 존재하는지로 판단한다.
+enum SubscriptionPlan {
+  NPLUS
+}
+
+enum SubscriptionStatus {
+  ACTIVE // 구독 중
+  EXPIRED // 기간 만료
+  CANCELLED // 사용자 해지
+}
+
+model Subscription {
+  id        Int                @id @default(autoincrement())
+  userId    Int                @map("user_id")
+  plan      SubscriptionPlan   @default(NPLUS)
+  status    SubscriptionStatus @default(ACTIVE)
+  startedAt DateTime           @default(now()) @map("started_at") @db.DateTime(3)
+  // null이면 무기한(해지 전까지 유효), 값이 있으면 그 시점 이후 만료로 본다.
+  expiresAt DateTime?          @map("expires_at") @db.DateTime(3)
+  createdAt DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
+
+  // 회원 탈퇴 시 구독도 함께 삭제되도록 Cascade.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 특정 사용자의 활성 구독을 조회하는 접근 패턴에 맞춘 인덱스.
+  @@index([userId, status])
+  @@map("subscriptions")
 }
 
 model WishShop {
