@@ -230,7 +230,8 @@ const swaggerSpec = swaggerJsdoc({
       },
     },
   },
-  apis: [path.resolve(__dirname, '../**/*.{ts,js}')],
+  // Windows에서 path.resolve()가 역슬래시를 반환해 glob이 동작하지 않으므로 슬래시로 변환한다.
+  apis: [path.resolve(__dirname, '../**/*.{ts,js}').replace(/\\/g, '/')],
 }) as SwaggerDocument;
 
 const paths = swaggerSpec.paths ?? {};

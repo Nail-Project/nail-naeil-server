@@ -29,7 +29,7 @@ cron.schedule('0 2 * * *', runImageCleanupScheduler, {
   timezone: 'Asia/Seoul',
 });
 
-// 매일 새벽 3시에 만료된 견적 요청(endDate 지난 MATCHING)을 EXPIRED로 전환하고 마감 알림을 보낸다.
+// 매일 새벽 3시에 만료된 견적 요청(모든 일정이 지난 MATCHING)을 EXPIRED로 전환하고 마감 알림을 보낸다.
 cron.schedule('0 3 * * *', () => runEstimateExpiryScheduler(), {
   timezone: 'Asia/Seoul',
 });

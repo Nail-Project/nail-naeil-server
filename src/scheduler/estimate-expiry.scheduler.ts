@@ -3,13 +3,14 @@ import { NotificationService } from '../notification/service/notification.servic
 
 // -------------------------------------------------------------------
 // 견적 요청 만료 처리 스케줄러
-// 대상: 아직 매칭 중(MATCHING)인데 가능한 일정(endDate)이 이미 지난 요청
+// 대상: 아직 매칭 중(MATCHING)인데 가능한 일정이 모두 지난 요청
+//       (schedules 중 오늘 이후인 날짜가 단 하나도 없는 경우)
 // 처리: 상태를 EXPIRED로 전환하고 요청자에게 "견적 응답 마감" 알림을 보낸다.
 // -------------------------------------------------------------------
 const SEOUL_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 // KST 기준 오늘 자정을 UTC Date로 반환한다.
-// endDate(@db.Date)가 이 값보다 이전이면 가능한 일정이 어제까지였다는 뜻이라 마감으로 본다.
+// schedule.date(@db.Date)가 이 값보다 이전이면 해당 날짜가 지난 것으로 본다.
 const getTodayStartKst = (): Date => {
   const nowKst = new Date(Date.now() + SEOUL_OFFSET_MS);
   const y = nowKst.getUTCFullYear();
@@ -26,8 +27,13 @@ export const runEstimateExpiryScheduler = async (
 ): Promise<void> => {
   const todayStart = getTodayStartKst();
 
+  // schedules 중 오늘 이후인 날짜가 하나도 없는(= 모든 일정이 지난) MATCHING 요청을 찾는다.
+  // schedules가 비어 있는 경우(정상 데이터라면 발생하지 않음)도 none 조건에 걸려 함께 처리된다.
   const candidates = await getPrisma().estimateRequest.findMany({
-    where: { status: 'MATCHING', endDate: { lt: todayStart } },
+    where: {
+      status: 'MATCHING',
+      schedules: { none: { date: { gte: todayStart } } },
+    },
     select: { id: true, userId: true },
   });
 
@@ -42,7 +48,11 @@ export const runEstimateExpiryScheduler = async (
   let expiredCount = 0;
   for (const request of candidates) {
     const { count } = await getPrisma().estimateRequest.updateMany({
-      where: { id: request.id, status: 'MATCHING', endDate: { lt: todayStart } },
+      where: {
+        id: request.id,
+        status: 'MATCHING',
+        schedules: { none: { date: { gte: todayStart } } },
+      },
       data: { status: 'EXPIRED' },
     });
     if (count === 0) continue; // 다른 실행이 이미 처리함

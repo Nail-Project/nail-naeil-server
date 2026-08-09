@@ -14,8 +14,8 @@ export interface CreatedSmsMessage {
 }
 
 export interface SmsParsingContext {
-  requestStartDate: Date;
-  requestEndDate: Date;
+  // 사용자가 선택한 방문 가능 날짜 목록 (중복 제거됨)
+  scheduleDates: Date[];
   messages: Prisma.JsonValue[];
 }
 
@@ -355,8 +355,11 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
     const request = await getPrisma().estimateRequest.findUnique({
       where: { id: requestId },
       select: {
-        startDate: true,
-        endDate: true,
+        // 방문 가능 날짜 목록 (날짜+시간 조합 row → 날짜만 추출 후 중복 제거)
+        schedules: {
+          select: { date: true },
+          orderBy: { date: 'asc' },
+        },
         smsMessages: {
           where: { shopId, direction: 'INBOUND' },
           select: { rawPayload: true },
@@ -370,9 +373,13 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
       return null;
     }
 
+    // 같은 날짜가 시간대 수만큼 중복되므로 Date 기준으로 중복 제거
+    const uniqueDates = [
+      ...new Map(request.schedules.map((s) => [s.date.getTime(), s.date])).values(),
+    ];
+
     return {
-      requestStartDate: request.startDate,
-      requestEndDate: request.endDate,
+      scheduleDates: uniqueDates,
       messages: request.smsMessages.reverse().map(({ rawPayload }) => rawPayload),
     };
   }

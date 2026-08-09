@@ -2,9 +2,13 @@
 // 목록 카드에 표시할 최소한의 데이터만 포함한다.
 export interface GetEstimatesResponseDto {
   estimateId: number;
-  // 요청에 첨부된 첫 번째 이미지 URL (없으면 null)
-  thumbnailUrl: string | null;
+  // 요청에 첨부된 디자인 이미지 목록 (등록 순)
+  images: { imageId: number; imageUrl: string }[];
   nailType: string;
+  // 제거 종류 (복수 선택): NONE | BASIC | PARTS | EXTENSION
+  removalTypes: string[];
+  // 방문 가능 일정 목록 (날짜별 희망 시간대)
+  schedules: { date: Date; times: string[] }[];
   createdAt: Date;
   // 견적 요청 상태: MATCHING | COMPLETED | EXPIRED
   status: string;

@@ -38,8 +38,8 @@ export interface GetReservationDetailResponse {
   shopComment: string | null;
   // 시술 부위 - EstimateRequest.nailType (HAND/PEDICURE/BOTH)
   nailType: string;
-  // 제거 유무 - EstimateRequest.removalType
-  removalType: string;
+  // 제거 종류 목록 - EstimateRequestRemoval 조인 테이블 (복수 선택)
+  removalTypes: string[];
   // 견적 요청 시 사용자가 업로드한 원본 참고 이미지 - EstimateRequest.images(RequestImage[])
   images: string[];
   status: ReservationStatus;

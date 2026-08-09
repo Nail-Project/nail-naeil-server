@@ -27,37 +27,57 @@ const estimateRequestRouter = Router();
  *             type: object
  *             required:
  *               - nailType
- *               - removalType
- *               - startDate
- *               - endDate
- *               - preferredTime
+ *               - removalTypes
+ *               - schedules
  *               - recommendType
  *             properties:
  *               nailType:
  *                 type: string
  *                 enum: [HAND, PEDICURE, BOTH]
- *               removalType:
- *                 type: string
- *                 enum: [EXTENSION, PARTS, BASIC, NONE]
- *               startDate:
- *                 type: string
- *                 example: "2026-08-01"
- *               endDate:
- *                 type: string
- *                 example: "2026-08-07"
- *               preferredTime:
- *                 type: string
- *                 enum: [AM, PM, EVENING, ANY]
+ *               removalTypes:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [NONE, BASIC, PARTS, EXTENSION]
+ *                 minItems: 1
+ *                 maxItems: 4
+ *                 description: 제거 없음(NONE), 젤 제거(BASIC), 아트/파츠 제거(PARTS), 연장 제거(EXTENSION) 중 복수 선택
+ *                 example: ["BASIC", "PARTS"]
+ *               schedules:
+ *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 7
+ *                 description: 방문 가능 날짜별 희망 시간 목록 (오늘~오늘+7일 이내, 중복 날짜 불가)
+ *                 items:
+ *                   type: object
+ *                   required: [date, times]
+ *                   properties:
+ *                     date:
+ *                       type: string
+ *                       example: "2026-08-10"
+ *                     times:
+ *                       type: array
+ *                       minItems: 1
+ *                       maxItems: 4
+ *                       items:
+ *                         type: string
+ *                         enum: [AM, PM, EVENING, ANY]
+ *                       description: 오전(AM), 오후(PM), 저녁(EVENING), 상관없음(ANY) 복수 선택 가능
+ *                       example: ["AM", "PM"]
+ *                 example: [{"date": "2026-08-10", "times": ["AM", "PM"]}, {"date": "2026-08-11", "times": ["ANY"]}]
  *               recommendType:
  *                 type: string
  *                 enum: [BALANCED, CLOSE, WIDE, CHEAP]
  *               description:
  *                 type: string
- *               designId:
+ *               priceMin:
  *                 type: integer
- *                 minimum: 1
- *                 description: 디자인 매거진에서 "이 디자인 그대로 견적받기"로 요청한 경우의 카탈로그 디자인 id (직접 사진 업로드 시 생략)
- *                 example: 1
+ *                 description: 희망 최소 가격 (원, 선택) - DB 미저장, SMS 참고용
+ *                 example: 70000
+ *               priceMax:
+ *                 type: integer
+ *                 description: 희망 최대 가격 (원, 선택) - DB 미저장, SMS 참고용
+ *                 example: 95000
  *               images:
  *                 type: array
  *                 items:
@@ -92,18 +112,26 @@ const estimateRequestRouter = Router();
  *                     nailType:
  *                       type: string
  *                       enum: [HAND, PEDICURE, BOTH]
- *                     removalType:
- *                       type: string
- *                       enum: [EXTENSION, PARTS, BASIC, NONE]
- *                     startDate:
- *                       type: string
- *                       format: date-time
- *                     endDate:
- *                       type: string
- *                       format: date-time
- *                     preferredTime:
- *                       type: string
- *                       enum: [AM, PM, EVENING, ANY]
+ *                     removalTypes:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                         enum: [NONE, BASIC, PARTS, EXTENSION]
+ *                       example: ["BASIC", "PARTS"]
+ *                     schedules:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           date:
+ *                             type: string
+ *                             format: date-time
+ *                           times:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                               enum: [AM, PM, EVENING, ANY]
+ *                       example: [{"date": "2026-08-10T00:00:00.000Z", "times": ["AM", "PM"]}]
  *                     recommendType:
  *                       type: string
  *                       enum: [BALANCED, CLOSE, WIDE, CHEAP]
@@ -128,6 +156,12 @@ const estimateRequestRouter = Router();
  *                     createdAt:
  *                       type: string
  *                       format: date-time
+ *                     smsPreview:
+ *                       type: string
+ *                       description: |
+ *                         샵에 실제로 발송된 SMS 문자 원문 (클라이언트 미리보기용).
+ *                         줄바꿈(\n)이 포함된 멀티라인 문자열이다.
+ *                       example: "[네일내일] 견적 요청이 도착했습니다.\n\n· 종류: 손 네일\n· 제거: 젤 제거\n· 방문 가능 일정:\n  - 8월 10일 (월) 오전 (8~12시)\n· 희망 가격: 70,000원 ~ 95,000원\n· 추천 기준: 균형 추천\n\n가격과 가능한 날짜/시간을 이 번호로 문자 답장해주세요."
  *       400:
  *         description: 필수 필드 누락, 타입 불일치, 또는 shopIds 초과
  *         content:
@@ -273,13 +307,41 @@ const estimateRequestRouter = Router();
  *                           estimateId:
  *                             type: integer
  *                             example: 1
- *                           thumbnailUrl:
- *                             type: string
- *                             nullable: true
- *                             example: "http://localhost:3000/uploads/2026-07-20/uuid.jpg"
+ *                           images:
+ *                             type: array
+ *                             description: 요청에 첨부된 디자인 이미지 목록 (등록 순)
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 imageId:
+ *                                   type: integer
+ *                                 imageUrl:
+ *                                   type: string
+ *                                   example: "https://bucket.s3.ap-northeast-2.amazonaws.com/images/2026-08-10/uuid.jpg"
  *                           nailType:
  *                             type: string
  *                             enum: [HAND, PEDICURE, BOTH]
+ *                           removalTypes:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                               enum: [NONE, BASIC, PARTS, EXTENSION]
+ *                             example: ["BASIC", "PARTS"]
+ *                           schedules:
+ *                             type: array
+ *                             description: 방문 가능 일정 목록 (날짜별 희망 시간대)
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 date:
+ *                                   type: string
+ *                                   format: date-time
+ *                                 times:
+ *                                   type: array
+ *                                   items:
+ *                                     type: string
+ *                                     enum: [AM, PM, EVENING, ANY]
+ *                             example: [{"date": "2026-08-10T00:00:00.000Z", "times": ["AM", "PM"]}]
  *                           createdAt:
  *                             type: string
  *                             format: date-time
