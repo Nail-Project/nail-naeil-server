@@ -55,6 +55,9 @@ export const CreateEstimateRequestSchema = z
     // 추가 요청 사항 (선택)
     description: z.string().optional(),
 
+    // 카탈로그 디자인 연결 ID (선택) — "이 디자인 그대로 견적받기" 흐름에서만 전달됨
+    designId: z.number().int().positive().optional(),
+
     // 예상 가격 범위 (선택) - DB 미저장, SMS 발송 시 참고용으로만 사용
     // 슬라이더에서 설정한 최소·최대 금액 (단위: 원)
     priceMin: z.number().int().nonnegative().optional(),

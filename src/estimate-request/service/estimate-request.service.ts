@@ -281,6 +281,9 @@ export class EstimateRequestService {
     dto: CreateEstimateRequestDto,
     userId: number,
   ): Promise<CreateEstimateResponseDto> {
+    // SMS 문자 내용 생성 (DTO 확정 후 한 번만 생성, 발송과 미리보기 양쪽에서 동일하게 사용)
+    const smsText = formatSmsText(dto);
+
     // designId가 존재하지 않는 디자인을 가리키면 SMS 발송 전에 걸러낸다.
     if (dto.designId !== undefined) {
       let designExists: boolean;
