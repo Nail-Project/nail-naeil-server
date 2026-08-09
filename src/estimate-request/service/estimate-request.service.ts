@@ -14,8 +14,14 @@ import { encodeCursor } from '../../common/pagination/cursor';
 import { EstimateRequestDesignNotFoundError } from '../error/estimate-request.error';
 import { Prisma } from '../../generated/prisma/client';
 
+// create()는 targetShops(shopId)도 함께 FK로 걸려있어 P2003이 designId 때문인지
+// shopId 때문인지 구분해야 한다 - 제약 이름(estimate_requests_design_id_fkey)으로
+// designId 위반만 골라내고, 나머지(예: 삭제된 샵)는 일반 실패로 남긴다.
 const isDesignForeignKeyError = (error: unknown): boolean =>
-  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
+  error instanceof Prisma.PrismaClientKnownRequestError &&
+  error.code === 'P2003' &&
+  typeof error.meta?.field_name === 'string' &&
+  error.meta.field_name.includes('design_id');
 
 // ─── SMS 설정 ───────────────────────────────────────────────────────────────────
 const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
