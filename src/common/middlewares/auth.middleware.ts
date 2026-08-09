@@ -2,14 +2,8 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UnauthorizedError, TokenExpiredError, TokenInvalidError } from '../errors/common.error';
 
-// Express Request 타입에 userId, role 필드를 추가한다.
-// auth 미들웨어를 통과한 이후의 핸들러에서 req.userId로 접근한다.
-declare module 'express-serve-static-core' {
-  interface Request {
-    userId: number;
-    role: string;
-  }
-}
+// Express.Request의 userId/role 타입 확장은 src/types/express.d.ts 한 곳에서만 선언한다
+// (예전엔 여기서도 따로 선언해서 중복이었음, 2026-08-09 정리).
 
 interface JwtPayload {
   sub: number;
