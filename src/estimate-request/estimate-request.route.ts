@@ -53,6 +53,11 @@ const estimateRequestRouter = Router();
  *                 enum: [BALANCED, CLOSE, WIDE, CHEAP]
  *               description:
  *                 type: string
+ *               designId:
+ *                 type: integer
+ *                 minimum: 1
+ *                 description: 디자인 매거진에서 "이 디자인 그대로 견적받기"로 요청한 경우의 카탈로그 디자인 id (직접 사진 업로드 시 생략)
+ *                 example: 1
  *               images:
  *                 type: array
  *                 items:
@@ -108,6 +113,9 @@ const estimateRequestRouter = Router();
  *                     status:
  *                       type: string
  *                       enum: [MATCHING, COMPLETED, EXPIRED]
+ *                     designId:
+ *                       type: integer
+ *                       nullable: true
  *                     images:
  *                       type: array
  *                       items:
@@ -139,6 +147,30 @@ const estimateRequestRouter = Router();
  *                     message:
  *                       type: string
  *                       example: 견적 요청 정보를 모두 입력해주세요.
+ *                     data:
+ *                       nullable: true
+ *                 success:
+ *                   nullable: true
+ *                   example: null
+ *       404:
+ *         description: designId로 지정한 디자인이 존재하지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultType:
+ *                   type: string
+ *                   example: FAIL
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: DESIGN_NOT_FOUND
+ *                     message:
+ *                       type: string
+ *                       example: 존재하지 않는 디자인입니다.
  *                     data:
  *                       nullable: true
  *                 success:

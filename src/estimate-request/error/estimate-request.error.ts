@@ -49,6 +49,18 @@ export class NoShopsSelectedError extends AppError {
   }
 }
 
+// POST / - designId로 지정한 카탈로그 디자인이 존재하지 않을 때
+export class EstimateRequestDesignNotFoundError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'DESIGN_NOT_FOUND',
+      statusCode: 404,
+      message: '존재하지 않는 디자인입니다.',
+      data,
+    });
+  }
+}
+
 // GET /result/:request_id - 요청자와 로그인한 사용자가 다를 때
 // TODO: [yej] 로그인 구현 후 활성화
 export class EstimateRequestForbiddenError extends AppError {

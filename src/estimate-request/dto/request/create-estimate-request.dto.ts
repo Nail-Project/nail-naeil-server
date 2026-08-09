@@ -40,6 +40,10 @@ export const CreateEstimateRequestSchema = z
     // 추가 요청 사항 (선택)
     description: z.string().optional(),
 
+    // 디자인 매거진에서 "이 디자인 그대로 견적받기"로 요청한 경우의 카탈로그 디자인 id (선택)
+    // 사용자가 직접 사진을 올려 요청하는 경우 생략한다.
+    designId: z.number().int().positive().optional(),
+
     // 거리 계산에는 견적 요청 당시 위치를 사용한다. 기존 클라이언트 호환을 위해 선택값이다.
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
