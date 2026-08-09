@@ -26,7 +26,8 @@ export interface SaveParsedEstimateResponseInput {
   totalPrice: number | null;
   basePrice: number | null;
   removalPrice: number | null;
-  extraPrice: number | null;
+  designExtraPrice: number | null;
+  optionExtraPrice: number | null;
   memo: string | null;
   proposalDateTimes: Date[];
 }
@@ -38,7 +39,8 @@ export interface EstimateResponseDetail {
   totalPrice: number | null;
   basePrice: number | null;
   removalPrice: number | null;
-  extraPrice: number | null;
+  designExtraPrice: number | null;
+  optionExtraPrice: number | null;
   estimatedDurationMinutes: number;
   canProvideService: boolean;
   isRemovalIncluded: boolean;
@@ -91,6 +93,7 @@ export interface ProposalTimeRecord {
 export interface EstimateResponseRepository {
   createSmsMessage(request: CreateSmsMessageRequest): Promise<CreatedSmsMessage>;
   findRequestOwner(requestId: number): Promise<{ userId: number } | null>;
+  findLowestOfferedPrice(requestId: number): Promise<number | null>;
   findDetail(responseId: number): Promise<EstimateResponseDetail | null>;
   findList(requestId: number): Promise<EstimateResponseListRecord[]>;
   findRequestContext(requestId: number): Promise<EstimateRequestContext | null>;
@@ -219,6 +222,21 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
     });
   }
 
+  // 해당 요청에 제시된 견적 중 최저가(totalPrice). 응답이 없거나 가격이 모두 null이면 null.
+  // "더 낮은 견적 도착" 판정에 사용한다(저장 직전에 호출해 이전 최저가를 얻는다).
+  // 확정(ACCEPTED)된 견적도 이미 제시된 가격이므로 기준 최저가에 포함한다(REJECTED만 제외).
+  async findLowestOfferedPrice(requestId: number): Promise<number | null> {
+    const result = await getPrisma().estimateResponse.aggregate({
+      where: {
+        requestId,
+        status: { in: ['SUBMITTED', 'ACCEPTED'] },
+        totalPrice: { not: null },
+      },
+      _min: { totalPrice: true },
+    });
+    return result._min.totalPrice ?? null;
+  }
+
   async findDetail(responseId: number): Promise<EstimateResponseDetail | null> {
     return getPrisma().estimateResponse.findUnique({
       where: { id: responseId },
@@ -229,7 +247,8 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
         totalPrice: true,
         basePrice: true,
         removalPrice: true,
-        extraPrice: true,
+        designExtraPrice: true,
+        optionExtraPrice: true,
         estimatedDurationMinutes: true,
         canProvideService: true,
         isRemovalIncluded: true,
@@ -386,7 +405,8 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           totalPrice: input.totalPrice,
           basePrice: input.basePrice,
           removalPrice: input.removalPrice,
-          extraPrice: input.extraPrice,
+          designExtraPrice: input.designExtraPrice,
+          optionExtraPrice: input.optionExtraPrice,
           memo: input.memo,
           estimatedDurationMinutes: input.estimatedDurationMinutes,
           canProvideService: input.canProvideService,
@@ -397,7 +417,8 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           totalPrice: input.totalPrice,
           basePrice: input.basePrice,
           removalPrice: input.removalPrice,
-          extraPrice: input.extraPrice,
+          designExtraPrice: input.designExtraPrice,
+          optionExtraPrice: input.optionExtraPrice,
           memo: input.memo,
           estimatedDurationMinutes: input.estimatedDurationMinutes,
           canProvideService: input.canProvideService,

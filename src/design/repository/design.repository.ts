@@ -12,6 +12,7 @@ export interface DesignSummaryRecord {
     tags: string[];
     viewCount: number;
     wishCount: number;
+    isHot: boolean;
   };
   // 커서 생성에만 쓰는 내부 필드 - design과 분리해둬서 실수로 응답에 통째로 spread할 수 없게 한다.
   createdAt: Date;
@@ -39,6 +40,7 @@ export interface WishlistItemRecord {
     tags: string[];
     viewCount: number;
     wishCount: number;
+    isHot: boolean;
   };
   // 커서 생성에만 쓰는 내부 필드 - design과 분리해둬서 실수로 응답에 통째로 spread할 수 없게 한다.
   // 디자인이 아니라 WishDesign(찜 기록) 행 기준이다("찜한 시점" 정렬).
@@ -124,6 +126,32 @@ const mapDesignAdminRecord = (design: DesignAdminRow): DesignAdminRecord => ({
 const isUniqueConstraintError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 
+// "상담폭주" 배지 기준 - 최근 7일간 이 디자인으로 견적 요청이 5건 이상 들어오면 노출한다.
+// TODO: [기획 확인 필요] 이 수치(7일/5건)는 확정된 기획값이 아니라 임시로 잡은 값이다.
+// 실제 기준이 정해지면 이 두 상수만 바꾸면 된다.
+const HOT_DESIGN_WINDOW_DAYS = 7;
+const HOT_DESIGN_MIN_REQUESTS = 5;
+
+// 페이지에 있는 디자인 중 "상담폭주" 기준을 넘는 디자인 id 집합을 구한다.
+// 디자인마다 개별 쿼리를 날리지 않도록 현재 페이지 id 목록을 한 번에 그룹핑해서 조회한다.
+const findHotDesignIds = async (designIds: number[]): Promise<Set<number>> => {
+  if (designIds.length === 0) return new Set();
+
+  const since = new Date(Date.now() - HOT_DESIGN_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+  const counts = await getPrisma().estimateRequest.groupBy({
+    by: ['designId'],
+    where: { designId: { in: designIds }, createdAt: { gte: since } },
+    _count: { _all: true },
+  });
+
+  return new Set(
+    counts
+      .filter((row) => row.designId !== null && row._count._all >= HOT_DESIGN_MIN_REQUESTS)
+      .map((row) => row.designId as number),
+  );
+};
+
 // 태그를 이름으로 upsert해서 id 목록으로 변환한다.
 // AI 자동 태깅/관리자 수동 입력 둘 다 "이름"만 알고 있는 상황을 가정한 설계 - 이미 있는
 // 이름이면 재사용하고, 처음 보는 이름이면 그 자리에서 새로 만든다.
@@ -185,6 +213,7 @@ export class PrismaDesignRepository implements DesignRepository {
 
     const hasNext = rows.length > size;
     const page = hasNext ? rows.slice(0, size) : rows;
+    const hotIds = await findHotDesignIds(page.map((row) => row.id));
 
     return {
       designs: page.map((row) => ({
@@ -195,6 +224,7 @@ export class PrismaDesignRepository implements DesignRepository {
           tags: row.tags.map((t) => t.tag.name),
           viewCount: row.viewCount,
           wishCount: row._count.wishes,
+          isHot: hotIds.has(row.id),
         },
         createdAt: row.createdAt,
       })),
@@ -336,6 +366,7 @@ export class PrismaDesignRepository implements DesignRepository {
 
     const hasNext = rows.length > size;
     const page = hasNext ? rows.slice(0, size) : rows;
+    const hotIds = await findHotDesignIds(page.map((row) => row.design.id));
 
     return {
       items: page.map((row) => ({
@@ -346,6 +377,7 @@ export class PrismaDesignRepository implements DesignRepository {
           tags: row.design.tags.map((t) => t.tag.name),
           viewCount: row.design.viewCount,
           wishCount: row.design._count.wishes,
+          isHot: hotIds.has(row.design.id),
         },
         wishId: row.id,
         wishedAt: row.createdAt,

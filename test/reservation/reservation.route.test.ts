@@ -161,7 +161,21 @@ describe('GET /api/v1/reserve/:reservationId', () => {
     const response = await request(app).get('/api/v1/reserve/1');
 
     expect(response.status).toBe(200);
-    expect(service.getReservationDetail).toHaveBeenCalledWith(1n, TEMP_USER_ID);
+    expect(service.getReservationDetail).toHaveBeenCalledWith(
+      1n,
+      TEMP_USER_ID,
+      undefined,
+      undefined,
+    );
+  });
+
+  it('위도/경도를 쿼리로 전달하면 그대로 서비스에 전달한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).get('/api/v1/reserve/1?latitude=37.5&longitude=127.0');
+
+    expect(response.status).toBe(200);
+    expect(service.getReservationDetail).toHaveBeenCalledWith(1n, TEMP_USER_ID, 37.5, 127.0);
   });
 
   it('숫자가 아닌 id는 400으로 응답하고, 쿼리 검증과 구분되는 전용 에러 코드를 반환한다', async () => {

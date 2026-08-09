@@ -100,7 +100,8 @@ class FakeRepository implements EstimateResponseRepository {
       totalPrice: 55_000,
       basePrice: 45_000,
       removalPrice: 5_000,
-      extraPrice: 5_000,
+      designExtraPrice: 3_000,
+      optionExtraPrice: 2_000,
       estimatedDurationMinutes: 60,
       canProvideService: true,
       isRemovalIncluded: true,
@@ -167,6 +168,12 @@ class FakeRepository implements EstimateResponseRepository {
 
   async findRequestOwner(requestId: number): Promise<{ userId: number } | null> {
     return requestId === 1 ? { userId: 1 } : null;
+  }
+
+  // 기본값 null → "더 낮은 견적" 아님(ESTIMATE_RESPONSE로 발송). 필요 시 하위 클래스에서 override.
+  lowestOfferedPrice: number | null = null;
+  async findLowestOfferedPrice(): Promise<number | null> {
+    return this.lowestOfferedPrice;
   }
 }
 
@@ -245,7 +252,8 @@ describe('EstimateResponseService', () => {
       totalPrice: 55_000,
       basePrice: null,
       removalPrice: null,
-      extraPrice: null,
+      designExtraPrice: null,
+      optionExtraPrice: null,
       memo: '제거 포함',
       proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
     });
@@ -259,7 +267,8 @@ describe('EstimateResponseService', () => {
         totalPrice: 55_000,
         basePrice: null,
         removalPrice: null,
-        extraPrice: null,
+        designExtraPrice: null,
+        optionExtraPrice: null,
         memo: '제거 포함',
       });
     });
@@ -277,7 +286,8 @@ describe('EstimateResponseService', () => {
       totalPrice: 55_000,
       basePrice: 55_000,
       removalPrice: 0,
-      extraPrice: 0,
+      designExtraPrice: 0,
+      optionExtraPrice: 0,
       memo: null,
       proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
     });
@@ -297,6 +307,34 @@ describe('EstimateResponseService', () => {
     });
   });
 
+  it('기존 최저가보다 낮은 견적이면 LOWER_ESTIMATE 알림을 생성한다', async () => {
+    const repository = new LinkedSmsRepository();
+    // 저장 전 기존 최저가를 60,000원으로 두고, 이번 응답(55,000원)이 더 낮게 들어오는 상황.
+    repository.lowestOfferedPrice = 60_000;
+    const parser = new FakeParser({
+      canProvideService: true,
+      estimatedDurationMinutes: 60,
+      isRemovalIncluded: false,
+      totalPrice: 55_000,
+      basePrice: 55_000,
+      removalPrice: 0,
+      designExtraPrice: 0,
+      optionExtraPrice: 0,
+      memo: null,
+      proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
+    });
+    const notificationService = createNotificationService();
+    const service = new EstimateResponseService(repository, parser, notificationService);
+
+    await service.createSmsMessage(smsRequest);
+
+    await vi.waitFor(() => {
+      expect(notificationService.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 1, type: 'LOWER_ESTIMATE' }),
+      );
+    });
+  });
+
   it('가격이나 가능 시간이 불완전하면 추가 문자를 기다린다', async () => {
     const repository = new LinkedSmsRepository();
     const parser = new FakeParser({
@@ -306,7 +344,8 @@ describe('EstimateResponseService', () => {
       totalPrice: 55_000,
       basePrice: null,
       removalPrice: 0,
-      extraPrice: 0,
+      designExtraPrice: 0,
+      optionExtraPrice: 0,
       memo: null,
       proposalDateTimes: [],
     });
@@ -330,7 +369,8 @@ describe('EstimateResponseService', () => {
       totalPrice: null,
       basePrice: null,
       removalPrice: null,
-      extraPrice: null,
+      designExtraPrice: null,
+      optionExtraPrice: null,
       memo: '시술이 어려워요.',
       proposalDateTimes: [],
     });
@@ -354,7 +394,8 @@ describe('EstimateResponseService', () => {
       totalPrice: 55_000,
       basePrice: 55_000,
       removalPrice: 0,
-      extraPrice: 0,
+      designExtraPrice: 0,
+      optionExtraPrice: 0,
       memo: null,
       proposalDateTimes: [
         '2026-07-20T14:00:00+09:00',
@@ -408,7 +449,13 @@ describe('EstimateResponseService', () => {
     await expect(service.getDetail(10, 1)).resolves.toMatchObject({
       id: 10,
       shop: { name: '내일네일' },
-      price: { totalPrice: 55_000 },
+      price: {
+        totalPrice: 55_000,
+        basePrice: 45_000,
+        removalPrice: 5_000,
+        designExtraPrice: 3_000,
+        optionExtraPrice: 2_000,
+      },
     });
   });
 

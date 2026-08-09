@@ -38,4 +38,35 @@ describe('GetReservationDetailRequest', () => {
   it('reservationId가 없으면 거부한다', () => {
     expect(GetReservationDetailRequest.safeParse({}).success).toBe(false);
   });
+
+  it('latitude/longitude를 함께 전달하면 숫자로 변환한다', () => {
+    const result = GetReservationDetailRequest.safeParse({
+      reservationId: '5',
+      latitude: '37.5',
+      longitude: '127.0',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({ latitude: 37.5, longitude: 127.0 });
+  });
+
+  it('latitude/longitude를 둘 다 생략하면 통과한다', () => {
+    expect(GetReservationDetailRequest.safeParse({ reservationId: '5' }).success).toBe(true);
+  });
+
+  it('latitude만 있고 longitude가 없으면 거부한다', () => {
+    expect(
+      GetReservationDetailRequest.safeParse({ reservationId: '5', latitude: '37.5' }).success,
+    ).toBe(false);
+  });
+
+  it('범위를 벗어난 위도는 거부한다', () => {
+    expect(
+      GetReservationDetailRequest.safeParse({
+        reservationId: '5',
+        latitude: '91',
+        longitude: '127.0',
+      }).success,
+    ).toBe(false);
+  });
 });

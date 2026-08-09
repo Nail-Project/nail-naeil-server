@@ -457,7 +457,7 @@ const estimateResponseRouter = Router();
  *                       type: object
  *                       required: [totalPrice]
  *                       description: 시술 가능한 견적의 총액은 필수이며, 시술 불가 응답에서는 totalPrice가 null이다. 상세 금액은 샵이 문자에 명시한 경우에만 제공한다.
- *                       example: { totalPrice: 55000, basePrice: null, removalPrice: null, extraPrice: null }
+ *                       example: { totalPrice: 55000, basePrice: null, removalPrice: null, designExtraPrice: null, optionExtraPrice: null }
  *                       properties:
  *                         totalPrice:
  *                           type: integer
@@ -473,10 +473,15 @@ const estimateResponseRouter = Router();
  *                           nullable: true
  *                           description: 샵이 제거 금액을 별도로 명시한 경우에만 제공
  *                           example: null
- *                         extraPrice:
+ *                         designExtraPrice:
  *                           type: integer
  *                           nullable: true
- *                           description: 샵이 추가 금액을 명시한 경우에만 합산 금액으로 제공하며 세부 항목은 memo에 포함
+ *                           description: 샵이 디자인(아트/그림 등) 관련 추가 금액을 명시한 경우에만 제공
+ *                           example: null
+ *                         optionExtraPrice:
+ *                           type: integer
+ *                           nullable: true
+ *                           description: 샵이 그 외 옵션(젤/파츠 등) 관련 추가 금액을 명시한 경우에만 제공
  *                           example: null
  *                     memo:
  *                       type: string

@@ -11,10 +11,13 @@ const createApp = () => {
     search: vi.fn().mockResolvedValue({ shops: [], nextCursor: null }),
     getDetail: vi.fn().mockResolvedValue({ shopId: 1, name: '내일네일' }),
     getReviews: vi.fn().mockResolvedValue({ reviews: [], nextCursor: null }),
+    getWishlist: vi.fn().mockResolvedValue({ shops: [], nextCursor: null }),
+    toggleWish: vi.fn().mockResolvedValue({ shopId: 1, isWished: true }),
   };
   const controller = new ShopQueryController(service as unknown as ShopQueryService);
   const app = express();
 
+  app.use(express.json());
   app.use((req, _res, next) => {
     req.userId = 1;
     next();
@@ -24,6 +27,8 @@ const createApp = () => {
   app.get('/api/v1/shops/search', controller.search);
   app.get('/api/v1/shops/:shopId/reviews', controller.getReviews);
   app.get('/api/v1/shops/:shopId', controller.getDetail);
+  app.get('/api/v1/users/me/bookmark', controller.getWishlist);
+  app.post('/api/v1/bookmark/toggle', controller.toggleWish);
   app.use(errorHandler);
 
   return { app, service };
@@ -73,6 +78,37 @@ describe('shop query routes', () => {
 
     expect(response.status).toBe(200);
     expect(service.getReviews).toHaveBeenCalledWith(1, 10, undefined);
+  });
+
+  it('찜한 매장 목록을 조회한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).get('/api/v1/users/me/bookmark');
+
+    expect(response.status).toBe(200);
+    expect(service.getWishlist).toHaveBeenCalledWith(1, 20, undefined, undefined, undefined);
+  });
+
+  it('찜을 토글한다', async () => {
+    const { app, service } = createApp();
+
+    const response = await request(app).post('/api/v1/bookmark/toggle').send({ shopId: 1 });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: { shopId: 1, isWished: true } });
+    expect(service.toggleWish).toHaveBeenCalledWith(1, 1);
+  });
+
+  it('찜 토글 요청에 shopId가 없으면 400을 던진다', async () => {
+    const { app } = createApp();
+
+    const response = await request(app).post('/api/v1/bookmark/toggle').send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      resultType: 'FAIL',
+      error: { code: 'INVALID_SHOP_QUERY_REQUEST' },
+    });
   });
 
   it.each([

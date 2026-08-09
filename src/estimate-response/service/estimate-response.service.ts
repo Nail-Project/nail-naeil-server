@@ -107,6 +107,9 @@ export class EstimateResponseService {
         return;
       }
 
+      // 저장 전, 이 요청의 기존 최저가를 구해 이번 응답이 더 낮은지(더 낮은 견적 도착) 판단한다.
+      const priorLowestPrice = await this.repository.findLowestOfferedPrice(message.requestId);
+
       await this.repository.saveParsedEstimateResponse(
         message.id,
         message.requestId,
@@ -118,23 +121,40 @@ export class EstimateResponseService {
           totalPrice: parsed.totalPrice,
           basePrice: parsed.basePrice,
           removalPrice: parsed.removalPrice,
-          extraPrice: parsed.extraPrice,
+          designExtraPrice: parsed.designExtraPrice,
+          optionExtraPrice: parsed.optionExtraPrice,
           memo: parsed.memo,
           proposalDateTimes,
         },
       );
 
       // 견적 응답이 저장되면 요청자에게 알림. 알림 실패가 파싱 플로우를 막지 않도록 격리한다.
+      // 이전 최저가보다 낮은 견적이면 "더 낮은 견적 도착", 아니면 일반 "견적 답변 도착"으로 보낸다.
       try {
         const owner = await this.repository.findRequestOwner(message.requestId);
         if (owner) {
-          await this.notificationService.notify({
-            userId: owner.userId,
-            type: 'ESTIMATE_RESPONSE',
-            title: '견적 답변이 도착했어요',
-            body: '요청하신 견적에 새 답변이 도착했어요.',
-            data: { estimateRequestId: message.requestId },
-          });
+          const isNewLowest =
+            parsed.totalPrice !== null &&
+            priorLowestPrice !== null &&
+            parsed.totalPrice < priorLowestPrice;
+
+          await this.notificationService.notify(
+            isNewLowest
+              ? {
+                  userId: owner.userId,
+                  type: 'LOWER_ESTIMATE',
+                  title: '더 저렴한 견적이 도착했어요',
+                  body: '지금까지보다 더 낮은 견적이 도착했어요.',
+                  data: { estimateRequestId: message.requestId },
+                }
+              : {
+                  userId: owner.userId,
+                  type: 'ESTIMATE_RESPONSE',
+                  title: '견적 답변이 도착했어요',
+                  body: '요청하신 견적에 새 답변이 도착했어요.',
+                  data: { estimateRequestId: message.requestId },
+                },
+          );
         }
       } catch (notifyError) {
         console.error('[EstimateResponseService] 알림 생성 실패', {
@@ -182,7 +202,8 @@ export class EstimateResponseService {
         totalPrice: response.totalPrice,
         basePrice: response.basePrice,
         removalPrice: response.removalPrice,
-        extraPrice: response.extraPrice,
+        designExtraPrice: response.designExtraPrice,
+        optionExtraPrice: response.optionExtraPrice,
       },
       memo: response.memo,
       estimatedDurationMinutes: response.estimatedDurationMinutes,

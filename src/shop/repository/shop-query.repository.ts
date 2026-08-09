@@ -36,7 +36,8 @@ export interface ShopQueryRepository {
   findDetail(shopId: number, userId: number): Promise<ShopDetailRecord | null>;
   exists(shopId: number): Promise<boolean>;
   createWish(shopId: number, userId: number): Promise<void>;
-  deleteWish(shopId: number, userId: number): Promise<void>;
+  // 삭제된 row가 있었는지(=찜돼 있었는지) 반환 - 토글이 이 값 하나로 분기한다.
+  deleteWish(shopId: number, userId: number): Promise<boolean>;
   findWishlist(
     userId: number,
     limit: number,
@@ -132,8 +133,11 @@ export class PrismaShopQueryRepository implements ShopQueryRepository {
     });
   }
 
-  async deleteWish(shopId: number, userId: number): Promise<void> {
-    await getPrisma().wishShop.deleteMany({ where: { shopId, userId } });
+  // deleteMany는 원자적으로 실행되므로 실제로 삭제된 row가 있었는지(=찜돼 있었는지)를
+  // count로 그대로 반환한다. 토글에서 "확인 후 분기"(TOCTOU) 없이 이 결과 하나로 분기한다.
+  async deleteWish(shopId: number, userId: number): Promise<boolean> {
+    const { count } = await getPrisma().wishShop.deleteMany({ where: { shopId, userId } });
+    return count > 0;
   }
 
   async findWishlist(

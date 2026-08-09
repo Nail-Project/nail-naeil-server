@@ -11,6 +11,17 @@ import { CreateEstimateResponseDto } from '../dto/response/create-estimate-respo
 import { GetEstimatesPageResponse } from '../dto/response/get-estimates-response.dto';
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
 import { encodeCursor } from '../../common/pagination/cursor';
+import { EstimateRequestDesignNotFoundError } from '../error/estimate-request.error';
+import { Prisma } from '../../generated/prisma/client';
+
+// create()는 targetShops(shopId)도 함께 FK로 걸려있어 P2003이 designId 때문인지
+// shopId 때문인지 구분해야 한다 - 제약 이름(estimate_requests_design_id_fkey)으로
+// designId 위반만 골라내고, 나머지(예: 삭제된 샵)는 일반 실패로 남긴다.
+const isDesignForeignKeyError = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError &&
+  error.code === 'P2003' &&
+  typeof error.meta?.field_name === 'string' &&
+  error.meta.field_name.includes('design_id');
 
 // ─── SMS 설정 ───────────────────────────────────────────────────────────────────
 const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
@@ -21,7 +32,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`SMS 타임아웃: ${ms}ms 초과`)), ms)
+      setTimeout(() => reject(new Error(`SMS 타임아웃: ${ms}ms 초과`)), ms),
     ),
   ]);
 }
@@ -54,7 +65,9 @@ function isAllowedS3ImageUrl(imageUrl: string): boolean {
     if (urlObj.hostname !== `${bucket}.s3.${region}.amazonaws.com`) return false;
     const key = urlObj.pathname.replace(/^\//, '');
     // UUID 형식 엄격 검사: 8-4-4-4-12 하이픈 위치까지 확인
-    return /^images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/.test(key);
+    return /^images\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-zA-Z]+$/.test(
+      key,
+    );
   } catch {
     return false;
   }
@@ -111,7 +124,10 @@ class SmsService {
         await fsp.writeFile(tmpPath, buffer);
 
         // Solapi에 임시 파일 업로드
-        const { fileId } = (await withTimeout(this.client.uploadFile(tmpPath, 'MMS'), SMS_TIMEOUT_MS)) as { fileId: string };
+        const { fileId } = (await withTimeout(
+          this.client.uploadFile(tmpPath, 'MMS'),
+          SMS_TIMEOUT_MS,
+        )) as { fileId: string };
         fileIds.push(fileId);
       } catch (error) {
         console.warn(`[SmsService] 이미지 업로드 실패, 건너뜀: ${key}`, error);
@@ -252,13 +268,29 @@ export class EstimateRequestService {
   private readonly repository = new EstimateRequestRepository();
   private readonly smsService = new SmsService();
 
+  // 진행 중(샵 매칭 중) 견적 요청 수. 마이페이지 요약(다른 도메인)에서 이 서비스를 통해 호출한다.
+  async countInProgress(userId: number): Promise<number> {
+    return this.repository.countInProgressByUser(userId);
+  }
+
   // 견적 요청 생성
   // ① SMS 발송 — 실패 시 DB 저장 없이 EstimateRequestFailedError + 실패 이유 반환
   // ② SMS 성공 후 DB 저장
   // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller가 전달한다.
-  async createEstimateRequest(dto: CreateEstimateRequestDto, userId: number): Promise<CreateEstimateResponseDto> {
-    // SMS 문자 내용 생성 (DTO 확정 후 한 번만 생성, 발송과 미리보기 양쪽에서 동일하게 사용)
-    const smsText = formatSmsText(dto);
+  async createEstimateRequest(
+    dto: CreateEstimateRequestDto,
+    userId: number,
+  ): Promise<CreateEstimateResponseDto> {
+    // designId가 존재하지 않는 디자인을 가리키면 SMS 발송 전에 걸러낸다.
+    if (dto.designId !== undefined) {
+      let designExists: boolean;
+      try {
+        designExists = await this.repository.designExists(dto.designId);
+      } catch {
+        throw new EstimateRequestFailedError();
+      }
+      if (!designExists) throw new EstimateRequestDesignNotFoundError();
+    }
 
     // ① SMS 발송 (실패 시 DB 저장 없이 즉시 에러 반환)
     try {
@@ -293,6 +325,7 @@ export class EstimateRequestService {
         recommendType: result.recommendType,
         description: result.description ?? null,
         status: result.status,
+        designId: result.designId ?? null,
         images: result.images.map((img) => ({
           imageId: img.id,
           imageUrl: img.imageUrl,
@@ -301,7 +334,9 @@ export class EstimateRequestService {
         // 샵에 실제로 발송된 SMS 원문 그대로 반환 (클라이언트 미리보기용)
         smsPreview: smsText,
       };
-    } catch {
+    } catch (error) {
+      // 존재 확인(designExists) 이후 삭제된 경쟁 상태로 FK 제약(P2003) 위반
+      if (isDesignForeignKeyError(error)) throw new EstimateRequestDesignNotFoundError();
       throw new EstimateRequestFailedError();
     }
   }
@@ -315,7 +350,12 @@ export class EstimateRequestService {
     size: number,
   ): Promise<GetEstimatesPageResponse> {
     try {
-      const { estimates, hasNext } = await this.repository.findByStatus(status, userId, cursor, size);
+      const { estimates, hasNext } = await this.repository.findByStatus(
+        status,
+        userId,
+        cursor,
+        size,
+      );
 
       const last = estimates[estimates.length - 1];
       const nextCursor =

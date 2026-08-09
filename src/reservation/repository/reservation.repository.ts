@@ -1,3 +1,4 @@
+import type { Prisma } from '../../generated/prisma/client';
 import { getPrisma } from '../../infra/prisma';
 import type { ReservationStatus } from '../../generated/prisma/enums';
 import type { ReservationCursor } from '../dto/get-reservations-request';
@@ -30,8 +31,19 @@ const reservationListSelect = {
   proposal: {
     select: {
       totalPrice: true,
-      shop: { select: { name: true } },
-      request: { select: { nailType: true, removalType: true } },
+      shop: { select: { name: true, thumbnailImageUrl: true } },
+      request: {
+        select: {
+          nailType: true,
+          removalType: true,
+          design: {
+            select: {
+              title: true,
+              tags: { select: { tag: { select: { name: true } } }, orderBy: { tagId: 'asc' } },
+            },
+          },
+        },
+      },
     },
   },
 } as const;
@@ -43,8 +55,12 @@ export interface ReservationRecord {
   status: ReservationStatus;
   proposal: {
     totalPrice: number | null;
-    shop: { name: string };
-    request: { nailType: string; removalType: string };
+    shop: { name: string; thumbnailImageUrl: string | null };
+    request: {
+      nailType: string;
+      removalType: string;
+      design: { title: string; tags: { tag: { name: string } }[] } | null;
+    };
   };
 }
 
@@ -56,7 +72,8 @@ export interface ReservationDetailRecord {
     totalPrice: number | null;
     basePrice: number | null;
     removalPrice: number | null;
-    extraPrice: number | null;
+    designExtraPrice: number | null;
+    optionExtraPrice: number | null;
     memo: string | null;
     shop: {
       name: string;
@@ -65,8 +82,18 @@ export interface ReservationDetailRecord {
       addressDetail: string | null;
       rating: { toNumber(): number };
       reviewCount: number;
+      latitude: { toNumber(): number };
+      longitude: { toNumber(): number };
+      thumbnailImageUrl: string | null;
+      businessHours: Prisma.JsonValue | null;
+      closedDays: Prisma.JsonValue | null;
     };
-    request: { nailType: string; removalType: string; images: { imageUrl: string }[] };
+    request: {
+      nailType: string;
+      removalType: string;
+      images: { imageUrl: string }[];
+      design: { title: string } | null;
+    };
   };
 }
 
@@ -120,6 +147,7 @@ export interface ReservationRepository {
     userId: number,
     reason: string,
   ): Promise<CancelledReservationRecord | null>;
+  countUpcomingByUser(userId: number, now: Date): Promise<number>;
 }
 
 export class PrismaReservationRepository implements ReservationRepository {
@@ -245,7 +273,8 @@ export class PrismaReservationRepository implements ReservationRepository {
             totalPrice: true,
             basePrice: true,
             removalPrice: true,
-            extraPrice: true,
+            designExtraPrice: true,
+            optionExtraPrice: true,
             memo: true,
             shop: {
               select: {
@@ -255,10 +284,22 @@ export class PrismaReservationRepository implements ReservationRepository {
                 addressDetail: true,
                 rating: true,
                 reviewCount: true,
+                latitude: true,
+                longitude: true,
+                thumbnailImageUrl: true,
+                businessHours: true,
+                closedDays: true,
               },
             },
+            // Reservation → proposal → request → design 체인을 타고 카탈로그 디자인명을 가져온다.
+            // 직접 사진을 올려 요청한 경우 request.design은 null.
             request: {
-              select: { nailType: true, removalType: true, images: { select: { imageUrl: true } } },
+              select: {
+                nailType: true,
+                removalType: true,
+                images: { select: { imageUrl: true } },
+                design: { select: { title: true } },
+              },
             },
           },
         },
@@ -297,6 +338,13 @@ export class PrismaReservationRepository implements ReservationRepository {
     return await prisma.reservation.findUniqueOrThrow({
       where: { id: reservationId },
       select: { id: true, status: true, cancelReason: true },
+    });
+  }
+
+  // 다가오는 예약 수: CONFIRMED이면서 예약 시각이 아직 지나지 않은(now 이후) 예약. 마이페이지 요약에 사용한다.
+  async countUpcomingByUser(userId: number, now: Date): Promise<number> {
+    return await getPrisma().reservation.count({
+      where: { userId, status: 'CONFIRMED', reservedAt: { gte: now } },
     });
   }
 }

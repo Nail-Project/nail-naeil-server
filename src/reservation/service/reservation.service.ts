@@ -1,6 +1,9 @@
 import { Prisma } from '../../generated/prisma/client';
 import type { ReservationStatus } from '../../generated/prisma/enums';
-import type { ReservationRepository } from '../repository/reservation.repository';
+import {
+  PrismaReservationRepository,
+  type ReservationRepository,
+} from '../repository/reservation.repository';
 import { CreateReservationRequestType } from '../dto/create-reservation-request';
 import { CreateReservationResponse } from '../dto/create-reservation-response';
 import { GetReservationsResponse } from '../dto/get-reservations-response';
@@ -17,6 +20,8 @@ import {
   ReservationLockConflictError,
   ReservationNotFoundError,
 } from '../error/reservation.error';
+import { NotificationService } from '../../notification/service/notification.service';
+import { distanceMeters } from '../../common/utils/distance';
 
 const isUniqueConstraintError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
@@ -27,7 +32,18 @@ const isRecordNotFoundError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 
 export class ReservationService {
-  constructor(private readonly reservationRepository: ReservationRepository) {}
+  // 기본값을 두어 다른 도메인(마이페이지)에서 new ReservationService()로 간단히 쓰되,
+  // 테스트/라우터에서는 fake·Prisma 구현체를 명시적으로 주입할 수 있다.
+  constructor(
+    private readonly reservationRepository: ReservationRepository = new PrismaReservationRepository(),
+    // 예약 확정/취소 시 알림을 보낸다. 알림 실패가 예약 처리 자체를 막지 않도록 격리한다.
+    private readonly notificationService = new NotificationService(),
+  ) {}
+
+  // 다가오는 예약 수(CONFIRMED + 예약 시각 미도래). 마이페이지 요약에서 이 서비스를 통해 호출한다.
+  async countUpcoming(userId: number): Promise<number> {
+    return this.reservationRepository.countUpcomingByUser(userId, new Date());
+  }
 
   // 예약 생성
   async createReservation(
@@ -68,6 +84,15 @@ export class ReservationService {
         timeId,
         userId,
         reservedAt: proposalTime.proposalDatetime,
+      });
+
+      // 예약 확정 알림. 실패해도 예약 결과 반환을 막지 않도록 격리한다.
+      await this.safeNotify({
+        userId,
+        type: 'RESERVATION_CONFIRMED',
+        title: '예약이 확정됐어요',
+        body: `${result.proposal.shop.name} 예약이 확정됐어요.`,
+        data: { reservationId: Number(result.id) },
       });
 
       return {
@@ -120,25 +145,30 @@ export class ReservationService {
         reservedAt: r.reservedAt,
         status: r.status,
         shopName: r.proposal.shop.name,
-        // TODO: [malibu] Shop 도메인(B8) 개발 후 실제 컬럼으로 연결 예정
-        shopThumbnailUrl: null,
+        shopThumbnailUrl: r.proposal.shop.thumbnailImageUrl,
         totalPrice: r.proposal.totalPrice,
         nailType: r.proposal.request.nailType,
         removalType: r.proposal.request.removalType,
+        designName: r.proposal.request.design?.title ?? null,
+        designTags: r.proposal.request.design?.tags.map((t) => t.tag.name) ?? [],
       })),
       pageInfo: { nextCursor, hasNext },
     };
   }
 
-  // 예약 상세 조회
+  // 예약 상세 조회 - latitude/longitude는 "지금 사용자 위치" (둘 다 없으면 distanceMeters는 null)
   async getReservationDetail(
     reservationId: bigint,
     userId: number,
+    latitude?: number,
+    longitude?: number,
   ): Promise<GetReservationDetailResponse> {
     const reservation = await this.reservationRepository.findByIdAndUserId(reservationId, userId);
     if (!reservation) throw new ReservationNotFoundError();
 
     const { shop } = reservation.proposal;
+    const shopLatitude = shop.latitude.toNumber();
+    const shopLongitude = shop.longitude.toNumber();
 
     return {
       reservationId: Number(reservation.id),
@@ -148,18 +178,28 @@ export class ReservationService {
       addressDetail: shop.addressDetail,
       shopRating: shop.rating.toNumber(),
       shopReviewCount: shop.reviewCount,
+      latitude: shopLatitude,
+      longitude: shopLongitude,
+      shopThumbnailUrl: shop.thumbnailImageUrl,
+      shopBusinessHours: shop.businessHours,
+      shopClosedDays: shop.closedDays,
+      distanceMeters:
+        latitude !== undefined && longitude !== undefined
+          ? distanceMeters(latitude, longitude, shopLatitude, shopLongitude)
+          : null,
       reservedAt: reservation.reservedAt,
       basePrice: reservation.proposal.basePrice,
       removalPrice: reservation.proposal.removalPrice,
-      extraPrice: reservation.proposal.extraPrice,
+      designExtraPrice: reservation.proposal.designExtraPrice,
+      optionExtraPrice: reservation.proposal.optionExtraPrice,
+      couponDiscount: 0,
       totalPrice: reservation.proposal.totalPrice,
       shopComment: reservation.proposal.memo,
       nailType: reservation.proposal.request.nailType,
       removalType: reservation.proposal.request.removalType,
       images: reservation.proposal.request.images.map((image) => image.imageUrl),
       status: reservation.status,
-      // TODO: [malibu] Design 모델 추가 후 연결 예정
-      designName: null,
+      designName: reservation.proposal.request.design?.title ?? null,
     };
   }
 
@@ -186,5 +226,32 @@ export class ReservationService {
     // 사전 체크와 조건부 업데이트(cancel()의 updateMany) 사이의 경쟁 상태로
     // 동시에 들어온 취소 요청이 먼저 반영된 경우 - count가 0이라 null이 돌아온다.
     if (!cancelled) throw new ReservationAlreadyFinalizedError();
+
+    // 예약 취소 알림. 실패해도 취소 처리를 막지 않도록 격리한다.
+    await this.safeNotify({
+      userId,
+      type: 'RESERVATION_CANCELLED',
+      title: '예약이 취소됐어요',
+      body: '예약이 취소됐어요.',
+      data: { reservationId: Number(reservationId) },
+    });
+  }
+
+  // 알림 발송을 격리해 호출한다. 알림 실패가 예약 처리 결과에 영향을 주지 않도록 로깅만 하고 삼킨다.
+  private async safeNotify(params: {
+    userId: number;
+    type: 'RESERVATION_CONFIRMED' | 'RESERVATION_CANCELLED';
+    title: string;
+    body: string;
+    data?: Prisma.InputJsonValue;
+  }): Promise<void> {
+    try {
+      await this.notificationService.notify(params);
+    } catch (error) {
+      console.error('[ReservationService] 알림 생성 실패', {
+        type: params.type,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+    }
   }
 }
