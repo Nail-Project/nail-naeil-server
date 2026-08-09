@@ -51,6 +51,13 @@ export class EstimateRequestRepository {
     });
   }
 
+  // 진행 중(샵 매칭 중, status=MATCHING) 견적 요청 수. 마이페이지 요약에 사용한다.
+  countInProgressByUser(userId: number): Promise<number> {
+    return getPrisma().estimateRequest.count({
+      where: { userId, status: 'MATCHING' },
+    });
+  }
+
   // 상태별 견적 요청 목록 조회 (커서 기반 페이지네이션)
   // userId로 본인 견적만 필터링하고, status가 'ALL'이 아닌 경우 추가로 상태 필터를 건다.
   // 커서는 (createdAt, id) 튜플 — createdAt이 같은 경우 id로 순서를 보장한다.

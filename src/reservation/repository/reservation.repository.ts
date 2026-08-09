@@ -142,6 +142,7 @@ export interface ReservationRepository {
     userId: number,
     reason: string,
   ): Promise<CancelledReservationRecord | null>;
+  countUpcomingByUser(userId: number, now: Date): Promise<number>;
 }
 
 export class PrismaReservationRepository implements ReservationRepository {
@@ -328,6 +329,13 @@ export class PrismaReservationRepository implements ReservationRepository {
     return await prisma.reservation.findUniqueOrThrow({
       where: { id: reservationId },
       select: { id: true, status: true, cancelReason: true },
+    });
+  }
+
+  // 다가오는 예약 수: CONFIRMED이면서 예약 시각이 아직 지나지 않은(now 이후) 예약. 마이페이지 요약에 사용한다.
+  async countUpcomingByUser(userId: number, now: Date): Promise<number> {
+    return await getPrisma().reservation.count({
+      where: { userId, status: 'CONFIRMED', reservedAt: { gte: now } },
     });
   }
 }

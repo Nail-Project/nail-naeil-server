@@ -105,6 +105,12 @@ class FakeRepository implements ReservationRepository {
     if (this.cancelError) throw this.cancelError;
     return this.cancelResult;
   }
+
+  upcomingCount = 0;
+
+  async countUpcomingByUser(): Promise<number> {
+    return this.upcomingCount;
+  }
 }
 
 const createDto: CreateReservationRequestType = { proposalId: 1, timeId: 1 };

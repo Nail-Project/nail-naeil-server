@@ -1,6 +1,9 @@
 import { Prisma } from '../../generated/prisma/client';
 import type { ReservationStatus } from '../../generated/prisma/enums';
-import type { ReservationRepository } from '../repository/reservation.repository';
+import {
+  PrismaReservationRepository,
+  type ReservationRepository,
+} from '../repository/reservation.repository';
 import { CreateReservationRequestType } from '../dto/create-reservation-request';
 import { CreateReservationResponse } from '../dto/create-reservation-response';
 import { GetReservationsResponse } from '../dto/get-reservations-response';
@@ -27,7 +30,16 @@ const isRecordNotFoundError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 
 export class ReservationService {
-  constructor(private readonly reservationRepository: ReservationRepository) {}
+  // 기본값을 두어 다른 도메인(마이페이지)에서 new ReservationService()로 간단히 쓰되,
+  // 테스트/라우터에서는 fake·Prisma 구현체를 명시적으로 주입할 수 있다.
+  constructor(
+    private readonly reservationRepository: ReservationRepository = new PrismaReservationRepository(),
+  ) {}
+
+  // 다가오는 예약 수(CONFIRMED + 예약 시각 미도래). 마이페이지 요약에서 이 서비스를 통해 호출한다.
+  async countUpcoming(userId: number): Promise<number> {
+    return this.reservationRepository.countUpcomingByUser(userId, new Date());
+  }
 
   // 예약 생성
   async createReservation(
