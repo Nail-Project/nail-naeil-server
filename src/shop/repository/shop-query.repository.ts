@@ -35,6 +35,7 @@ export interface ShopQueryRepository {
   ): Promise<ShopSummaryRecord[]>;
   findDetail(shopId: number, userId: number): Promise<ShopDetailRecord | null>;
   exists(shopId: number): Promise<boolean>;
+  isWished(shopId: number, userId: number): Promise<boolean>;
   createWish(shopId: number, userId: number): Promise<void>;
   deleteWish(shopId: number, userId: number): Promise<void>;
   findWishlist(
@@ -122,6 +123,10 @@ export class PrismaShopQueryRepository implements ShopQueryRepository {
 
   async exists(shopId: number): Promise<boolean> {
     return (await getPrisma().shop.count({ where: { id: shopId, isDataActive: true } })) > 0;
+  }
+
+  async isWished(shopId: number, userId: number): Promise<boolean> {
+    return (await getPrisma().wishShop.count({ where: { shopId, userId } })) > 0;
   }
 
   async createWish(shopId: number, userId: number): Promise<void> {

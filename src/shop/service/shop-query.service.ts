@@ -51,16 +51,18 @@ export class ShopQueryService {
     };
   }
 
-  async createWish(shopId: number, userId: number): Promise<ShopWishResponse> {
+  // 찜 추가/해제를 하나의 호출로 처리한다 - 현재 찜 상태를 확인해 반대로 뒤집는다.
+  async toggleWish(shopId: number, userId: number): Promise<ShopWishResponse> {
     if (!(await this.repository.exists(shopId))) throw new ShopNotFoundError({ shopId });
+
+    const isWished = await this.repository.isWished(shopId, userId);
+    if (isWished) {
+      await this.repository.deleteWish(shopId, userId);
+      return { shopId, isWished: false };
+    }
+
     await this.repository.createWish(shopId, userId);
     return { shopId, isWished: true };
-  }
-
-  async deleteWish(shopId: number, userId: number): Promise<ShopWishResponse> {
-    if (!(await this.repository.exists(shopId))) throw new ShopNotFoundError({ shopId });
-    await this.repository.deleteWish(shopId, userId);
-    return { shopId, isWished: false };
   }
 
   async getWishlist(

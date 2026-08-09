@@ -1,9 +1,10 @@
 import type { NextFunction, Request, Response } from 'express';
 import { success } from '../../common/responses/api-response';
-import { GetShopDetailRequestSchema, ShopIdSchema } from '../dto/request/get-shop-detail-request';
+import { GetShopDetailRequestSchema } from '../dto/request/get-shop-detail-request';
 import { GetShopListRequestSchema } from '../dto/request/get-shop-list-request';
 import { SearchShopRequestSchema } from '../dto/request/search-shop-request';
 import { GetShopReviewsRequestSchema } from '../dto/request/get-shop-reviews-request';
+import { ToggleBookmarkRequestSchema } from '../dto/request/toggle-bookmark-request';
 import { InvalidShopQueryRequestError } from '../errors/shop.error';
 import type { ShopQueryService } from '../service/shop-query.service';
 
@@ -60,21 +61,11 @@ export class ShopQueryController {
     }
   };
 
-  createWish = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  toggleWish = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const parsed = ShopIdSchema.safeParse(req.params.shopId);
+      const parsed = ToggleBookmarkRequestSchema.safeParse(req.body);
       if (!parsed.success) throw new InvalidShopQueryRequestError(parsed.error.flatten());
-      res.status(200).json(success(await this.service.createWish(parsed.data, req.userId)));
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  deleteWish = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const parsed = ShopIdSchema.safeParse(req.params.shopId);
-      if (!parsed.success) throw new InvalidShopQueryRequestError(parsed.error.flatten());
-      res.status(200).json(success(await this.service.deleteWish(parsed.data, req.userId)));
+      res.status(200).json(success(await this.service.toggleWish(parsed.data.shopId, req.userId)));
     } catch (error) {
       next(error);
     }
