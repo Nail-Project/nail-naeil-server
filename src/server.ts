@@ -3,6 +3,7 @@ import cron from 'node-cron';
 import { app } from './app';
 import { runImageCleanupScheduler } from './scheduler/image.scheduler';
 import { runEstimateExpiryScheduler } from './scheduler/estimate-expiry.scheduler';
+import { runReservationReminderScheduler } from './scheduler/reservation-reminder.scheduler';
 
 dotenv.config();
 
@@ -30,5 +31,10 @@ cron.schedule('0 2 * * *', runImageCleanupScheduler, {
 
 // 매일 새벽 3시에 만료된 견적 요청(endDate 지난 MATCHING)을 EXPIRED로 전환하고 마감 알림을 보낸다.
 cron.schedule('0 3 * * *', () => runEstimateExpiryScheduler(), {
+  timezone: 'Asia/Seoul',
+});
+
+// 매일 오전 9시에 예약 하루 전/당일 리마인더 문자를 발송한다.
+cron.schedule('0 9 * * *', () => runReservationReminderScheduler(), {
   timezone: 'Asia/Seoul',
 });
