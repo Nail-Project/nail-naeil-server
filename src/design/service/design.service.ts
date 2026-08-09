@@ -45,6 +45,7 @@ export class DesignService {
         tags: item.design.tags,
         viewCount: item.design.viewCount,
         wishCount: item.design.wishCount,
+        isHot: item.design.isHot,
       })),
       pageInfo: { nextCursor, hasNext },
     };
@@ -138,6 +139,7 @@ export class DesignService {
         tags: item.design.tags,
         viewCount: item.design.viewCount,
         wishCount: item.design.wishCount,
+        isHot: item.design.isHot,
       })),
       pageInfo: { nextCursor, hasNext },
     };
