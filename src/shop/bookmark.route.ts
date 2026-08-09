@@ -69,7 +69,7 @@ export const bookmarkToggleRouter = Router();
  *             type: object
  *             required: [shopId]
  *             properties:
- *               shopId: { type: integer }
+ *               shopId: { type: integer, minimum: 1 }
  *     responses:
  *       200:
  *         description: 매장 찜 토글 성공 - 토글 후 상태(isWished)를 반환한다.

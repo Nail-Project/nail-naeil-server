@@ -36,14 +36,13 @@ class FakeShopQueryRepository implements ShopQueryRepository {
     return shopId === 1;
   }
   wished = false;
-  async isWished() {
-    return this.wished;
-  }
   async createWish() {
     this.wished = true;
   }
   async deleteWish() {
+    const wasWished = this.wished;
     this.wished = false;
+    return wasWished;
   }
   async findWishlist() {
     return [];

@@ -51,15 +51,15 @@ export class ShopQueryService {
     };
   }
 
-  // 찜 추가/해제를 하나의 호출로 처리한다 - 현재 찜 상태를 확인해 반대로 뒤집는다.
+  // 찜 추가/해제를 하나의 호출로 처리한다. "현재 상태를 조회 후 반대로 분기"하면
+  // 동시 요청 사이에 TOCTOU 레이스가 생길 수 있어서(CodeRabbit 리뷰 반영, 2026-08-09),
+  // 대신 삭제를 먼저 시도해 실제로 지워진 row가 있었는지(deleteMany의 원자적 count)로
+  // 분기한다 - 별도 조회 없이 단일 쿼리 결과만으로 상태를 판단한다.
   async toggleWish(shopId: number, userId: number): Promise<ShopWishResponse> {
     if (!(await this.repository.exists(shopId))) throw new ShopNotFoundError({ shopId });
 
-    const isWished = await this.repository.isWished(shopId, userId);
-    if (isWished) {
-      await this.repository.deleteWish(shopId, userId);
-      return { shopId, isWished: false };
-    }
+    const wasWished = await this.repository.deleteWish(shopId, userId);
+    if (wasWished) return { shopId, isWished: false };
 
     await this.repository.createWish(shopId, userId);
     return { shopId, isWished: true };
