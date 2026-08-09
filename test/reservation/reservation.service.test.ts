@@ -255,7 +255,14 @@ describe('ReservationService.getReservations', () => {
           proposal: {
             totalPrice: 55_000,
             shop: { name: '영찬 네일 강남점' },
-            request: { nailType: 'HAND', removalType: 'NONE' },
+            request: {
+              nailType: 'HAND',
+              removalType: 'NONE',
+              design: {
+                title: '도트 프렌치 네일',
+                tags: [{ tag: { name: '프렌치' } }, { tag: { name: '심플' } }],
+              },
+            },
           },
         },
       ],
@@ -275,9 +282,37 @@ describe('ReservationService.getReservations', () => {
           totalPrice: 55_000,
           nailType: 'HAND',
           removalType: 'NONE',
+          designName: '도트 프렌치 네일',
+          designTags: ['프렌치', '심플'],
         },
       ],
       pageInfo: { nextCursor: null, hasNext: false },
+    });
+  });
+
+  it('직접 사진을 올려 요청한 예약이면 디자인명과 태그가 모두 비어있다', async () => {
+    repository.reservationsResult = {
+      reservations: [
+        {
+          id: 100n,
+          proposalId: 1,
+          reservedAt: TOMORROW,
+          status: 'CONFIRMED',
+          proposal: {
+            totalPrice: 55_000,
+            shop: { name: '영찬 네일 강남점' },
+            request: { nailType: 'HAND', removalType: 'NONE', design: null },
+          },
+        },
+      ],
+      hasNext: false,
+    };
+
+    const result = await service.getReservations('CONFIRMED', userId, undefined, 10);
+
+    expect(result.reservations[0]).toMatchObject({
+      designName: null,
+      designTags: [],
     });
   });
 
@@ -292,7 +327,7 @@ describe('ReservationService.getReservations', () => {
           proposal: {
             totalPrice: 55_000,
             shop: { name: '영찬 네일 강남점' },
-            request: { nailType: 'HAND', removalType: 'NONE' },
+            request: { nailType: 'HAND', removalType: 'NONE', design: null },
           },
         },
       ],
@@ -344,11 +379,14 @@ describe('ReservationService.getReservationDetail', () => {
           addressDetail: '2층',
           rating: { toNumber: () => 4.5 },
           reviewCount: 12,
+          latitude: { toNumber: () => 37.4979 },
+          longitude: { toNumber: () => 127.0276 },
         },
         request: {
           nailType: 'HAND',
           removalType: 'PARTS',
           images: [{ imageUrl: 'https://example.com/a.jpg' }],
+          design: null,
         },
       },
     };
@@ -361,6 +399,8 @@ describe('ReservationService.getReservationDetail', () => {
       addressDetail: '2층',
       shopRating: 4.5,
       shopReviewCount: 12,
+      latitude: 37.4979,
+      longitude: 127.0276,
       basePrice: 40_000,
       removalPrice: 5_000,
       extraPrice: 10_000,
@@ -391,8 +431,10 @@ describe('ReservationService.getReservationDetail', () => {
           addressDetail: null,
           rating: { toNumber: () => 0 },
           reviewCount: 0,
+          latitude: { toNumber: () => 37.4979 },
+          longitude: { toNumber: () => 127.0276 },
         },
-        request: { nailType: 'PEDICURE', removalType: 'NONE', images: [] },
+        request: { nailType: 'PEDICURE', removalType: 'NONE', images: [], design: null },
       },
     };
 
@@ -474,6 +516,71 @@ describe('ReservationService.cancelReservation', () => {
       code: 'RESERVATION_FAILED',
       statusCode: 500,
       data: { originalError },
+    });
+  });
+
+  it('카탈로그 디자인 그대로 견적받은 예약이면 디자인명을 반환한다', async () => {
+    repository.detailResult = {
+      id: 1n,
+      reservedAt: TOMORROW,
+      status: 'CONFIRMED',
+      proposal: {
+        totalPrice: 55_000,
+        basePrice: 40_000,
+        removalPrice: 5_000,
+        extraPrice: 10_000,
+        memo: null,
+        shop: {
+          name: '영찬 네일 강남점',
+          phoneNumber: null,
+          address: '서울시 강남구',
+          addressDetail: null,
+          rating: { toNumber: () => 0 },
+          reviewCount: 0,
+          latitude: { toNumber: () => 37.4979 },
+          longitude: { toNumber: () => 127.0276 },
+        },
+        request: {
+          nailType: 'HAND',
+          removalType: 'NONE',
+          images: [],
+          design: { title: '도트 프렌치 네일' },
+        },
+      },
+    };
+
+    await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
+      designName: '도트 프렌치 네일',
+    });
+  });
+
+  it('직접 사진을 올려 요청한 예약이면 디자인명은 null이다', async () => {
+    repository.detailResult = {
+      id: 1n,
+      reservedAt: TOMORROW,
+      status: 'CONFIRMED',
+      proposal: {
+        totalPrice: 55_000,
+        basePrice: 40_000,
+        removalPrice: 5_000,
+        extraPrice: 10_000,
+        memo: null,
+        shop: {
+          name: '영찬 네일 강남점',
+          phoneNumber: null,
+          address: '서울시 강남구',
+          addressDetail: null,
+          rating: { toNumber: () => 0 },
+          reviewCount: 0,
+          latitude: { toNumber: () => 37.4979 },
+          longitude: { toNumber: () => 127.0276 },
+        },
+        request: { nailType: 'HAND', removalType: 'NONE', images: [], design: null },
+      },
+    };
+
+    await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
+      designName: null,
     });
   });
 });
