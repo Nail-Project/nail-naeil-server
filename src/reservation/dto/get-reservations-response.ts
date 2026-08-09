@@ -14,6 +14,10 @@ export interface ReservationListItem {
   nailType: string;
   // 제거 유무 - EstimateRequest.removalType
   removalType: string;
+  // 카탈로그 디자인 그대로 견적받은 예약만 값이 있다. 직접 사진을 올려 요청한 예약은 null.
+  designName: string | null;
+  // designName이 null이면(직접 사진 업로드) 항상 빈 배열.
+  designTags: string[];
 }
 
 export interface ReservationPageInfo {
