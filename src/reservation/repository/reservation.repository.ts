@@ -72,7 +72,8 @@ export interface ReservationDetailRecord {
     totalPrice: number | null;
     basePrice: number | null;
     removalPrice: number | null;
-    extraPrice: number | null;
+    designExtraPrice: number | null;
+    optionExtraPrice: number | null;
     memo: string | null;
     shop: {
       name: string;
@@ -272,7 +273,8 @@ export class PrismaReservationRepository implements ReservationRepository {
             totalPrice: true,
             basePrice: true,
             removalPrice: true,
-            extraPrice: true,
+            designExtraPrice: true,
+            optionExtraPrice: true,
             memo: true,
             shop: {
               select: {

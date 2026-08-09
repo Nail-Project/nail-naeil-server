@@ -18,7 +18,8 @@ export interface EstimateResponseDetailResponse {
     totalPrice: number | null;
     basePrice: number | null;
     removalPrice: number | null;
-    extraPrice: number | null;
+    designExtraPrice: number | null;
+    optionExtraPrice: number | null;
   };
   memo: string | null;
   estimatedDurationMinutes: number;

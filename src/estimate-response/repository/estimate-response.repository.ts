@@ -26,7 +26,8 @@ export interface SaveParsedEstimateResponseInput {
   totalPrice: number | null;
   basePrice: number | null;
   removalPrice: number | null;
-  extraPrice: number | null;
+  designExtraPrice: number | null;
+  optionExtraPrice: number | null;
   memo: string | null;
   proposalDateTimes: Date[];
 }
@@ -38,7 +39,8 @@ export interface EstimateResponseDetail {
   totalPrice: number | null;
   basePrice: number | null;
   removalPrice: number | null;
-  extraPrice: number | null;
+  designExtraPrice: number | null;
+  optionExtraPrice: number | null;
   estimatedDurationMinutes: number;
   canProvideService: boolean;
   isRemovalIncluded: boolean;
@@ -245,7 +247,8 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
         totalPrice: true,
         basePrice: true,
         removalPrice: true,
-        extraPrice: true,
+        designExtraPrice: true,
+        optionExtraPrice: true,
         estimatedDurationMinutes: true,
         canProvideService: true,
         isRemovalIncluded: true,
@@ -395,7 +398,8 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           totalPrice: input.totalPrice,
           basePrice: input.basePrice,
           removalPrice: input.removalPrice,
-          extraPrice: input.extraPrice,
+          designExtraPrice: input.designExtraPrice,
+          optionExtraPrice: input.optionExtraPrice,
           memo: input.memo,
           estimatedDurationMinutes: input.estimatedDurationMinutes,
           canProvideService: input.canProvideService,
@@ -406,7 +410,8 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
           totalPrice: input.totalPrice,
           basePrice: input.basePrice,
           removalPrice: input.removalPrice,
-          extraPrice: input.extraPrice,
+          designExtraPrice: input.designExtraPrice,
+          optionExtraPrice: input.optionExtraPrice,
           memo: input.memo,
           estimatedDurationMinutes: input.estimatedDurationMinutes,
           canProvideService: input.canProvideService,

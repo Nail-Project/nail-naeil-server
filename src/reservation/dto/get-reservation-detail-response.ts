@@ -24,11 +24,15 @@ export interface GetReservationDetailResponse {
   distanceMeters: number | null;
   reservedAt: Date;
   // 견적서 세부내역 - EstimateResponse에 이미 저장돼 있던 값을 그대로 노출한다.
-  // Figma의 "디자인 추가"/"옵션 추가" 라벨과 정확히 어떤 필드가 대응하는지는
-  // 기획 확인이 필요해서(2026-08-03), 우선 실제 컬럼명 그대로 내려준다.
+  // Figma 가격 세부내역 화면(기본 가격/디자인 추가/옵션 추가/쿠폰 할인/최종 예상 금액) 기준으로
+  // 확정된 매핑(2026-08-09): basePrice=기본 가격, designExtraPrice=디자인 추가,
+  // optionExtraPrice=옵션 추가, totalPrice=최종 예상 금액.
   basePrice: number | null;
   removalPrice: number | null;
-  extraPrice: number | null;
+  designExtraPrice: number | null;
+  optionExtraPrice: number | null;
+  // 쿠폰 도메인이 아직 없어 항상 0을 반환하는 더미 필드. 쿠폰 기능이 생기면 실제 값으로 교체 예정.
+  couponDiscount: number;
   totalPrice: number | null;
   // 샵이 견적 응답 시 남긴 코멘트 - EstimateResponse.memo
   shopComment: string | null;

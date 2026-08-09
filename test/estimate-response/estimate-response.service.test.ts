@@ -100,7 +100,8 @@ class FakeRepository implements EstimateResponseRepository {
       totalPrice: 55_000,
       basePrice: 45_000,
       removalPrice: 5_000,
-      extraPrice: 5_000,
+      designExtraPrice: 3_000,
+      optionExtraPrice: 2_000,
       estimatedDurationMinutes: 60,
       canProvideService: true,
       isRemovalIncluded: true,
@@ -251,7 +252,8 @@ describe('EstimateResponseService', () => {
       totalPrice: 55_000,
       basePrice: null,
       removalPrice: null,
-      extraPrice: null,
+      designExtraPrice: null,
+      optionExtraPrice: null,
       memo: '제거 포함',
       proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
     });
@@ -265,7 +267,8 @@ describe('EstimateResponseService', () => {
         totalPrice: 55_000,
         basePrice: null,
         removalPrice: null,
-        extraPrice: null,
+        designExtraPrice: null,
+        optionExtraPrice: null,
         memo: '제거 포함',
       });
     });
@@ -283,7 +286,8 @@ describe('EstimateResponseService', () => {
       totalPrice: 55_000,
       basePrice: 55_000,
       removalPrice: 0,
-      extraPrice: 0,
+      designExtraPrice: 0,
+      optionExtraPrice: 0,
       memo: null,
       proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
     });
@@ -314,7 +318,8 @@ describe('EstimateResponseService', () => {
       totalPrice: 55_000,
       basePrice: 55_000,
       removalPrice: 0,
-      extraPrice: 0,
+      designExtraPrice: 0,
+      optionExtraPrice: 0,
       memo: null,
       proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
     });
@@ -339,7 +344,8 @@ describe('EstimateResponseService', () => {
       totalPrice: 55_000,
       basePrice: null,
       removalPrice: 0,
-      extraPrice: 0,
+      designExtraPrice: 0,
+      optionExtraPrice: 0,
       memo: null,
       proposalDateTimes: [],
     });
@@ -363,7 +369,8 @@ describe('EstimateResponseService', () => {
       totalPrice: null,
       basePrice: null,
       removalPrice: null,
-      extraPrice: null,
+      designExtraPrice: null,
+      optionExtraPrice: null,
       memo: '시술이 어려워요.',
       proposalDateTimes: [],
     });
@@ -387,7 +394,8 @@ describe('EstimateResponseService', () => {
       totalPrice: 55_000,
       basePrice: 55_000,
       removalPrice: 0,
-      extraPrice: 0,
+      designExtraPrice: 0,
+      optionExtraPrice: 0,
       memo: null,
       proposalDateTimes: [
         '2026-07-20T14:00:00+09:00',
@@ -441,7 +449,13 @@ describe('EstimateResponseService', () => {
     await expect(service.getDetail(10, 1)).resolves.toMatchObject({
       id: 10,
       shop: { name: '내일네일' },
-      price: { totalPrice: 55_000 },
+      price: {
+        totalPrice: 55_000,
+        basePrice: 45_000,
+        removalPrice: 5_000,
+        designExtraPrice: 3_000,
+        optionExtraPrice: 2_000,
+      },
     });
   });
 
