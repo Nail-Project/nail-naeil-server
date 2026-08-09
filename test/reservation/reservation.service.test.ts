@@ -293,7 +293,7 @@ describe('ReservationService.getReservations', () => {
             },
             request: {
               nailType: 'HAND',
-              removals: [{ removalType: 'NONE' }],
+              removals: [{ removalType: 'BASIC' }, { removalType: 'PARTS' }],
               design: {
                 title: '도트 프렌치 네일',
                 tags: [{ tag: { name: '프렌치' } }, { tag: { name: '심플' } }],
@@ -317,7 +317,7 @@ describe('ReservationService.getReservations', () => {
           shopThumbnailUrl: 'https://example.com/shop-thumb.jpg',
           totalPrice: 55_000,
           nailType: 'HAND',
-          removalTypes: ['NONE'],
+          removalTypes: ['BASIC', 'PARTS'],
           designName: '도트 프렌치 네일',
           designTags: ['프렌치', '심플'],
         },
