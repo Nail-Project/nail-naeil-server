@@ -1,4 +1,5 @@
 import type { ReservationStatus } from '../../generated/prisma/enums';
+import type { JsonValue } from '../../common/types/json';
 
 // GET /api/v1/reserve/:reservationId - 예약 상세 조회 성공 시 Response
 export interface GetReservationDetailResponse {
@@ -16,8 +17,8 @@ export interface GetReservationDetailResponse {
   latitude: number;
   longitude: number;
   shopThumbnailUrl: string | null;
-  shopBusinessHours: unknown;
-  shopClosedDays: unknown;
+  shopBusinessHours: JsonValue | null;
+  shopClosedDays: JsonValue | null;
   reservedAt: Date;
   // 견적서 세부내역 - EstimateResponse에 이미 저장돼 있던 값을 그대로 노출한다.
   // Figma의 "디자인 추가"/"옵션 추가" 라벨과 정확히 어떤 필드가 대응하는지는
