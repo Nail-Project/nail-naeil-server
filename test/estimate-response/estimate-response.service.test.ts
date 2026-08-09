@@ -193,8 +193,7 @@ class LinkedSmsRepository extends FakeRepository {
 
   async findSmsParsingContext(): Promise<SmsParsingContext> {
     return {
-      requestStartDate: new Date('2026-07-20T00:00:00.000Z'),
-      requestEndDate: new Date('2026-07-25T00:00:00.000Z'),
+      scheduleDates: [new Date('2026-07-20T00:00:00.000Z')],
       messages: [{ body: '제거 포함 55000원이에요.' }, { body: '7월 20일 오후 2시 가능해요.' }],
     };
   }

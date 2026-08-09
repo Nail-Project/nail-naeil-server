@@ -18,8 +18,7 @@ describe('OpenAiEstimateResponseParser', () => {
       new OpenAiEstimateResponseParser().parse({
         messages: ['견적 문자'],
         receivedAt: '2026-08-01T13:20:38+09:00',
-        requestStartDate: '2026-08-01',
-        requestEndDate: '2026-08-07',
+        scheduleDates: ['2026-08-01', '2026-08-07'],
       }),
     ).rejects.toThrow('OPENAI_API_KEY');
     expect(fetchMock).not.toHaveBeenCalled();
@@ -41,8 +40,7 @@ describe('OpenAiEstimateResponseParser', () => {
       new OpenAiEstimateResponseParser().parse({
         messages: ['견적 문자'],
         receivedAt: '2026-08-01T13:20:38+09:00',
-        requestStartDate: '2026-08-01',
-        requestEndDate: '2026-08-07',
+        scheduleDates: ['2026-08-01', '2026-08-07'],
       }),
     ).rejects.toThrow('구조화 결과');
   });
@@ -84,8 +82,7 @@ describe('OpenAiEstimateResponseParser', () => {
       parser.parse({
         messages: ['제거 포함 55000원, 8월 3일 오후 2시 가능해요.'],
         receivedAt: '2026-08-01T13:20:38+09:00',
-        requestStartDate: '2026-08-01',
-        requestEndDate: '2026-08-07',
+        scheduleDates: ['2026-08-01', '2026-08-07'],
       }),
     ).resolves.toMatchObject({
       totalPrice: 55_000,
