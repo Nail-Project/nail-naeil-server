@@ -24,6 +24,18 @@ export class InvalidNotificationIdError extends AppError {
   }
 }
 
+// PATCH /api/v1/notifications/settings - 유효하지 않은 설정 값(정의되지 않은 키, boolean 아님 등)
+export class InvalidNotificationSettingRequestError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'INVALID_NOTIFICATION_SETTING_REQUEST',
+      statusCode: 400,
+      message: '유효하지 않은 요청입니다.',
+      data,
+    });
+  }
+}
+
 // 존재하지 않거나 본인 소유가 아닌 알림 접근.
 // 소유권 없음을 404로 통일해 다른 사용자의 알림 존재 여부를 노출하지 않는다.
 export class NotificationNotFoundError extends AppError {

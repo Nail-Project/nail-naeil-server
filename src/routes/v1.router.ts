@@ -11,6 +11,7 @@ import userAuthRouter from '../user/route/user-auth.route';
 import userRouter from '../user/route/user.route';
 import socialAuthRouter from '../user/route/social-auth.route';
 import notificationRouter from '../notification/notification.route';
+import notificationSettingRouter from '../notification/notification-setting.route';
 import deviceTokenRouter from '../device-token/device-token.route';
 
 const v1Router = Router();
@@ -26,6 +27,8 @@ v1Router.use('/image', imageRouter);
 v1Router.use('/users', userAuthRouter);
 v1Router.use('/users', userRouter);
 v1Router.use('/auth', socialAuthRouter);
+// 정적 경로 `/settings`가 알림 목록 라우터의 `/:notificationId`에 먼저 걸리지 않도록 설정 라우터를 먼저 등록한다.
+v1Router.use('/notifications', notificationSettingRouter);
 v1Router.use('/notifications', notificationRouter);
 v1Router.use('/device-tokens', deviceTokenRouter);
 
