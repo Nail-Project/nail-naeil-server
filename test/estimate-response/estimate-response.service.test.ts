@@ -168,6 +168,12 @@ class FakeRepository implements EstimateResponseRepository {
   async findRequestOwner(requestId: number): Promise<{ userId: number } | null> {
     return requestId === 1 ? { userId: 1 } : null;
   }
+
+  // 기본값 null → "더 낮은 견적" 아님(ESTIMATE_RESPONSE로 발송). 필요 시 하위 클래스에서 override.
+  lowestSubmittedPrice: number | null = null;
+  async findLowestSubmittedPrice(): Promise<number | null> {
+    return this.lowestSubmittedPrice;
+  }
 }
 
 class LinkedSmsRepository extends FakeRepository {
@@ -294,6 +300,33 @@ describe('EstimateResponseService', () => {
         body: '요청하신 견적에 새 답변이 도착했어요.',
         data: { estimateRequestId: 1 },
       });
+    });
+  });
+
+  it('기존 최저가보다 낮은 견적이면 LOWER_ESTIMATE 알림을 생성한다', async () => {
+    const repository = new LinkedSmsRepository();
+    // 저장 전 기존 최저가를 60,000원으로 두고, 이번 응답(55,000원)이 더 낮게 들어오는 상황.
+    repository.lowestSubmittedPrice = 60_000;
+    const parser = new FakeParser({
+      canProvideService: true,
+      estimatedDurationMinutes: 60,
+      isRemovalIncluded: false,
+      totalPrice: 55_000,
+      basePrice: 55_000,
+      removalPrice: 0,
+      extraPrice: 0,
+      memo: null,
+      proposalDateTimes: ['2026-07-20T14:00:00+09:00'],
+    });
+    const notificationService = createNotificationService();
+    const service = new EstimateResponseService(repository, parser, notificationService);
+
+    await service.createSmsMessage(smsRequest);
+
+    await vi.waitFor(() => {
+      expect(notificationService.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 1, type: 'LOWER_ESTIMATE' }),
+      );
     });
   });
 

@@ -20,6 +20,7 @@ import {
   ReservationLockConflictError,
   ReservationNotFoundError,
 } from '../error/reservation.error';
+import { NotificationService } from '../../notification/service/notification.service';
 
 const isUniqueConstraintError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
@@ -34,6 +35,8 @@ export class ReservationService {
   // 테스트/라우터에서는 fake·Prisma 구현체를 명시적으로 주입할 수 있다.
   constructor(
     private readonly reservationRepository: ReservationRepository = new PrismaReservationRepository(),
+    // 예약 확정/취소 시 알림을 보낸다. 알림 실패가 예약 처리 자체를 막지 않도록 격리한다.
+    private readonly notificationService = new NotificationService(),
   ) {}
 
   // 다가오는 예약 수(CONFIRMED + 예약 시각 미도래). 마이페이지 요약에서 이 서비스를 통해 호출한다.
@@ -80,6 +83,15 @@ export class ReservationService {
         timeId,
         userId,
         reservedAt: proposalTime.proposalDatetime,
+      });
+
+      // 예약 확정 알림. 실패해도 예약 결과 반환을 막지 않도록 격리한다.
+      await this.safeNotify({
+        userId,
+        type: 'RESERVATION_CONFIRMED',
+        title: '예약이 확정됐어요',
+        body: `${result.proposal.shop.name} 예약이 확정됐어요.`,
+        data: { reservationId: Number(result.id) },
       });
 
       return {
@@ -201,5 +213,32 @@ export class ReservationService {
     // 사전 체크와 조건부 업데이트(cancel()의 updateMany) 사이의 경쟁 상태로
     // 동시에 들어온 취소 요청이 먼저 반영된 경우 - count가 0이라 null이 돌아온다.
     if (!cancelled) throw new ReservationAlreadyFinalizedError();
+
+    // 예약 취소 알림. 실패해도 취소 처리를 막지 않도록 격리한다.
+    await this.safeNotify({
+      userId,
+      type: 'RESERVATION_CANCELLED',
+      title: '예약이 취소됐어요',
+      body: '예약이 취소됐어요.',
+      data: { reservationId: Number(reservationId) },
+    });
+  }
+
+  // 알림 발송을 격리해 호출한다. 알림 실패가 예약 처리 결과에 영향을 주지 않도록 로깅만 하고 삼킨다.
+  private async safeNotify(params: {
+    userId: number;
+    type: 'RESERVATION_CONFIRMED' | 'RESERVATION_CANCELLED';
+    title: string;
+    body: string;
+    data?: Prisma.InputJsonValue;
+  }): Promise<void> {
+    try {
+      await this.notificationService.notify(params);
+    } catch (error) {
+      console.error('[ReservationService] 알림 생성 실패', {
+        type: params.type,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+    }
   }
 }

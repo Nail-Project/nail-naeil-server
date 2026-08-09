@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { Prisma } from '../../src/generated/prisma/client';
 import type { ReservationStatus } from '../../src/generated/prisma/enums';
 import type {
@@ -12,7 +12,12 @@ import type {
   ReservationStatusRecord,
 } from '../../src/reservation/repository/reservation.repository';
 import { ReservationService } from '../../src/reservation/service/reservation.service';
+import type { NotificationService } from '../../src/notification/service/notification.service';
 import { ReservationLockConflictError } from '../../src/reservation/error/reservation.error';
+
+// 예약 확정/취소 시 호출되는 알림 서비스는 fake로 주입해 DB를 타지 않게 한다.
+const fakeNotificationService = () =>
+  ({ notify: vi.fn().mockResolvedValue(undefined) }) as unknown as NotificationService;
 import type { CreateReservationRequestType } from '../../src/reservation/dto/create-reservation-request';
 import type { ReservationCursor } from '../../src/reservation/dto/get-reservations-request';
 import { encodeCursor } from '../../src/common/pagination/cursor';
@@ -125,7 +130,7 @@ describe('ReservationService.createReservation', () => {
 
   beforeEach(() => {
     repository = new FakeRepository();
-    service = new ReservationService(repository);
+    service = new ReservationService(repository, fakeNotificationService());
   });
 
   it('정상적으로 예약을 생성한다', async () => {
@@ -134,6 +139,28 @@ describe('ReservationService.createReservation', () => {
       shopName: '영찬 네일 강남점',
       totalPrice: 55_000,
       status: 'CONFIRMED',
+    });
+  });
+
+  it('예약 확정 시 RESERVATION_CONFIRMED 알림을 보낸다', async () => {
+    const notificationService = fakeNotificationService();
+    const svc = new ReservationService(repository, notificationService);
+
+    await svc.createReservation(createDto, userId);
+
+    expect(notificationService.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ userId, type: 'RESERVATION_CONFIRMED' }),
+    );
+  });
+
+  it('알림 발송이 실패해도 예약 생성은 성공한다(격리)', async () => {
+    const notificationService = {
+      notify: vi.fn().mockRejectedValue(new Error('notify down')),
+    } as unknown as NotificationService;
+    const svc = new ReservationService(repository, notificationService);
+
+    await expect(svc.createReservation(createDto, userId)).resolves.toMatchObject({
+      reservationId: 100,
     });
   });
 
@@ -227,7 +254,7 @@ describe('ReservationService.getReservations', () => {
 
   beforeEach(() => {
     repository = new FakeRepository();
-    service = new ReservationService(repository);
+    service = new ReservationService(repository, fakeNotificationService());
   });
 
   it('CONFIRMED 상태는 CONFIRMED만 조회한다', async () => {
@@ -355,7 +382,7 @@ describe('ReservationService.getReservationDetail', () => {
 
   beforeEach(() => {
     repository = new FakeRepository();
-    service = new ReservationService(repository);
+    service = new ReservationService(repository, fakeNotificationService());
   });
 
   it('존재하지 않는 예약이면 404를 던진다', async () => {
@@ -463,7 +490,7 @@ describe('ReservationService.cancelReservation', () => {
 
   beforeEach(() => {
     repository = new FakeRepository();
-    service = new ReservationService(repository);
+    service = new ReservationService(repository, fakeNotificationService());
   });
 
   it('정상적으로 예약을 취소한다', async () => {
@@ -476,6 +503,17 @@ describe('ReservationService.cancelReservation', () => {
       userId,
       reason: '개인 사정으로 인해 취소할게요',
     });
+  });
+
+  it('예약 취소 시 RESERVATION_CANCELLED 알림을 보낸다', async () => {
+    const notificationService = fakeNotificationService();
+    const svc = new ReservationService(repository, notificationService);
+
+    await svc.cancelReservation(1n, userId, '개인 사정으로 인해 취소할게요');
+
+    expect(notificationService.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ userId, type: 'RESERVATION_CANCELLED' }),
+    );
   });
 
   it('존재하지 않거나 본인 소유가 아닌 예약이면 404를 던진다', async () => {
