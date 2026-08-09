@@ -110,7 +110,7 @@ export class EstimateResponseService {
       }
 
       // 저장 전, 이 요청의 기존 최저가를 구해 이번 응답이 더 낮은지(더 낮은 견적 도착) 판단한다.
-      const priorLowestPrice = await this.repository.findLowestSubmittedPrice(message.requestId);
+      const priorLowestPrice = await this.repository.findLowestOfferedPrice(message.requestId);
 
       await this.repository.saveParsedEstimateResponse(
         message.id,

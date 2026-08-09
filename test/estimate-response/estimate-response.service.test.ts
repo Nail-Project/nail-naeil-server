@@ -170,9 +170,9 @@ class FakeRepository implements EstimateResponseRepository {
   }
 
   // 기본값 null → "더 낮은 견적" 아님(ESTIMATE_RESPONSE로 발송). 필요 시 하위 클래스에서 override.
-  lowestSubmittedPrice: number | null = null;
-  async findLowestSubmittedPrice(): Promise<number | null> {
-    return this.lowestSubmittedPrice;
+  lowestOfferedPrice: number | null = null;
+  async findLowestOfferedPrice(): Promise<number | null> {
+    return this.lowestOfferedPrice;
   }
 }
 
@@ -306,7 +306,7 @@ describe('EstimateResponseService', () => {
   it('기존 최저가보다 낮은 견적이면 LOWER_ESTIMATE 알림을 생성한다', async () => {
     const repository = new LinkedSmsRepository();
     // 저장 전 기존 최저가를 60,000원으로 두고, 이번 응답(55,000원)이 더 낮게 들어오는 상황.
-    repository.lowestSubmittedPrice = 60_000;
+    repository.lowestOfferedPrice = 60_000;
     const parser = new FakeParser({
       canProvideService: true,
       estimatedDurationMinutes: 60,

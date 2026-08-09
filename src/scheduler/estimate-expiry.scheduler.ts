@@ -26,24 +26,30 @@ export const runEstimateExpiryScheduler = async (
 ): Promise<void> => {
   const todayStart = getTodayStartKst();
 
-  const expired = await getPrisma().estimateRequest.findMany({
+  const candidates = await getPrisma().estimateRequest.findMany({
     where: { status: 'MATCHING', endDate: { lt: todayStart } },
     select: { id: true, userId: true },
   });
 
-  if (expired.length === 0) {
+  if (candidates.length === 0) {
     console.log('[EstimateExpiryScheduler] 만료 대상 없음');
     return;
   }
 
-  const ids = expired.map((request) => request.id);
-  await getPrisma().estimateRequest.updateMany({
-    where: { id: { in: ids } },
-    data: { status: 'EXPIRED' },
-  });
+  // 요청별로 조건부 업데이트(status=MATCHING 조건 포함)를 수행해, 실제로 이 실행이
+  // MATCHING→EXPIRED 전환에 성공한 건(count===1)에만 마감 알림을 보낸다.
+  // 여러 인스턴스/재실행이 같은 대상을 잡아도 전환은 한 번만 성립하므로 중복 알림을 막는다.
+  let expiredCount = 0;
+  for (const request of candidates) {
+    const { count } = await getPrisma().estimateRequest.updateMany({
+      where: { id: request.id, status: 'MATCHING', endDate: { lt: todayStart } },
+      data: { status: 'EXPIRED' },
+    });
+    if (count === 0) continue; // 다른 실행이 이미 처리함
 
-  // 각 요청자에게 마감 알림. 한 건 실패가 나머지 알림을 막지 않도록 개별 격리한다.
-  for (const request of expired) {
+    expiredCount += 1;
+
+    // 마감 알림. 한 건 실패가 나머지 알림을 막지 않도록 개별 격리한다.
     try {
       await notificationService.notify({
         userId: request.userId,
@@ -60,5 +66,5 @@ export const runEstimateExpiryScheduler = async (
     }
   }
 
-  console.log(`[EstimateExpiryScheduler] ${ids.length}건 만료 처리 완료`);
+  console.log(`[EstimateExpiryScheduler] ${expiredCount}건 만료 처리 완료`);
 };
