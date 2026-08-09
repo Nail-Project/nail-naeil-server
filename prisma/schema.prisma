@@ -179,7 +179,13 @@ model RefreshToken {
 // FCM 외부 발송은 후속 단계에서 이 데이터를 재사용해 얹는다.
 enum NotificationType {
   ESTIMATE_RESPONSE // 견적 응답 도착
-  RESERVATION_STATUS // 예약 상태 변경(확정/취소 등)
+  RESERVATION_STATUS // 예약 상태 변경(확정/취소 등) - 레거시, 신규 코드는 아래 세분화된 타입을 쓴다.
+  LOWER_ESTIMATE // 더 낮은 견적 도착
+  ESTIMATE_CLOSED // 견적 응답 마감(요청 만료)
+  RESERVATION_CONFIRMED // 예약 확정
+  RESERVATION_CANCELLED // 예약 취소
+  RESERVATION_DAY_BEFORE // 예약 하루 전
+  RESERVATION_DAY_OF // 예약 당일
 }
 
 model Notification {
