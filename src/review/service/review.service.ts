@@ -15,6 +15,11 @@ import { ReviewFailedError } from '../../common/errors/common.error';
 const isUniqueConstraintError = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 
+// findByIdForOwner로 존재를 확인한 이후, update/delete 실행 사이의 경쟁 상태로
+// 리뷰가 먼저 삭제된 경우 (design/reservation 도메인의 isRecordNotFoundError와 동일 패턴)
+const isRecordNotFoundError = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+
 export class ReviewService {
   constructor(private readonly reviewRepository: ReviewRepository) {}
 
@@ -75,6 +80,7 @@ export class ReviewService {
         updatedAt: updated.updatedAt,
       };
     } catch (error) {
+      if (isRecordNotFoundError(error)) throw new ReviewNotFoundError();
       throw new ReviewFailedError({ originalError: error });
     }
   }
@@ -87,6 +93,7 @@ export class ReviewService {
     try {
       await this.reviewRepository.delete(reviewId, review.shopId);
     } catch (error) {
+      if (isRecordNotFoundError(error)) throw new ReviewNotFoundError();
       throw new ReviewFailedError({ originalError: error });
     }
 

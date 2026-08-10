@@ -113,7 +113,12 @@ export class NotificationService {
         data: params.data,
       });
     } catch (error) {
-      console.error('[NotificationService] 푸시 발송 실패(알림은 저장됨)', error);
+      // FCM 에러 객체를 통째로 로깅하면 디바이스 토큰 등 내부 정보가 실릴 수 있어
+      // (reservation/estimate-expiry 스케줄러와 동일하게) errorType만 남긴다.
+      console.error('[NotificationService] 푸시 발송 실패(알림은 저장됨)', {
+        userId: params.userId,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
     }
   }
 }

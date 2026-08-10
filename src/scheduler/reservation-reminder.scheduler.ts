@@ -68,47 +68,57 @@ export const runReservationReminderScheduler = async (
 
   let sentCount = 0;
 
-  for (const target of targets) {
-    // 당일 리마인더는 이미 지난 시간의 예약은 제외한다(cron 실행 시각 이후 예약만).
-    const gte = target.kind === 'DAY_OF' && now > target.start ? now : target.start;
+  // cron 콜백은 아무도 반환된 Promise를 catch하지 않고, 전역 unhandledRejection 핸들러도
+  // 없다. DB 조회가 이 try 밖에서 던지면 Node 기본 동작으로 서버 프로세스 전체가 죽으므로
+  // 스케줄러 실행 전체를 감싸 실패해도 로그만 남기고 프로세스는 살아있게 한다.
+  try {
+    for (const target of targets) {
+      // 당일 리마인더는 이미 지난 시간의 예약은 제외한다(cron 실행 시각 이후 예약만).
+      const gte = target.kind === 'DAY_OF' && now > target.start ? now : target.start;
 
-    const reservations = await getPrisma().reservation.findMany({
-      where: { status: 'CONFIRMED', reservedAt: { gte, lt: target.end } },
-      select: {
-        id: true,
-        userId: true,
-        reservedAt: true,
-        user: { select: { phoneNumber: true } },
-        proposal: { select: { shop: { select: { name: true } } } },
-      },
-    });
+      const reservations = await getPrisma().reservation.findMany({
+        where: { status: 'CONFIRMED', reservedAt: { gte, lt: target.end } },
+        select: {
+          id: true,
+          userId: true,
+          reservedAt: true,
+          user: { select: { phoneNumber: true } },
+          proposal: { select: { shop: { select: { name: true } } } },
+        },
+      });
 
-    for (const reservation of reservations) {
-      const phone = reservation.user.phoneNumber;
-      if (!phone) continue;
+      for (const reservation of reservations) {
+        const phone = reservation.user.phoneNumber;
+        if (!phone) continue;
 
-      // 예약 알림을 끈 사용자는 리마인더 문자도 보내지 않는다.
-      const enabled = await settingRepository.isCategoryEnabled(reservation.userId, 'reservation');
-      if (!enabled) continue;
+        // 예약 알림을 끈 사용자는 리마인더 문자도 보내지 않는다.
+        const enabled = await settingRepository.isCategoryEnabled(
+          reservation.userId,
+          'reservation',
+        );
+        if (!enabled) continue;
 
-      const text = formatReminderText(
-        target.kind,
-        reservation.proposal.shop.name,
-        reservation.reservedAt,
-      );
+        const text = formatReminderText(
+          target.kind,
+          reservation.proposal.shop.name,
+          reservation.reservedAt,
+        );
 
-      try {
-        await smsClient.sendText(phone, text);
-        sentCount += 1;
-      } catch (error) {
-        console.error('[ReservationReminderScheduler] 문자 발송 실패', {
-          reservationId: Number(reservation.id),
-          kind: target.kind,
-          errorType: error instanceof Error ? error.name : typeof error,
-        });
+        try {
+          await smsClient.sendText(phone, text);
+          sentCount += 1;
+        } catch (error) {
+          console.error('[ReservationReminderScheduler] 문자 발송 실패', {
+            reservationId: Number(reservation.id),
+            kind: target.kind,
+            errorType: error instanceof Error ? error.name : typeof error,
+          });
+        }
       }
     }
-  }
 
-  console.log(`[ReservationReminderScheduler] ${sentCount}건 리마인더 발송`);
+    console.log(`[ReservationReminderScheduler] ${sentCount}건 리마인더 발송`);
+  } catch (error) {
+    console.error('[ReservationReminderScheduler] 오류 발생:', error);
+  }
 };
