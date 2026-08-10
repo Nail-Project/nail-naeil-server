@@ -3,6 +3,19 @@ import { SocialTokenExchangeError, SocialProfileError } from '../../user/error/s
 
 const AUTH_BASE = 'https://nid.naver.com';
 const API_BASE = 'https://openapi.naver.com';
+const TIMEOUT_MS = 10_000;
+
+// 네이버 서버 응답이 지연될 때 요청이 무한 대기하지 않도록 타임아웃을 건다.
+// (sbiz-shop.client.ts와 동일한 AbortController 패턴)
+const fetchWithTimeout = async (input: string | URL, init?: RequestInit): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
 interface NaverTokenResponse {
   access_token?: string;
@@ -59,7 +72,7 @@ export class NaverAuthClient implements SocialAuthClient {
 
     let response: Response;
     try {
-      response = await fetch(url);
+      response = await fetchWithTimeout(url);
     } catch (error) {
       throw new SocialTokenExchangeError({
         provider: 'NAVER',
@@ -81,7 +94,7 @@ export class NaverAuthClient implements SocialAuthClient {
   private async getProfile(accessToken: string): Promise<SocialProfile> {
     let response: Response;
     try {
-      response = await fetch(`${API_BASE}/v1/nid/me`, {
+      response = await fetchWithTimeout(`${API_BASE}/v1/nid/me`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
     } catch (error) {
