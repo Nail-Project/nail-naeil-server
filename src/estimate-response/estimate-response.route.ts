@@ -3,6 +3,7 @@ import { EstimateResponseController } from './controller/estimate-response.contr
 import { PrismaEstimateResponseRepository } from './repository/estimate-response.repository';
 import { EstimateResponseService } from './service/estimate-response.service';
 import { authMiddleware } from '../common/middlewares/auth.middleware';
+import { smsWebhookAuth } from './middlewares/sms-webhook-auth.middleware';
 
 const repository = new PrismaEstimateResponseRepository();
 const service = new EstimateResponseService(repository);
@@ -203,6 +204,11 @@ const estimateResponseRouter = Router();
  *       - body: SMS 원문 (가격, 시간 등 파싱 대상)
  *       - receivedAt: 수신 시각 (ISO 8601)
  *     tags: [Estimate Response]
+ *     parameters:
+ *       - in: header
+ *         name: x-sms-webhook-key
+ *         required: true
+ *         schema: { type: string }
  *     requestBody:
  *       required: true
  *       content:
@@ -294,6 +300,12 @@ const estimateResponseRouter = Router();
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       401:
+ *         description: SMS 웹훅 권한 없음
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: UNAUTHORIZED_SMS_WEBHOOK, message: SMS 웹훅 권한이 없어요., data: null }, success: null }
  */
 /**
  * @openapi
@@ -565,7 +577,7 @@ const estimateResponseRouter = Router();
  */
 const registerRoutes = (router: Router, routeController: EstimateResponseController): Router => {
   router.get('/result/:request_id', authMiddleware, routeController.getList);
-  router.post('/sms', routeController.receive);
+  router.post('/sms', smsWebhookAuth, routeController.receive);
   router.get('/:proposal_id/time', authMiddleware, routeController.getProposalTimes);
   router.get('/:proposal_id/detail', authMiddleware, routeController.getDetail);
 

@@ -30,6 +30,7 @@ class FakeRepository implements ReservationRepository {
     id: 1,
     totalPrice: 55_000,
     shop: { name: '영찬 네일 강남점' },
+    request: { userId: 1 },
   };
 
   proposalTime: ProposalTimeRecord | null = {
@@ -166,6 +167,15 @@ describe('ReservationService.createReservation', () => {
 
   it('존재하지 않는 견적이면 404를 던진다', async () => {
     repository.proposal = null;
+
+    await expect(service.createReservation(createDto, userId)).rejects.toMatchObject({
+      code: 'PROPOSAL_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
+
+  it('본인이 요청한 견적이 아니면 404를 던진다 (IDOR 방지)', async () => {
+    repository.proposal = { ...repository.proposal!, request: { userId: 999 } };
 
     await expect(service.createReservation(createDto, userId)).rejects.toMatchObject({
       code: 'PROPOSAL_NOT_FOUND',

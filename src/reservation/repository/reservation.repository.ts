@@ -112,6 +112,8 @@ export interface ProposalRecord {
   id: number;
   totalPrice: number | null;
   shop: { name: string };
+  // 견적을 요청한 본인만 그 견적으로 예약을 생성할 수 있도록 소유권 검증에 사용한다(IDOR 방지).
+  request: { userId: number };
 }
 
 export interface ProposalTimeRecord {
@@ -155,7 +157,12 @@ export class PrismaReservationRepository implements ReservationRepository {
   async findProposalById(proposalId: number): Promise<ProposalRecord | null> {
     return await getPrisma().estimateResponse.findUnique({
       where: { id: proposalId },
-      select: { id: true, totalPrice: true, shop: { select: { name: true } } },
+      select: {
+        id: true,
+        totalPrice: true,
+        shop: { select: { name: true } },
+        request: { select: { userId: true } },
+      },
     });
   }
 

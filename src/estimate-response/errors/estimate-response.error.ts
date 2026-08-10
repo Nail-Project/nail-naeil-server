@@ -32,3 +32,13 @@ export class EstimateResponseForbiddenError extends AppError {
     });
   }
 }
+
+export class UnauthorizedSmsWebhookError extends AppError {
+  constructor() {
+    super({
+      code: 'UNAUTHORIZED_SMS_WEBHOOK',
+      statusCode: 401,
+      message: 'SMS 웹훅 권한이 없어요.',
+    });
+  }
+}
