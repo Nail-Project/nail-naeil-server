@@ -176,6 +176,15 @@ describe('ReviewService.updateReview', () => {
       data: { originalError },
     });
   });
+
+  it('소유권 확인 이후 삭제된 경쟁 상태(P2025)면 500 대신 404를 던진다', async () => {
+    repository.updateError = prismaError('P2025');
+
+    await expect(service.updateReview(100, userId, { rating: 4 })).rejects.toMatchObject({
+      code: 'REVIEW_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
 });
 
 describe('ReviewService.deleteReview', () => {
@@ -208,6 +217,15 @@ describe('ReviewService.deleteReview', () => {
       code: 'REVIEW_FAILED',
       statusCode: 500,
       data: { originalError },
+    });
+  });
+
+  it('소유권 확인 이후 삭제된 경쟁 상태(P2025)면 500 대신 404를 던진다', async () => {
+    repository.deleteError = prismaError('P2025');
+
+    await expect(service.deleteReview(100, userId)).rejects.toMatchObject({
+      code: 'REVIEW_NOT_FOUND',
+      statusCode: 404,
     });
   });
 });
