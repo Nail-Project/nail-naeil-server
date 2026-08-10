@@ -7,8 +7,8 @@ import type { NotificationService } from '../../src/notification/service/notific
 import { encodeCursor } from '../../src/common/pagination/cursor';
 
 // 라우트 테스트에서는 JWT 검증 없이 userId만 주입되면 충분하므로 인증 미들웨어를 mock으로 대체한다.
-vi.mock('../../src/user/middlewares/user-auth.middleware', () => ({
-  authenticate: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+vi.mock('../../src/common/middlewares/auth.middleware', () => ({
+  authMiddleware: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
     req.userId = 1;
     req.role = 'CUSTOMER';
     next();

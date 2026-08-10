@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { NotificationSettingController } from './controller/notification-setting.controller';
 import { NotificationSettingService } from './service/notification-setting.service';
-import { authenticate } from '../user/middlewares/user-auth.middleware';
+import { authMiddleware as authenticate } from '../common/middlewares/auth.middleware';
 
 const service = new NotificationSettingService();
 const controller = new NotificationSettingController(service);
