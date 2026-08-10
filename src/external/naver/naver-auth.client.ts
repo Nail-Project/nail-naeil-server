@@ -6,12 +6,19 @@ const API_BASE = 'https://openapi.naver.com';
 const TIMEOUT_MS = 10_000;
 
 // 네이버 서버 응답이 지연될 때 요청이 무한 대기하지 않도록 타임아웃을 건다.
-// (sbiz-shop.client.ts와 동일한 AbortController 패턴)
-const fetchWithTimeout = async (input: string | URL, init?: RequestInit): Promise<Response> => {
+// fetch()가 resolve된 직후(응답 헤더 도착 시점)에 바로 clearTimeout하면 본문을 읽는
+// response.json() 구간은 타임아웃 보호를 못 받으므로, onResponse(본문 파싱까지)가
+// 끝날 때까지 타이머를 유지한다.
+const fetchWithTimeout = async <T>(
+  input: string | URL,
+  init: RequestInit | undefined,
+  onResponse: (response: Response) => Promise<T>,
+): Promise<T> => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    const response = await fetch(input, { ...init, signal: controller.signal });
+    return await onResponse(response);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -70,21 +77,22 @@ export class NaverAuthClient implements SocialAuthClient {
     url.searchParams.set('code', code);
     url.searchParams.set('state', state);
 
-    let response: Response;
+    let data: NaverTokenResponse;
     try {
-      response = await fetchWithTimeout(url);
+      data = await fetchWithTimeout(url, undefined, async (response) => {
+        if (!response.ok) {
+          throw new SocialTokenExchangeError({ provider: 'NAVER', status: response.status });
+        }
+        return (await response.json()) as NaverTokenResponse;
+      });
     } catch (error) {
+      if (error instanceof SocialTokenExchangeError) throw error;
       throw new SocialTokenExchangeError({
         provider: 'NAVER',
         reason: 'network_error',
         cause: String(error),
       });
     }
-    if (!response.ok) {
-      throw new SocialTokenExchangeError({ provider: 'NAVER', status: response.status });
-    }
-
-    const data = (await response.json()) as NaverTokenResponse;
     if (!data.access_token) {
       throw new SocialTokenExchangeError({ provider: 'NAVER', reason: 'no_access_token' });
     }
@@ -92,23 +100,26 @@ export class NaverAuthClient implements SocialAuthClient {
   }
 
   private async getProfile(accessToken: string): Promise<SocialProfile> {
-    let response: Response;
+    let data: NaverProfileResponse;
     try {
-      response = await fetchWithTimeout(`${API_BASE}/v1/nid/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      data = await fetchWithTimeout(
+        `${API_BASE}/v1/nid/me`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+        async (response) => {
+          if (!response.ok) {
+            throw new SocialProfileError({ provider: 'NAVER', status: response.status });
+          }
+          return (await response.json()) as NaverProfileResponse;
+        },
+      );
     } catch (error) {
+      if (error instanceof SocialProfileError) throw error;
       throw new SocialProfileError({
         provider: 'NAVER',
         reason: 'network_error',
         cause: String(error),
       });
     }
-    if (!response.ok) {
-      throw new SocialProfileError({ provider: 'NAVER', status: response.status });
-    }
-
-    const data = (await response.json()) as NaverProfileResponse;
     const profile = data.response;
     if (!profile?.id) {
       throw new SocialProfileError({ provider: 'NAVER', reason: 'no_id' });
