@@ -27,7 +27,7 @@ export class EstimateRequestRepository {
   // 견적 요청 생성
   // 이미지 URL 목록을 RequestImage 레코드로 함께 생성(nested create)한다.
   // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller → service → repository로 전달받는다.
-  async create(dto: CreateEstimateRequestDto, userId: number) {
+  async create(dto: CreateEstimateRequestDto, userId: number, title?: string) {
     // priceMin/priceMax는 SMS 전용이라 DB에 저장하지 않는다.
     const { images, shopIds: _, removalTypes, schedules, priceMin: _pm, priceMax: _pM, ...estimateData } = dto;
 
@@ -35,6 +35,7 @@ export class EstimateRequestRepository {
       data: {
         ...estimateData,
         userId,
+        title: title ?? null,
         images: {
           create: images.map((url) => ({ imageUrl: url })),
         },
