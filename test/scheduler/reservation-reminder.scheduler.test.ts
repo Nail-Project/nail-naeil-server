@@ -126,4 +126,18 @@ describe('runReservationReminderScheduler', () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it('DB 조회가 실패해도 예외를 던지지 않는다(unhandled rejection으로 인한 서버 크래시 방지)', async () => {
+    findManyMock.mockRejectedValueOnce(new Error('DB connection lost'));
+    const smsClient = fakeSmsClient();
+
+    await expect(
+      runReservationReminderScheduler({
+        smsClient,
+        settingRepository: fakeSettingRepository(true),
+        now: new Date('2026-08-09T05:00:00Z'),
+      }),
+    ).resolves.toBeUndefined();
+    expect(smsClient.sendText).not.toHaveBeenCalled();
+  });
 });
