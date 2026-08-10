@@ -18,7 +18,13 @@ describe('smsWebhookAuth 미들웨어', () => {
   });
 
   afterEach(() => {
-    process.env.SMS_WEBHOOK_KEY = originalKey;
+    // originalKey가 undefined일 때 그대로 대입하면 삭제가 아니라 문자열 "undefined"가
+    // 들어가버리므로(process.env는 값을 문자열로 강제 변환), 명시적으로 delete한다.
+    if (originalKey === undefined) {
+      delete process.env.SMS_WEBHOOK_KEY;
+    } else {
+      process.env.SMS_WEBHOOK_KEY = originalKey;
+    }
   });
 
   it('올바른 키면 에러 없이 next를 호출한다', () => {
