@@ -50,6 +50,11 @@ const estimateResponseRouter = Router();
  *                     requestId:
  *                       type: integer
  *                       example: 1
+ *                     title:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 견적 제목. 예) "8/3 패디 견적"
+ *                       example: "8/3 패디 견적"
  *                     responses:
  *                       type: array
  *                       items:
@@ -416,6 +421,11 @@ const estimateResponseRouter = Router();
  *                       example: 1
  *                     requestId:
  *                       type: integer
+ *                     title:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 견적 제목. 예) "8/3 패디 견적"
+ *                       example: "8/3 패디 견적"
  *                     shop:
  *                       type: object
  *                       properties:

@@ -61,6 +61,8 @@ export interface EstimateResponseDetail {
     closedDays: Prisma.JsonValue | null;
   };
   proposalTimes: { proposalDatetime: Date }[];
+  // 연결된 견적 요청 정보 (title 표시용)
+  request: { title: string | null };
 }
 
 export interface EstimateResponseListRecord {
@@ -92,7 +94,7 @@ export interface ProposalTimeRecord {
 
 export interface EstimateResponseRepository {
   createSmsMessage(request: CreateSmsMessageRequest): Promise<CreatedSmsMessage>;
-  findRequestOwner(requestId: number): Promise<{ userId: number } | null>;
+  findRequestOwner(requestId: number): Promise<{ userId: number; title: string | null } | null>;
   findLowestOfferedPrice(requestId: number): Promise<number | null>;
   findDetail(responseId: number): Promise<EstimateResponseDetail | null>;
   findList(requestId: number): Promise<EstimateResponseListRecord[]>;
@@ -215,10 +217,10 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
   }
 
   // 견적 요청의 소유자 userId 조회 - 403 접근 권한 확인용
-  async findRequestOwner(requestId: number): Promise<{ userId: number } | null> {
+  async findRequestOwner(requestId: number): Promise<{ userId: number; title: string | null } | null> {
     return getPrisma().estimateRequest.findUnique({
       where: { id: requestId },
-      select: { userId: true },
+      select: { userId: true, title: true },
     });
   }
 
@@ -273,6 +275,9 @@ export class PrismaEstimateResponseRepository implements EstimateResponseReposit
         proposalTimes: {
           select: { proposalDatetime: true },
           orderBy: { proposalDatetime: 'asc' },
+        },
+        request: {
+          select: { title: true },
         },
       },
     });

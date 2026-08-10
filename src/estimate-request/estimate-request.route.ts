@@ -109,6 +109,11 @@ const estimateRequestRouter = Router();
  *                     estimateId:
  *                       type: integer
  *                       example: 1
+ *                     title:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 자동 생성된 견적 제목. 예) "8/3 패디 견적"
+ *                       example: "8/3 패디 견적"
  *                     nailType:
  *                       type: string
  *                       enum: [HAND, PEDICURE, BOTH]
@@ -307,6 +312,11 @@ const estimateRequestRouter = Router();
  *                           estimateId:
  *                             type: integer
  *                             example: 1
+ *                           title:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 자동 생성된 견적 제목. 예) "8/3 패디 견적"
+ *                             example: "8/3 패디 견적"
  *                           images:
  *                             type: array
  *                             description: 요청에 첨부된 디자인 이미지 목록 (등록 순)

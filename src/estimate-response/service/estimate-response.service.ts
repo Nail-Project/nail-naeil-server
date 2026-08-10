@@ -192,6 +192,7 @@ export class EstimateResponseService {
     return {
       id: response.id,
       requestId: response.requestId,
+      title: response.request.title ?? null,
       shop: {
         ...response.shop,
         latitude: response.shop.latitude.toNumber(),
@@ -289,6 +290,7 @@ export class EstimateResponseService {
 
     return {
       requestId,
+      title: request.title ?? null,
       responses: items,
       waitingShops: waiting.map(({ shop }) => {
         const averageResponseMinutes = averages.get(shop.id) ?? 60;

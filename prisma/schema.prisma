@@ -373,6 +373,8 @@ model EstimateRequest {
   id            Int                   @id @default(autoincrement())
   nailType      NailType              @map("nail_type")
   recommendType RecommendType         @map("recommend_type")
+  // 견적 요청 생성 시 자동 생성. 예: "8/3 패디 견적", "8/3 핸드 견적"
+  title         String?               @db.VarChar(100)
   description   String?               @db.Text
   latitude      Decimal?              @db.Decimal(10, 7)
   longitude     Decimal?              @db.Decimal(10, 7)

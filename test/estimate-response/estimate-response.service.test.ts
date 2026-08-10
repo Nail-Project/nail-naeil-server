@@ -122,6 +122,7 @@ class FakeRepository implements EstimateResponseRepository {
         closedDays: ['SUN'],
       },
       proposalTimes: [{ proposalDatetime: new Date('2026-07-20T05:00:00.000Z') }],
+      request: { title: '8/20 핸드 견적' },
     };
   }
 
@@ -166,8 +167,8 @@ class FakeRepository implements EstimateResponseRepository {
       : null;
   }
 
-  async findRequestOwner(requestId: number): Promise<{ userId: number } | null> {
-    return requestId === 1 ? { userId: 1 } : null;
+  async findRequestOwner(requestId: number): Promise<{ userId: number; title: string | null } | null> {
+    return requestId === 1 ? { userId: 1, title: '8/20 핸드 견적' } : null;
   }
 
   // 기본값 null → "더 낮은 견적" 아님(ESTIMATE_RESPONSE로 발송). 필요 시 하위 클래스에서 override.

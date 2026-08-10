@@ -2,6 +2,8 @@
 // 목록 카드에 표시할 최소한의 데이터만 포함한다.
 export interface GetEstimatesResponseDto {
   estimateId: number;
+  // 자동 생성된 견적 제목. 예: "8/3 패디 견적"
+  title: string | null;
   // 요청에 첨부된 디자인 이미지 목록 (등록 순)
   images: { imageId: number; imageUrl: string }[];
   nailType: string;

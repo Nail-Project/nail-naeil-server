@@ -232,6 +232,25 @@ function formatPriceRange(priceMin?: number, priceMax?: number): string | null {
   return null;
 }
 
+// 네일 종류 → 견적 제목용 짧은 레이블
+const NAIL_TYPE_TITLE_LABEL: Record<string, string> = {
+  HAND: '핸드',
+  PEDICURE: '패디',
+  BOTH: '핸드&패디',
+};
+
+// 견적 요청 제목 자동 생성
+// 형식: "{M}/{D} {nailLabel} 견적"  예: "8/3 패디 견적", "8/10 핸드 견적"
+// 날짜는 schedules 중 가장 이른 날짜 기준 (없으면 오늘 날짜)
+function generateEstimateTitle(dto: CreateEstimateRequestDto): string {
+  const earliest = dto.schedules.map((s) => s.date).sort()[0];
+  const dateStr = earliest ?? new Date().toISOString().slice(0, 10);
+  const month = Number(dateStr.slice(5, 7));
+  const day = Number(dateStr.slice(8, 10));
+  const nailLabel = NAIL_TYPE_TITLE_LABEL[dto.nailType] ?? dto.nailType;
+  return `${month}/${day} ${nailLabel} 견적`;
+}
+
 // DTO를 SMS 문자 문자열로 변환
 // TODO: [yej] AI 연동 확정 후 이 메서드 대신 AI 서비스를 호출하는 방식으로 교체한다.
 //   예) const text = await aiService.generateSmsText(dto);
@@ -311,9 +330,11 @@ export class EstimateRequestService {
 
     // ② DB 저장 (SMS 성공 후)
     try {
-      const result = await this.repository.create(dto, userId);
+      const title = generateEstimateTitle(dto);
+      const result = await this.repository.create(dto, userId, title);
       return {
         estimateId: result.id,
+        title: result.title ?? null,
         nailType: result.nailType,
         removalTypes: result.removals.map((r) => r.removalType),
         // DB row (date, time)를 날짜별로 묶어 { date, times[] } 형태로 변환
@@ -384,6 +405,7 @@ export class EstimateRequestService {
 
           return {
             estimateId: estimate.id,
+            title: estimate.title ?? null,
             images: estimate.images.map((img) => ({
               imageId: img.id,
               imageUrl: img.imageUrl,
