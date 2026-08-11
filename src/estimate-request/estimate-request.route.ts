@@ -372,6 +372,20 @@ const estimateRequestRouter = Router();
  *                             type: integer
  *                             nullable: true
  *                             example: 30000
+ *                           lowestPriceShop:
+ *                             nullable: true
+ *                             description: 최저가 제안 샵 정보. 응답 없으면 null.
+ *                             type: object
+ *                             properties:
+ *                               shopId:
+ *                                 type: integer
+ *                                 example: 7
+ *                               name:
+ *                                 type: string
+ *                                 example: "유네일"
+ *                               address:
+ *                                 type: string
+ *                                 example: "서울 동작구 사당동"
  *                           radiusMeters:
  *                             type: integer
  *                             nullable: true
