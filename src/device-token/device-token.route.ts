@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { DeviceTokenController } from './controller/device-token.controller';
 import { DeviceTokenService } from './service/device-token.service';
-import { authenticate } from '../user/middlewares/user-auth.middleware';
+import { authMiddleware as authenticate } from '../common/middlewares/auth.middleware';
 
 const service = new DeviceTokenService();
 const controller = new DeviceTokenController(service);

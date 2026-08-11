@@ -35,8 +35,15 @@ class FakeShopQueryRepository implements ShopQueryRepository {
   async exists(shopId: number) {
     return shopId === 1;
   }
-  async createWish() {}
-  async deleteWish() {}
+  wished = false;
+  async createWish() {
+    this.wished = true;
+  }
+  async deleteWish() {
+    const wasWished = this.wished;
+    this.wished = false;
+    return wasWished;
+  }
   async findWishlist() {
     return [];
   }
@@ -85,6 +92,18 @@ describe('ShopQueryService', () => {
 
   it('존재하지 않는 샵 상세 조회는 404 예외를 던진다', async () => {
     await expect(service.getDetail(999, 1)).rejects.toMatchObject({
+      code: 'SHOP_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
+
+  it('찜 토글 - 찜 안 한 상태면 추가하고, 찜한 상태면 해제한다', async () => {
+    await expect(service.toggleWish(1, 1)).resolves.toEqual({ shopId: 1, isWished: true });
+    await expect(service.toggleWish(1, 1)).resolves.toEqual({ shopId: 1, isWished: false });
+  });
+
+  it('존재하지 않는 샵 찜 토글은 404 예외를 던진다', async () => {
+    await expect(service.toggleWish(999, 1)).rejects.toMatchObject({
       code: 'SHOP_NOT_FOUND',
       statusCode: 404,
     });

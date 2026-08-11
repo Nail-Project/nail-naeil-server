@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { NotificationService } from '../../src/notification/service/notification.service';
 import type { NotificationRepository } from '../../src/notification/repository/notification.repository';
 import type { PushSender } from '../../src/notification/push/push-sender';
+import type { NotificationSettingRepository } from '../../src/notification/repository/notification-setting.repository';
 import { encodeCursor } from '../../src/common/pagination/cursor';
 
 // Prisma Notification 레코드 형태의 최소 fake 데이터
@@ -18,11 +19,19 @@ const notificationRecord = (overrides: Partial<Record<string, unknown>> = {}) =>
   ...overrides,
 });
 
-// 필요한 메서드만 가진 fake repository/pushSender를 만들어 주입한다.
-const createService = (repo: Partial<NotificationRepository>, push?: Partial<PushSender>) =>
+// 필요한 메서드만 가진 fake repository/pushSender/설정 repository를 만들어 주입한다.
+// 설정 repository 기본값은 항상 ON(isCategoryEnabled=true)이라 기존 발송 테스트에 영향을 주지 않는다.
+const createService = (
+  repo: Partial<NotificationRepository>,
+  push?: Partial<PushSender>,
+  settingRepo?: Partial<NotificationSettingRepository>,
+) =>
   new NotificationService(
     repo as unknown as NotificationRepository,
     (push as PushSender) ?? { send: vi.fn().mockResolvedValue(undefined) },
+    (settingRepo as NotificationSettingRepository) ?? {
+      isCategoryEnabled: vi.fn().mockResolvedValue(true),
+    },
   );
 
 describe('NotificationService.getMyNotifications', () => {
@@ -160,5 +169,25 @@ describe('NotificationService.notify', () => {
       service.notify({ userId: 1, type: 'RESERVATION_STATUS', title: 't', body: 'b' }),
     ).resolves.toBeUndefined();
     expect(create).toHaveBeenCalledOnce();
+  });
+
+  it('사용자가 해당 카테고리 알림을 껐으면 저장·발송을 모두 건너뛴다', async () => {
+    const create = vi.fn();
+    const send = vi.fn();
+    const service = createService(
+      { create },
+      { send },
+      { isCategoryEnabled: vi.fn().mockResolvedValue(false) },
+    );
+
+    await service.notify({
+      userId: 1,
+      type: 'ESTIMATE_RESPONSE',
+      title: '견적 답변이 도착했어요',
+      body: '요청하신 견적에 새 답변이 도착했어요.',
+    });
+
+    expect(create).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
   });
 });

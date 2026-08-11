@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UserService } from '../../src/user/service/user.service';
 import type { UserRepository } from '../../src/user/repository/user.repository';
+import type { EstimateRequestService } from '../../src/estimate-request/service/estimate-request.service';
+import type { ReservationService } from '../../src/reservation/service/reservation.service';
+import type { SubscriptionService } from '../../src/subscription/service/subscription.service';
 
 // Prisma User 레코드 형태의 최소 fake 데이터
 const userRecord = (overrides: Partial<Record<string, unknown>> = {}) => ({
@@ -15,9 +18,27 @@ const userRecord = (overrides: Partial<Record<string, unknown>> = {}) => ({
   ...overrides,
 });
 
-// 필요한 메서드만 가진 fake repository를 만들어 주입한다.
-const createService = (repo: Partial<UserRepository>) =>
-  new UserService(repo as unknown as UserRepository);
+// 마이페이지 요약 수치를 담당하는 타 도메인 서비스는 fake로 주입해 DB를 타지 않게 한다.
+interface SummaryOverrides {
+  inProgressEstimateCount?: number;
+  upcomingReservationCount?: number;
+  isNPlus?: boolean;
+}
+
+// 필요한 메서드만 가진 fake repository/서비스를 만들어 주입한다.
+const createService = (repo: Partial<UserRepository>, summary: SummaryOverrides = {}) =>
+  new UserService(
+    repo as unknown as UserRepository,
+    {
+      countInProgress: vi.fn().mockResolvedValue(summary.inProgressEstimateCount ?? 0),
+    } as unknown as EstimateRequestService,
+    {
+      countUpcoming: vi.fn().mockResolvedValue(summary.upcomingReservationCount ?? 0),
+    } as unknown as ReservationService,
+    {
+      isNPlus: vi.fn().mockResolvedValue(summary.isNPlus ?? false),
+    } as unknown as SubscriptionService,
+  );
 
 describe('UserService.getMyProfile', () => {
   it('존재하는 유저의 프로필을 응답 DTO로 반환한다', async () => {
@@ -32,6 +53,22 @@ describe('UserService.getMyProfile', () => {
       nickname: '홍길동',
       profileImageUrl: null,
       role: 'CUSTOMER',
+      inProgressEstimateCount: 0,
+      upcomingReservationCount: 0,
+      isNPlus: false,
+    });
+  });
+
+  it('마이페이지 요약(진행 중 견적 수·다가오는 예약 수·NPlus 여부)을 함께 반환한다', async () => {
+    const service = createService(
+      { findById: vi.fn().mockResolvedValue(userRecord()) },
+      { inProgressEstimateCount: 2, upcomingReservationCount: 1, isNPlus: true },
+    );
+
+    await expect(service.getMyProfile(1)).resolves.toMatchObject({
+      inProgressEstimateCount: 2,
+      upcomingReservationCount: 1,
+      isNPlus: true,
     });
   });
 

@@ -27,27 +27,48 @@ export class EstimateRequestRepository {
   // 견적 요청 생성
   // 이미지 URL 목록을 RequestImage 레코드로 함께 생성(nested create)한다.
   // userId는 auth 미들웨어가 JWT에서 추출한 값을 controller → service → repository로 전달받는다.
-  async create(dto: CreateEstimateRequestDto, userId: number) {
-    const { images, shopIds: _, ...estimateData } = dto;
+  async create(dto: CreateEstimateRequestDto, userId: number, title?: string) {
+    // priceMin/priceMax는 SMS 전용이라 DB에 저장하지 않는다.
+    const { images, shopIds: _, removalTypes, schedules, priceMin: _pm, priceMax: _pM, ...estimateData } = dto;
 
     return getPrisma().estimateRequest.create({
       data: {
         ...estimateData,
-        // 프론트에서 문자열로 전달받은 날짜를 Date 객체로 변환한다.
-        startDate: new Date(estimateData.startDate),
-        endDate: new Date(estimateData.endDate),
         userId,
+        title: title ?? null,
         images: {
           create: images.map((url) => ({ imageUrl: url })),
         },
         targetShops: {
           create: dto.shopIds.map((shopId) => ({ shopId })),
         },
+        // 복수 선택 제거 종류를 join table에 각각 저장한다.
+        removals: {
+          create: removalTypes.map((removalType) => ({ removalType })),
+        },
+        // 날짜별 희망 시간을 join table에 각각 row로 저장한다.
+        // { date: "8/10", times: ["AM","PM"] } → (8/10, AM), (8/10, PM) 두 개 row
+        schedules: {
+          create: schedules.flatMap((s) =>
+            s.times.map((time) => ({
+              date: new Date(s.date),
+              time,
+            })),
+          ),
+        },
       },
       include: {
-        // 생성된 이미지 레코드를 응답에 포함하기 위해 join한다.
         images: true,
+        removals: true,
+        schedules: true,
       },
+    });
+  }
+
+  // 진행 중(샵 매칭 중, status=MATCHING) 견적 요청 수. 마이페이지 요약에 사용한다.
+  countInProgressByUser(userId: number): Promise<number> {
+    return getPrisma().estimateRequest.count({
+      where: { userId, status: 'MATCHING' },
     });
   }
 
@@ -77,17 +98,29 @@ export class EstimateRequestRepository {
     const rows = await getPrisma().estimateRequest.findMany({
       where,
       include: {
-        // 썸네일은 가장 먼저 등록된 이미지 1장만 가져온다.
+        // 첨부된 모든 이미지 (등록 순)
         images: {
-          take: 1,
           orderBy: { id: 'asc' },
         },
-        // 견적 응답 수, SUBMITTED 샵 수, 최저가 계산에 필요한 필드만 select한다.
+        // 견적 응답 수, SUBMITTED 샵 수, 최저가·최저가 샵 정보 계산에 필요한 필드만 select한다.
         proposals: {
           select: {
             totalPrice: true,
             status: true,
+            shop: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
           },
+        },
+        // 제거 종류 목록
+        removals: true,
+        // 방문 가능 일정 목록
+        schedules: {
+          orderBy: [{ date: 'asc' }, { time: 'asc' }],
         },
       },
       // (createdAt, id) 모두 내림차순 — 최신 요청이 위에 오도록

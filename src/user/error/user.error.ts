@@ -46,17 +46,6 @@ export class InvalidCredentialsError extends AppError {
   }
 }
 
-export class InvalidTokenError extends AppError {
-  constructor(data?: unknown) {
-    super({
-      code: 'INVALID_TOKEN',
-      statusCode: 401,
-      message: '유효하지 않은 토큰입니다.',
-      data,
-    });
-  }
-}
-
 export class UserNotFoundError extends AppError {
   constructor(data?: unknown) {
     super({

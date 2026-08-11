@@ -56,6 +56,18 @@ export class UserController {
    *                     role:
    *                       type: string
    *                       example: CUSTOMER
+   *                     inProgressEstimateCount:
+   *                       type: integer
+   *                       description: 진행 중(샵 매칭 중)인 견적 요청 수
+   *                       example: 2
+   *                     upcomingReservationCount:
+   *                       type: integer
+   *                       description: 다가오는(확정 + 예약 시각 미도래) 예약 수
+   *                       example: 1
+   *                     isNPlus:
+   *                       type: boolean
+   *                       description: NPlus 구독 가입 여부
+   *                       example: false
    *       401:
    *         description: 유효하지 않은 토큰
    *         content:
@@ -106,7 +118,56 @@ export class UserController {
    *                 example: https://bucket.s3.ap-northeast-2.amazonaws.com/images/2026-08-05/0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d.jpg
    *     responses:
    *       200:
-   *         description: 수정 성공, 갱신된 내 정보 반환
+   *         description: 수정 성공, 갱신된 내 정보 반환(마이페이지 요약 필드 포함)
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 resultType:
+   *                   type: string
+   *                   example: SUCCESS
+   *                 error:
+   *                   type: object
+   *                   nullable: true
+   *                   example: null
+   *                 success:
+   *                   type: object
+   *                   properties:
+   *                     userId:
+   *                       type: integer
+   *                       example: 1
+   *                     email:
+   *                       type: string
+   *                       nullable: true
+   *                       example: new@test.com
+   *                     phoneNumber:
+   *                       type: string
+   *                       nullable: true
+   *                       example: "01012345678"
+   *                     nickname:
+   *                       type: string
+   *                       nullable: true
+   *                       example: 홍길동
+   *                     profileImageUrl:
+   *                       type: string
+   *                       nullable: true
+   *                       example: https://bucket.s3.ap-northeast-2.amazonaws.com/images/2026-08-05/0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d.jpg
+   *                     role:
+   *                       type: string
+   *                       example: CUSTOMER
+   *                     inProgressEstimateCount:
+   *                       type: integer
+   *                       description: 진행 중(샵 매칭 중)인 견적 요청 수
+   *                       example: 2
+   *                     upcomingReservationCount:
+   *                       type: integer
+   *                       description: 다가오는(확정 + 예약 시각 미도래) 예약 수
+   *                       example: 1
+   *                     isNPlus:
+   *                       type: boolean
+   *                       description: NPlus 구독 가입 여부
+   *                       example: false
    *       400:
    *         description: 입력값 검증 실패
    *         content:

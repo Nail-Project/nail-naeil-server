@@ -77,8 +77,41 @@ model User {
   wishDesigns     WishDesign[]
   wishShops       WishShop[]
   shopReviews     ShopReview[]
+  notificationSetting NotificationSetting?
+  subscriptions   Subscription[]
 
   @@map("users")
+}
+
+// NPlus 구독. 결제 연동은 범위 밖(P2)이라 상태와 기간만 관리한다.
+// 마이페이지의 NPlus 가입 여부는 "ACTIVE이면서 만료되지 않은" 구독이 존재하는지로 판단한다.
+enum SubscriptionPlan {
+  NPLUS
+}
+
+enum SubscriptionStatus {
+  ACTIVE // 구독 중
+  EXPIRED // 기간 만료
+  CANCELLED // 사용자 해지
+}
+
+model Subscription {
+  id        Int                @id @default(autoincrement())
+  userId    Int                @map("user_id")
+  plan      SubscriptionPlan   @default(NPLUS)
+  status    SubscriptionStatus @default(ACTIVE)
+  startedAt DateTime           @default(now()) @map("started_at") @db.DateTime(3)
+  // null이면 무기한(해지 전까지 유효), 값이 있으면 그 시점 이후 만료로 본다.
+  expiresAt DateTime?          @map("expires_at") @db.DateTime(3)
+  createdAt DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
+
+  // 회원 탈퇴 시 구독도 함께 삭제되도록 Cascade.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 특정 사용자의 활성 구독을 조회하는 접근 패턴에 맞춘 인덱스.
+  @@index([userId, status])
+  @@map("subscriptions")
 }
 
 model WishShop {
@@ -146,7 +179,13 @@ model RefreshToken {
 // FCM 외부 발송은 후속 단계에서 이 데이터를 재사용해 얹는다.
 enum NotificationType {
   ESTIMATE_RESPONSE // 견적 응답 도착
-  RESERVATION_STATUS // 예약 상태 변경(확정/취소 등)
+  RESERVATION_STATUS // 예약 상태 변경(확정/취소 등) - 레거시, 신규 코드는 아래 세분화된 타입을 쓴다.
+  LOWER_ESTIMATE // 더 낮은 견적 도착
+  ESTIMATE_CLOSED // 견적 응답 마감(요청 만료)
+  RESERVATION_CONFIRMED // 예약 확정
+  RESERVATION_CANCELLED // 예약 취소
+  RESERVATION_DAY_BEFORE // 예약 하루 전
+  RESERVATION_DAY_OF // 예약 당일
 }
 
 model Notification {
@@ -167,6 +206,25 @@ model Notification {
   // 내 알림 목록을 최신순으로, 안읽음 필터와 함께 조회하는 접근 패턴에 맞춘 인덱스.
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+// 사용자별 알림 수신 설정. 각 카테고리별 ON/OFF를 관리한다.
+// 알림 생성 시 이 설정을 확인해 OFF인 카테고리는 발송을 건너뛴다(후속 단계).
+// 행이 없으면 전부 ON(기본값)으로 간주하며, 수정 시점에 lazy하게 생성한다.
+model NotificationSetting {
+  id                 Int      @id @default(autoincrement())
+  // 사용자당 설정은 하나뿐이라 unique. upsert의 기준 키로도 사용한다.
+  userId             Int      @unique @map("user_id")
+  estimateEnabled    Boolean  @default(true) @map("estimate_enabled")
+  reservationEnabled Boolean  @default(true) @map("reservation_enabled")
+  marketingEnabled   Boolean  @default(true) @map("marketing_enabled")
+  createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  // 회원 탈퇴 시 설정도 함께 삭제되도록 Cascade.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
 }
 
 // FCM 푸시 발송 대상이 되는 사용자별 디바이스 토큰.
@@ -221,7 +279,10 @@ model EstimateResponse {
   totalPrice               Int?                   @map("total_price")
   basePrice                Int?                   @map("base_price")
   removalPrice             Int?                   @map("removal_price")
-  extraPrice               Int?                   @map("extra_price")
+  // Figma 가격 세부내역의 "디자인 추가"/"옵션 추가" 두 줄에 대응시키려고 기존 extraPrice를
+  // 쪼갠 컬럼(2026-08-09). designExtraPrice는 기존 extraPrice 값을 그대로 이어받는다.
+  designExtraPrice         Int?                   @map("design_extra_price")
+  optionExtraPrice         Int?                   @map("option_extra_price")
   memo                     String?                @db.Text
   estimatedDurationMinutes Int                    @default(60) @map("estimated_duration_minutes")
   canProvideService        Boolean                @default(true) @map("can_provide_service")
@@ -311,11 +372,11 @@ enum EstimateStatus {
 model EstimateRequest {
   id            Int                   @id @default(autoincrement())
   nailType      NailType              @map("nail_type")
-  removalType   RemovalType           @map("removal_type")
-  startDate     DateTime              @map("start_date") @db.Date
-  endDate       DateTime              @map("end_date") @db.Date
-  preferredTime PreferredTime         @map("preferred_time")
   recommendType RecommendType         @map("recommend_type")
+  // 견적 요청 생성 시 자동 생성. 예: "8/3 패디 견적", "8/3 핸드 견적"
+  title         String?               @db.VarChar(100)
+  // 샵 탐색 시 사용자가 선택한 반경 (단위: 미터). 예: 3000 → 3km
+  radiusMeters  Int?                  @map("radius_meters")
   description   String?               @db.Text
   latitude      Decimal?              @db.Decimal(10, 7)
   longitude     Decimal?              @db.Decimal(10, 7)
@@ -333,9 +394,31 @@ model EstimateRequest {
   proposals     EstimateResponse[]
   smsMessages   SmsMessage[]
   targetShops   EstimateRequestShop[]
+  removals      EstimateRequestRemoval[]
+  schedules     EstimateRequestSchedule[]
 
   @@index([designId])
   @@map("estimate_requests")
+}
+
+model EstimateRequestSchedule {
+  requestId   Int             @map("request_id")
+  date        DateTime        @map("date") @db.Date
+  time        PreferredTime   @map("time")
+  request     EstimateRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  // (requestId, date, time) 복합 PK — 같은 날짜에 시간대 복수 선택 지원
+  @@id([requestId, date, time])
+  @@map("estimate_request_schedules")
+}
+
+model EstimateRequestRemoval {
+  requestId   Int             @map("request_id")
+  removalType RemovalType     @map("removal_type")
+  request     EstimateRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@id([requestId, removalType])
+  @@map("estimate_request_removals")
 }
 
 model EstimateRequestShop {

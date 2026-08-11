@@ -9,6 +9,7 @@ import type {
 } from '../dto/response/shop-query-response';
 import { ShopNotFoundError } from '../errors/shop.error';
 import type { ShopQueryRepository, ShopSummaryRecord } from '../repository/shop-query.repository';
+import { distanceMeters } from '../../common/utils/distance';
 
 export class ShopQueryService {
   constructor(private readonly repository: ShopQueryRepository) {}
@@ -51,16 +52,18 @@ export class ShopQueryService {
     };
   }
 
-  async createWish(shopId: number, userId: number): Promise<ShopWishResponse> {
+  // 찜 추가/해제를 하나의 호출로 처리한다. "현재 상태를 조회 후 반대로 분기"하면
+  // 동시 요청 사이에 TOCTOU 레이스가 생길 수 있어서(CodeRabbit 리뷰 반영, 2026-08-09),
+  // 대신 삭제를 먼저 시도해 실제로 지워진 row가 있었는지(deleteMany의 원자적 count)로
+  // 분기한다 - 별도 조회 없이 단일 쿼리 결과만으로 상태를 판단한다.
+  async toggleWish(shopId: number, userId: number): Promise<ShopWishResponse> {
     if (!(await this.repository.exists(shopId))) throw new ShopNotFoundError({ shopId });
+
+    const wasWished = await this.repository.deleteWish(shopId, userId);
+    if (wasWished) return { shopId, isWished: false };
+
     await this.repository.createWish(shopId, userId);
     return { shopId, isWished: true };
-  }
-
-  async deleteWish(shopId: number, userId: number): Promise<ShopWishResponse> {
-    if (!(await this.repository.exists(shopId))) throw new ShopNotFoundError({ shopId });
-    await this.repository.deleteWish(shopId, userId);
-    return { shopId, isWished: false };
   }
 
   async getWishlist(
@@ -139,19 +142,9 @@ export class ShopQueryService {
       reviewCount: shop.reviewCount,
       distanceMeters:
         latitude !== undefined && longitude !== undefined
-          ? this.distanceMeters(latitude, longitude, shopLatitude, shopLongitude)
+          ? distanceMeters(latitude, longitude, shopLatitude, shopLongitude)
           : null,
       isWished: shop.wishes.length > 0,
     };
-  }
-
-  private distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const toRad = (value: number) => (value * Math.PI) / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const value =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-    return Math.round(6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value)));
   }
 }

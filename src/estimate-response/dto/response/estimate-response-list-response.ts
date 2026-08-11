@@ -23,6 +23,8 @@ export interface EstimateResponseListItem {
 
 export interface EstimateResponseListResponse {
   requestId: number;
+  // 견적 제목. 예: "8/3 패디 견적"
+  title: string | null;
   responses: EstimateResponseListItem[];
   waitingShops: Array<{
     shopId: number;

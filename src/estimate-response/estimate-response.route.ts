@@ -3,6 +3,7 @@ import { EstimateResponseController } from './controller/estimate-response.contr
 import { PrismaEstimateResponseRepository } from './repository/estimate-response.repository';
 import { EstimateResponseService } from './service/estimate-response.service';
 import { authMiddleware } from '../common/middlewares/auth.middleware';
+import { smsWebhookAuth } from './middlewares/sms-webhook-auth.middleware';
 
 const repository = new PrismaEstimateResponseRepository();
 const service = new EstimateResponseService(repository);
@@ -50,6 +51,11 @@ const estimateResponseRouter = Router();
  *                     requestId:
  *                       type: integer
  *                       example: 1
+ *                     title:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 견적 제목. 예) "8/3 패디 견적"
+ *                       example: "8/3 패디 견적"
  *                     responses:
  *                       type: array
  *                       items:
@@ -198,6 +204,11 @@ const estimateResponseRouter = Router();
  *       - body: SMS 원문 (가격, 시간 등 파싱 대상)
  *       - receivedAt: 수신 시각 (ISO 8601)
  *     tags: [Estimate Response]
+ *     parameters:
+ *       - in: header
+ *         name: x-sms-webhook-key
+ *         required: true
+ *         schema: { type: string }
  *     requestBody:
  *       required: true
  *       content:
@@ -289,6 +300,12 @@ const estimateResponseRouter = Router();
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       401:
+ *         description: SMS 웹훅 권한 없음
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             example: { resultType: FAIL, error: { code: UNAUTHORIZED_SMS_WEBHOOK, message: SMS 웹훅 권한이 없어요., data: null }, success: null }
  */
 /**
  * @openapi
@@ -416,6 +433,11 @@ const estimateResponseRouter = Router();
  *                       example: 1
  *                     requestId:
  *                       type: integer
+ *                     title:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 견적 제목. 예) "8/3 패디 견적"
+ *                       example: "8/3 패디 견적"
  *                     shop:
  *                       type: object
  *                       properties:
@@ -457,7 +479,7 @@ const estimateResponseRouter = Router();
  *                       type: object
  *                       required: [totalPrice]
  *                       description: 시술 가능한 견적의 총액은 필수이며, 시술 불가 응답에서는 totalPrice가 null이다. 상세 금액은 샵이 문자에 명시한 경우에만 제공한다.
- *                       example: { totalPrice: 55000, basePrice: null, removalPrice: null, extraPrice: null }
+ *                       example: { totalPrice: 55000, basePrice: null, removalPrice: null, designExtraPrice: null, optionExtraPrice: null }
  *                       properties:
  *                         totalPrice:
  *                           type: integer
@@ -473,10 +495,15 @@ const estimateResponseRouter = Router();
  *                           nullable: true
  *                           description: 샵이 제거 금액을 별도로 명시한 경우에만 제공
  *                           example: null
- *                         extraPrice:
+ *                         designExtraPrice:
  *                           type: integer
  *                           nullable: true
- *                           description: 샵이 추가 금액을 명시한 경우에만 합산 금액으로 제공하며 세부 항목은 memo에 포함
+ *                           description: 샵이 디자인(아트/그림 등) 관련 추가 금액을 명시한 경우에만 제공
+ *                           example: null
+ *                         optionExtraPrice:
+ *                           type: integer
+ *                           nullable: true
+ *                           description: 샵이 그 외 옵션(젤/파츠 등) 관련 추가 금액을 명시한 경우에만 제공
  *                           example: null
  *                     memo:
  *                       type: string
@@ -550,7 +577,7 @@ const estimateResponseRouter = Router();
  */
 const registerRoutes = (router: Router, routeController: EstimateResponseController): Router => {
   router.get('/result/:request_id', authMiddleware, routeController.getList);
-  router.post('/sms', routeController.receive);
+  router.post('/sms', smsWebhookAuth, routeController.receive);
   router.get('/:proposal_id/time', authMiddleware, routeController.getProposalTimes);
   router.get('/:proposal_id/detail', authMiddleware, routeController.getDetail);
 
