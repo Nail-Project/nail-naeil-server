@@ -397,11 +397,15 @@ export class EstimateRequestService {
           // SUBMITTED: 샵에서 견적을 제출했지만 사용자가 아직 수락/거절하지 않은 상태
           const submittedShopCount = proposals.filter((p) => p.status === 'SUBMITTED').length;
 
-          // 도착한 견적 중 최저 총금액 (견적 응답이 없으면 null)
-          const prices = proposals
-            .map((p) => p.totalPrice)
-            .filter((price): price is number => price !== null);
-          const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+          // 도착한 견적 중 최저 총금액 + 해당 샵 정보 (견적 응답이 없으면 null)
+          const withPrice = proposals.filter((p): p is typeof p & { totalPrice: number } => p.totalPrice !== null);
+          const minPrice = withPrice.length > 0 ? Math.min(...withPrice.map((p) => p.totalPrice)) : null;
+          const lowestProposal = minPrice !== null
+            ? withPrice.find((p) => p.totalPrice === minPrice) ?? null
+            : null;
+          const lowestPriceShop = lowestProposal
+            ? { shopId: lowestProposal.shop.id, name: lowestProposal.shop.name, address: lowestProposal.shop.address }
+            : null;
 
           return {
             estimateId: estimate.id,
@@ -429,6 +433,8 @@ export class EstimateRequestService {
             proposalCount,
             submittedShopCount,
             minPrice,
+            lowestPriceShop,
+            radiusMeters: estimate.radiusMeters ?? null,
           };
         }),
         pageInfo: { nextCursor, hasNext },

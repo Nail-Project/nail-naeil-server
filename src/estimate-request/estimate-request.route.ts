@@ -70,6 +70,12 @@ const estimateRequestRouter = Router();
  *                 enum: [BALANCED, CLOSE, WIDE, CHEAP]
  *               description:
  *                 type: string
+ *               radiusMeters:
+ *                 type: integer
+ *                 description: 샵 탐색 시 사용한 반경 (미터, 선택). 예) 3000 → 근처 3km
+ *                 minimum: 1
+ *                 maximum: 2147483647
+ *                 example: 3000
  *               priceMin:
  *                 type: integer
  *                 description: 희망 최소 가격 (원, 선택) - DB 미저장, SMS 참고용
@@ -368,6 +374,25 @@ const estimateRequestRouter = Router();
  *                             type: integer
  *                             nullable: true
  *                             example: 30000
+ *                           lowestPriceShop:
+ *                             nullable: true
+ *                             description: 최저가 제안 샵 정보. 응답 없으면 null.
+ *                             type: object
+ *                             properties:
+ *                               shopId:
+ *                                 type: integer
+ *                                 example: 7
+ *                               name:
+ *                                 type: string
+ *                                 example: "유네일"
+ *                               address:
+ *                                 type: string
+ *                                 example: "서울 동작구 사당동"
+ *                           radiusMeters:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: 샵 탐색 시 사용한 반경 (미터). 예) 3000 → 근처 3km
+ *                             example: 3000
  *                     pageInfo:
  *                       type: object
  *                       properties:

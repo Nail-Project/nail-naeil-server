@@ -102,11 +102,18 @@ export class EstimateRequestRepository {
         images: {
           orderBy: { id: 'asc' },
         },
-        // 견적 응답 수, SUBMITTED 샵 수, 최저가 계산에 필요한 필드만 select한다.
+        // 견적 응답 수, SUBMITTED 샵 수, 최저가·최저가 샵 정보 계산에 필요한 필드만 select한다.
         proposals: {
           select: {
             totalPrice: true,
             status: true,
+            shop: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
           },
         },
         // 제거 종류 목록
