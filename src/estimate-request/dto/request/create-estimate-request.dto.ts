@@ -73,7 +73,8 @@ export const CreateEstimateRequestSchema = z
 
     // 샵 탐색 시 사용자가 선택한 반경 (단위: 미터, 선택)
     // 예: 3000 → 3km. 클라이언트가 주변 샵 조회 API 호출 시 사용한 반경을 그대로 전달한다.
-    radiusMeters: z.number().int().positive().optional(),
+    // MySQL INT 상한(2_147_483_647)을 초과하지 않도록 제한한다.
+    radiusMeters: z.number().int().positive().max(2_147_483_647).optional(),
 
     // 예상 가격 범위 (선택) - DB 미저장, SMS 발송 시 참고용으로만 사용
     // 슬라이더에서 설정한 최소·최대 금액 (단위: 원)

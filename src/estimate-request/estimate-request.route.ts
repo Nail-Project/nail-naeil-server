@@ -73,6 +73,8 @@ const estimateRequestRouter = Router();
  *               radiusMeters:
  *                 type: integer
  *                 description: 샵 탐색 시 사용한 반경 (미터, 선택). 예) 3000 → 근처 3km
+ *                 minimum: 1
+ *                 maximum: 2147483647
  *                 example: 3000
  *               priceMin:
  *                 type: integer
