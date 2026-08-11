@@ -70,6 +70,10 @@ const estimateRequestRouter = Router();
  *                 enum: [BALANCED, CLOSE, WIDE, CHEAP]
  *               description:
  *                 type: string
+ *               radiusMeters:
+ *                 type: integer
+ *                 description: 샵 탐색 시 사용한 반경 (미터, 선택). 예) 3000 → 근처 3km
+ *                 example: 3000
  *               priceMin:
  *                 type: integer
  *                 description: 희망 최소 가격 (원, 선택) - DB 미저장, SMS 참고용
@@ -368,6 +372,11 @@ const estimateRequestRouter = Router();
  *                             type: integer
  *                             nullable: true
  *                             example: 30000
+ *                           radiusMeters:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: 샵 탐색 시 사용한 반경 (미터). 예) 3000 → 근처 3km
+ *                             example: 3000
  *                     pageInfo:
  *                       type: object
  *                       properties:

@@ -71,6 +71,10 @@ export const CreateEstimateRequestSchema = z
     // 카탈로그 디자인 연결 ID (선택) — "이 디자인 그대로 견적받기" 흐름에서만 전달됨
     designId: z.number().int().positive().optional(),
 
+    // 샵 탐색 시 사용자가 선택한 반경 (단위: 미터, 선택)
+    // 예: 3000 → 3km. 클라이언트가 주변 샵 조회 API 호출 시 사용한 반경을 그대로 전달한다.
+    radiusMeters: z.number().int().positive().optional(),
+
     // 예상 가격 범위 (선택) - DB 미저장, SMS 발송 시 참고용으로만 사용
     // 슬라이더에서 설정한 최소·최대 금액 (단위: 원)
     priceMin: z.number().int().nonnegative().optional(),

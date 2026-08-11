@@ -429,6 +429,7 @@ export class EstimateRequestService {
             proposalCount,
             submittedShopCount,
             minPrice,
+            radiusMeters: estimate.radiusMeters ?? null,
           };
         }),
         pageInfo: { nextCursor, hasNext },

@@ -375,6 +375,8 @@ model EstimateRequest {
   recommendType RecommendType         @map("recommend_type")
   // 견적 요청 생성 시 자동 생성. 예: "8/3 패디 견적", "8/3 핸드 견적"
   title         String?               @db.VarChar(100)
+  // 샵 탐색 시 사용자가 선택한 반경 (단위: 미터). 예: 3000 → 3km
+  radiusMeters  Int?                  @map("radius_meters")
   description   String?               @db.Text
   latitude      Decimal?              @db.Decimal(10, 7)
   longitude     Decimal?              @db.Decimal(10, 7)

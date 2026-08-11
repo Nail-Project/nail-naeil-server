@@ -20,6 +20,8 @@ export interface GetEstimatesResponseDto {
   submittedShopCount: number;
   // 도착한 견적 중 최저 총금액 (견적 응답이 없으면 null)
   minPrice: number | null;
+  // 샵 탐색 시 사용한 반경 (단위: 미터). 예: 3000 → "근처 3km" 표시용
+  radiusMeters: number | null;
 }
 
 export interface GetEstimatesPageResponse {
