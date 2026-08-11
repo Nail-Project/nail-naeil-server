@@ -230,7 +230,7 @@ const swaggerSpec = swaggerJsdoc({
       },
     },
   },
-  apis: [path.resolve(__dirname, '../**/*.{ts,js}')],
+  apis: [path.resolve(__dirname, '../**/*.{ts,js}').replace(/\\/g, '/')],
 }) as SwaggerDocument;
 
 const paths = swaggerSpec.paths ?? {};
