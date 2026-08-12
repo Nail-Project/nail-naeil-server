@@ -16,8 +16,8 @@ const swaggerSpec = swaggerJsdoc({
     },
     servers: [
       {
-        url: 'http://localhost:3000',
-        description: 'Local server',
+        url: '/',
+        description: '현재 접속한 서버',
       },
     ],
     components: {

@@ -24,6 +24,7 @@ app.use(
   '/api-docs',
   swaggerUi.serve,
   swaggerUi.setup(undefined, {
+    explorer: true,
     swaggerOptions: {
       urls: [
         { name: '사용자 API', url: '/api-docs/user.json' },
