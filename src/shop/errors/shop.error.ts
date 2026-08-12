@@ -84,3 +84,25 @@ export class ShopNotFoundError extends AppError {
     });
   }
 }
+
+export class InvalidShopAdminRequestError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'INVALID_SHOP_ADMIN_REQUEST',
+      statusCode: 400,
+      message: '샵 관리자 요청을 확인해주세요.',
+      data,
+    });
+  }
+}
+
+export class InvalidShopIdError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'INVALID_SHOP_ID',
+      statusCode: 400,
+      message: '샵 ID를 확인해주세요.',
+      data,
+    });
+  }
+}
