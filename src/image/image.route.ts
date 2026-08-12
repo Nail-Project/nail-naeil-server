@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ImageController } from './controller/image.controller';
 import { ImageService } from './service/image.service';
 import { wrapMulterArray } from '../common/middlewares/multer-error.middleware';
+import { authMiddleware } from '../common/middlewares/auth.middleware';
 
 const imageRouter = Router();
 const imageController = new ImageController();
@@ -22,6 +23,8 @@ const upload = imageService.getMulter();
  *       - form-data 필드명: image (고정)
  *     tags:
  *       - Image
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -85,6 +88,15 @@ const upload = imageService.getMulter();
  *                 success:
  *                   nullable: true
  *                   example: null
+ *       401:
+ *         description: 인증 실패
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+ *             examples:
+ *               unauthorized: { value: { resultType: FAIL, error: { code: UNAUTHORIZED, message: 로그인이 필요합니다., data: null }, success: null } }
+ *               tokenExpired: { value: { resultType: FAIL, error: { code: TOKEN_EXPIRED, message: 토큰이 만료됐습니다., data: null }, success: null } }
+ *               tokenInvalid: { value: { resultType: FAIL, error: { code: TOKEN_INVALID, message: 유효하지 않은 토큰입니다., data: null }, success: null } }
  *       500:
  *         description: 서버 오류 (파일 저장 실패)
  *         content:
@@ -112,6 +124,12 @@ const upload = imageService.getMulter();
  *                   example: null
  */
 // wrapMulter: multer 실행 + 에러 발생 시 커스텀 에러로 변환해 공통 핸들러로 위임
-imageRouter.post('/upload', wrapMulterArray(upload, 'images', 3), imageController.uploadImage);
+// authMiddleware를 먼저 걸어 비로그인 사용자의 무제한 업로드(스토리지 어뷰징)를 막는다.
+imageRouter.post(
+  '/upload',
+  authMiddleware,
+  wrapMulterArray(upload, 'images', 3),
+  imageController.uploadImage,
+);
 
 export default imageRouter;

@@ -2,9 +2,15 @@
 // 목록 카드에 표시할 최소한의 데이터만 포함한다.
 export interface GetEstimatesResponseDto {
   estimateId: number;
-  // 요청에 첨부된 첫 번째 이미지 URL (없으면 null)
-  thumbnailUrl: string | null;
+  // 자동 생성된 견적 제목. 예: "8/3 패디 견적"
+  title: string | null;
+  // 요청에 첨부된 디자인 이미지 목록 (등록 순)
+  images: { imageId: number; imageUrl: string }[];
   nailType: string;
+  // 제거 종류 (복수 선택): NONE | BASIC | PARTS | EXTENSION
+  removalTypes: string[];
+  // 방문 가능 일정 목록 (날짜별 희망 시간대)
+  schedules: { date: Date; times: string[] }[];
   createdAt: Date;
   // 견적 요청 상태: MATCHING | COMPLETED | EXPIRED
   status: string;
@@ -14,6 +20,10 @@ export interface GetEstimatesResponseDto {
   submittedShopCount: number;
   // 도착한 견적 중 최저 총금액 (견적 응답이 없으면 null)
   minPrice: number | null;
+  // 최저가 제안 샵 정보 (응답 없으면 null)
+  lowestPriceShop: { shopId: number; name: string; address: string } | null;
+  // 샵 탐색 시 사용한 반경 (단위: 미터). 예: 3000 → "근처 3km" 표시용
+  radiusMeters: number | null;
 }
 
 export interface GetEstimatesPageResponse {

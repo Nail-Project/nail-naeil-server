@@ -14,9 +14,8 @@ describe('shop query Swagger error responses', () => {
   it.each([
     ['/api/v1/shops', 'get', ['400', '401', '500']],
     ['/api/v1/shops/search', 'get', ['400', '401', '500']],
-    ['/api/v1/shops/wishlist', 'get', ['400', '401', '500']],
-    ['/api/v1/shops/{shopId}/wish', 'post', ['400', '401', '404', '500']],
-    ['/api/v1/shops/{shopId}/wish', 'delete', ['400', '401', '404', '500']],
+    ['/api/v1/users/me/bookmark', 'get', ['400', '401', '500']],
+    ['/api/v1/bookmark/toggle', 'post', ['400', '401', '404', '500']],
     ['/api/v1/shops/{shopId}/reviews', 'get', ['400', '404', '500']],
     ['/api/v1/shops/{shopId}', 'get', ['400', '401', '404', '500']],
   ])('%s %s의 예상 에러 응답을 명세한다', (path, method, statusCodes) => {

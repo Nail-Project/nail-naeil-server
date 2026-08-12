@@ -14,6 +14,13 @@ vi.mock('../../src/common/middlewares/auth.middleware', () => ({
   },
 }));
 
+// SMS 웹훅 인증도 별도 테스트(estimate-response.sms-auth.route.test.ts)에서 다루므로 여기선 통과시킨다.
+vi.mock('../../src/estimate-response/middlewares/sms-webhook-auth.middleware', () => ({
+  smsWebhookAuth: (_req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    next();
+  },
+}));
+
 const createApp = () => {
   const service = {
     createSmsMessage: vi.fn().mockResolvedValue({

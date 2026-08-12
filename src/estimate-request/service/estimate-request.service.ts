@@ -12,6 +12,16 @@ import { GetEstimatesPageResponse } from '../dto/response/get-estimates-response
 import { EstimateRequestFailedError, InternalServerError } from '../../common/errors/common.error';
 import { encodeCursor } from '../../common/pagination/cursor';
 import { EstimateRequestDesignNotFoundError } from '../error/estimate-request.error';
+import { Prisma } from '../../generated/prisma/client';
+
+// create()는 targetShops(shopId)도 함께 FK로 걸려있어 P2003이 designId 때문인지
+// shopId 때문인지 구분해야 한다 - 제약 이름(estimate_requests_design_id_fkey)으로
+// designId 위반만 골라내고, 나머지(예: 삭제된 샵)는 일반 실패로 남긴다.
+const isDesignForeignKeyError = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError &&
+  error.code === 'P2003' &&
+  typeof error.meta?.field_name === 'string' &&
+  error.meta.field_name.includes('design_id');
 
 // ─── SMS 설정 ───────────────────────────────────────────────────────────────────
 const SMS_ENABLED = process.env.SMS_ENABLED === 'true';
@@ -175,17 +185,17 @@ const NAIL_TYPE_LABEL: Record<string, string> = {
 // 제거 타입 한글 변환
 const REMOVAL_TYPE_LABEL: Record<string, string> = {
   EXTENSION: '연장 제거',
-  PARTS: '부분 제거',
-  BASIC: '기본 제거',
+  PARTS: '아트/파츠 제거',
+  BASIC: '젤 제거',
   NONE: '제거 없음',
 };
 
-// 선호 시간대 한글 변환
+// 희망 시간대 한글 변환
 const PREFERRED_TIME_LABEL: Record<string, string> = {
-  AM: '오전',
-  PM: '오후',
-  EVENING: '저녁',
-  ANY: '무관',
+  AM: '오전 (8~12시)',
+  PM: '오후 (12~18시)',
+  EVENING: '저녁 (18~22시)',
+  ANY: '상관없음',
 };
 
 // 추천 기준 한글 변환
@@ -196,18 +206,69 @@ const RECOMMEND_TYPE_LABEL: Record<string, string> = {
   CHEAP: '저렴한 순',
 };
 
+// 한국어 요일
+const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'] as const;
+
+// "YYYY-MM-DD" → "8월 10일 (월)" 형식으로 변환 (UTC 기준)
+function formatDateKorean(dateStr: string): string {
+  const year = Number(dateStr.slice(0, 4));
+  const month = Number(dateStr.slice(5, 7));
+  const day = Number(dateStr.slice(8, 10));
+  const dayOfWeek = DAY_NAMES[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  return `${month}월 ${day}일 (${dayOfWeek})`;
+}
+
+// 희망 가격 범위 문자열 생성 (min만 / max만 / 둘 다 / 없음)
+function formatPriceRange(priceMin?: number, priceMax?: number): string | null {
+  if (priceMin !== undefined && priceMax !== undefined) {
+    return `${priceMin.toLocaleString('ko-KR')}원 ~ ${priceMax.toLocaleString('ko-KR')}원`;
+  }
+  if (priceMin !== undefined) {
+    return `${priceMin.toLocaleString('ko-KR')}원 이상`;
+  }
+  if (priceMax !== undefined) {
+    return `${priceMax.toLocaleString('ko-KR')}원 이하`;
+  }
+  return null;
+}
+
+// 네일 종류 → 견적 제목용 짧은 레이블
+const NAIL_TYPE_TITLE_LABEL: Record<string, string> = {
+  HAND: '핸드',
+  PEDICURE: '패디',
+  BOTH: '핸드&패디',
+};
+
+// 견적 요청 제목 자동 생성
+// 형식: "{M}/{D} {nailLabel} 견적"  예: "8/3 패디 견적", "8/10 핸드 견적"
+// 날짜는 schedules 중 가장 이른 날짜 기준 (없으면 오늘 날짜)
+function generateEstimateTitle(dto: CreateEstimateRequestDto): string {
+  const earliest = dto.schedules.map((s) => s.date).sort()[0];
+  const dateStr = earliest ?? new Date().toISOString().slice(0, 10);
+  const month = Number(dateStr.slice(5, 7));
+  const day = Number(dateStr.slice(8, 10));
+  const nailLabel = NAIL_TYPE_TITLE_LABEL[dto.nailType] ?? dto.nailType;
+  return `${month}/${day} ${nailLabel} 견적`;
+}
+
 // DTO를 SMS 문자 문자열로 변환
 // TODO: [yej] AI 연동 확정 후 이 메서드 대신 AI 서비스를 호출하는 방식으로 교체한다.
 //   예) const text = await aiService.generateSmsText(dto);
 //   현재는 DTO 필드를 단순 한글 텍스트로 조합해 임시 사용한다.
 function formatSmsText(dto: CreateEstimateRequestDto): string {
+  const priceRange = formatPriceRange(dto.priceMin, dto.priceMax);
+
   const lines = [
     '[네일내일] 견적 요청이 도착했습니다.',
     '',
     `· 종류: ${NAIL_TYPE_LABEL[dto.nailType] ?? dto.nailType}`,
-    `· 제거: ${REMOVAL_TYPE_LABEL[dto.removalType] ?? dto.removalType}`,
-    `· 희망 기간: ${dto.startDate} ~ ${dto.endDate}`,
-    `· 선호 시간: ${PREFERRED_TIME_LABEL[dto.preferredTime] ?? dto.preferredTime}`,
+    `· 제거: ${dto.removalTypes.map((rt) => REMOVAL_TYPE_LABEL[rt] ?? rt).join(', ')}`,
+    `· 방문 가능 일정:`,
+    ...dto.schedules.map(
+      (s) =>
+        `  - ${formatDateKorean(s.date)} ${s.times.map((t) => PREFERRED_TIME_LABEL[t] ?? t).join(', ')}`,
+    ),
+    ...(priceRange ? [`· 희망 가격: ${priceRange}`] : []),
     `· 추천 기준: ${RECOMMEND_TYPE_LABEL[dto.recommendType] ?? dto.recommendType}`,
   ];
 
@@ -226,6 +287,11 @@ export class EstimateRequestService {
   private readonly repository = new EstimateRequestRepository();
   private readonly smsService = new SmsService();
 
+  // 진행 중(샵 매칭 중) 견적 요청 수. 마이페이지 요약(다른 도메인)에서 이 서비스를 통해 호출한다.
+  async countInProgress(userId: number): Promise<number> {
+    return this.repository.countInProgressByUser(userId);
+  }
+
   // 견적 요청 생성
   // ① SMS 발송 — 실패 시 DB 저장 없이 EstimateRequestFailedError + 실패 이유 반환
   // ② SMS 성공 후 DB 저장
@@ -234,14 +300,22 @@ export class EstimateRequestService {
     dto: CreateEstimateRequestDto,
     userId: number,
   ): Promise<CreateEstimateResponseDto> {
+    // SMS 문자 내용 생성 (DTO 확정 후 한 번만 생성, 발송과 미리보기 양쪽에서 동일하게 사용)
+    const smsText = formatSmsText(dto);
+
     // designId가 존재하지 않는 디자인을 가리키면 SMS 발송 전에 걸러낸다.
-    if (dto.designId !== undefined && !(await this.repository.designExists(dto.designId))) {
-      throw new EstimateRequestDesignNotFoundError();
+    if (dto.designId !== undefined) {
+      let designExists: boolean;
+      try {
+        designExists = await this.repository.designExists(dto.designId);
+      } catch {
+        throw new EstimateRequestFailedError();
+      }
+      if (!designExists) throw new EstimateRequestDesignNotFoundError();
     }
 
     // ① SMS 발송 (실패 시 DB 저장 없이 즉시 에러 반환)
     try {
-      const smsText = formatSmsText(dto);
       const shops = await this.repository.findShopsByIds(dto.shopIds);
       const phoneNumbers = shops.map((s) => s.phoneNumber);
       // 유효한 S3 URL만 필터링 후 첫 번째 1장만 MMS 발송
@@ -256,14 +330,22 @@ export class EstimateRequestService {
 
     // ② DB 저장 (SMS 성공 후)
     try {
-      const result = await this.repository.create(dto, userId);
+      const title = generateEstimateTitle(dto);
+      const result = await this.repository.create(dto, userId, title);
       return {
         estimateId: result.id,
+        title: result.title ?? null,
         nailType: result.nailType,
-        removalType: result.removalType,
-        startDate: result.startDate,
-        endDate: result.endDate,
-        preferredTime: result.preferredTime,
+        removalTypes: result.removals.map((r) => r.removalType),
+        // DB row (date, time)를 날짜별로 묶어 { date, times[] } 형태로 변환
+        schedules: Object.values(
+          result.schedules.reduce<Record<string, { date: Date; times: string[] }>>((acc, s) => {
+            const key = s.date.toISOString();
+            if (!acc[key]) acc[key] = { date: s.date, times: [] };
+            acc[key].times.push(s.time);
+            return acc;
+          }, {}),
+        ),
         recommendType: result.recommendType,
         description: result.description ?? null,
         status: result.status,
@@ -273,8 +355,12 @@ export class EstimateRequestService {
           imageUrl: img.imageUrl,
         })),
         createdAt: result.createdAt,
+        // 샵에 실제로 발송된 SMS 원문 그대로 반환 (클라이언트 미리보기용)
+        smsPreview: smsText,
       };
-    } catch {
+    } catch (error) {
+      // 존재 확인(designExists) 이후 삭제된 경쟁 상태로 FK 제약(P2003) 위반
+      if (isDesignForeignKeyError(error)) throw new EstimateRequestDesignNotFoundError();
       throw new EstimateRequestFailedError();
     }
   }
@@ -288,7 +374,12 @@ export class EstimateRequestService {
     size: number,
   ): Promise<GetEstimatesPageResponse> {
     try {
-      const { estimates, hasNext } = await this.repository.findByStatus(status, userId, cursor, size);
+      const { estimates, hasNext } = await this.repository.findByStatus(
+        status,
+        userId,
+        cursor,
+        size,
+      );
 
       const last = estimates[estimates.length - 1];
       const nextCursor =
@@ -306,21 +397,44 @@ export class EstimateRequestService {
           // SUBMITTED: 샵에서 견적을 제출했지만 사용자가 아직 수락/거절하지 않은 상태
           const submittedShopCount = proposals.filter((p) => p.status === 'SUBMITTED').length;
 
-          // 도착한 견적 중 최저 총금액 (견적 응답이 없으면 null)
-          const prices = proposals
-            .map((p) => p.totalPrice)
-            .filter((price): price is number => price !== null);
-          const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+          // 도착한 견적 중 최저 총금액 + 해당 샵 정보 (견적 응답이 없으면 null)
+          const withPrice = proposals.filter((p): p is typeof p & { totalPrice: number } => p.totalPrice !== null);
+          const minPrice = withPrice.length > 0 ? Math.min(...withPrice.map((p) => p.totalPrice)) : null;
+          const lowestProposal = minPrice !== null
+            ? withPrice.find((p) => p.totalPrice === minPrice) ?? null
+            : null;
+          const lowestPriceShop = lowestProposal
+            ? { shopId: lowestProposal.shop.id, name: lowestProposal.shop.name, address: lowestProposal.shop.address }
+            : null;
 
           return {
             estimateId: estimate.id,
-            thumbnailUrl: estimate.images[0]?.imageUrl ?? null,
+            title: estimate.title ?? null,
+            images: estimate.images.map((img) => ({
+              imageId: img.id,
+              imageUrl: img.imageUrl,
+            })),
             nailType: estimate.nailType,
+            removalTypes: estimate.removals.map((r) => r.removalType),
+            // DB row (date, time)를 날짜별로 묶어 { date, times[] } 형태로 변환
+            schedules: Object.values(
+              estimate.schedules.reduce<Record<string, { date: Date; times: string[] }>>(
+                (acc, s) => {
+                  const key = s.date.toISOString();
+                  if (!acc[key]) acc[key] = { date: s.date, times: [] };
+                  acc[key].times.push(s.time);
+                  return acc;
+                },
+                {},
+              ),
+            ),
             createdAt: estimate.createdAt,
             status: estimate.status,
             proposalCount,
             submittedShopCount,
             minPrice,
+            lowestPriceShop,
+            radiusMeters: estimate.radiusMeters ?? null,
           };
         }),
         pageInfo: { nextCursor, hasNext },

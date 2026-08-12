@@ -57,6 +57,18 @@ export class ReservationFailedError extends AppError {
   }
 }
 
+// 작성/수정/삭제 전반에서 공통으로 쓰는 메시지라 특정 동작에 국한하지 않는다.
+export class ReviewFailedError extends AppError {
+  constructor(data?: unknown) {
+    super({
+      code: 'REVIEW_FAILED',
+      statusCode: 500,
+      message: '리뷰 처리에 실패했어요. 다시 시도해주세요.',
+      data,
+    });
+  }
+}
+
 export class InternalServerError extends AppError {
   constructor(data?: unknown) {
     super({
