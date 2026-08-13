@@ -42,6 +42,7 @@ describe('app', () => {
 
   it('소셜 로그인 시작은 v1 경로, 콜백은 v1 없는 경로에 등록한다', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubEnv('KAKAO_CLIENT_ID', 'test-client-id');
     vi.stubEnv('KAKAO_REDIRECT_URI', 'https://api.example.com/api/auth/kakao/callback');
 
@@ -55,6 +56,16 @@ describe('app', () => {
     expect(startResponse.headers['set-cookie']?.[0]).toContain('Path=/');
     expect(callbackResponse.status).toBe(400);
     expect(callbackResponse.body.error.code).toBe('INVALID_OAUTH_STATE');
+    expect(warn).toHaveBeenCalledWith(
+      '[OAuth] state validation failed',
+      expect.objectContaining({
+        provider: 'kakao',
+        hasCode: false,
+        hasQueryState: false,
+        hasStateCookie: false,
+        stateMatched: false,
+      }),
+    );
     expect(oldCallbackResponse.status).toBe(404);
     expect(oldCallbackResponse.body.error.code).toBe('ROUTE_NOT_FOUND');
 
