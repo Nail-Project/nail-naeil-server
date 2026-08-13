@@ -5,7 +5,7 @@ const client = () =>
   new NaverAuthClient(
     'naver-client-id',
     'naver-secret',
-    'http://localhost:3000/api/v1/auth/naver/callback',
+    'http://localhost:3000/api/auth/naver/callback',
   );
 
 describe('NaverAuthClient', () => {
@@ -19,7 +19,7 @@ describe('NaverAuthClient', () => {
     expect(url.origin + url.pathname).toBe('https://nid.naver.com/oauth2.0/authorize');
     expect(url.searchParams.get('client_id')).toBe('naver-client-id');
     expect(url.searchParams.get('redirect_uri')).toBe(
-      'http://localhost:3000/api/v1/auth/naver/callback',
+      'http://localhost:3000/api/auth/naver/callback',
     );
     expect(url.searchParams.get('response_type')).toBe('code');
     expect(url.searchParams.get('state')).toBe('state-xyz');

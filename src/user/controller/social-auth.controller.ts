@@ -49,7 +49,7 @@ export class SocialAuthController {
 
   /**
    * @openapi
-   * /api/v1/auth/{provider}/callback:
+   * /api/auth/{provider}/callback:
    *   get:
    *     summary: 소셜 로그인 콜백 (토큰 발급 후 앱 딥링크로 리다이렉트)
    *     tags:
@@ -74,6 +74,13 @@ export class SocialAuthController {
    *     responses:
    *       302:
    *         description: 앱 딥링크(accessToken/refreshToken 포함)로 리다이렉트
+   *         headers:
+   *           Location:
+   *             description: 로그인 성공 토큰을 쿼리 파라미터로 전달하는 앱 딥링크
+   *             schema:
+   *               type: string
+   *               format: uri
+   *               example: nailnaeil://auth?accessToken=eyJhbGciOiJIUzI1NiJ9...&refreshToken=eyJhbGciOiJIUzI1NiJ9...
    *       400:
    *         description: OAuth 요청 검증 실패
    *         content:
