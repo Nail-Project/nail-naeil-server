@@ -111,6 +111,14 @@ export class SocialAuthController {
         const savedState = this.readStateCookie(req);
 
         if (!code || !state || !savedState || state !== savedState) {
+          console.warn('[OAuth] state validation failed', {
+            provider,
+            hasCode: Boolean(code),
+            hasQueryState: Boolean(state),
+            hasStateCookie: Boolean(savedState),
+            stateMatched: Boolean(state && savedState && state === savedState),
+            userAgent: req.get('user-agent') ?? null,
+          });
           throw new InvalidOAuthStateError();
         }
         const tokens = await this.socialAuthService.handleCallback(provider, code, state);
