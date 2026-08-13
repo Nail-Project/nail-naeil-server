@@ -113,10 +113,9 @@ export class SocialAuthController {
         if (!code || !state || !savedState || state !== savedState) {
           throw new InvalidOAuthStateError();
         }
-        res.clearCookie(STATE_COOKIE, { path: '/' });
-
         const tokens = await this.socialAuthService.handleCallback(provider, code, state);
 
+        res.clearCookie(STATE_COOKIE, { path: '/' });
         const deeplink = new URL(process.env.APP_AUTH_DEEPLINK ?? DEFAULT_DEEPLINK);
         deeplink.searchParams.set('accessToken', tokens.accessToken);
         deeplink.searchParams.set('refreshToken', tokens.refreshToken);
