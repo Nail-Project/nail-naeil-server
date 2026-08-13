@@ -106,6 +106,27 @@ describe('app', () => {
     ).toBe('#/components/schemas/ReservationDetailSuccessResponse');
   });
 
+  it('소셜 로그인 콜백은 완료 페이지로 리다이렉트하고, 완료 페이지는 앱 딥링크로 전환한다', async () => {
+    vi.stubEnv('APP_AUTH_DEEPLINK', 'nailnaeil://auth');
+
+    const [missingTokenResponse, completeResponse] = await Promise.all([
+      request(app).get('/api/auth/complete'),
+      request(app).get('/api/auth/complete?accessToken=test-access&refreshToken=test-refresh'),
+    ]);
+
+    expect(missingTokenResponse.status).toBe(400);
+
+    expect(completeResponse.status).toBe(200);
+    expect(completeResponse.text).toContain(
+      'nailnaeil://auth?accessToken=test-access&amp;refreshToken=test-refresh',
+    );
+    expect(completeResponse.text).toContain(
+      'nailnaeil://auth?accessToken=test-access&refreshToken=test-refresh',
+    );
+
+    vi.unstubAllEnvs();
+  });
+
   it('존재하지 않는 경로는 기본 404 HTML이 아니라 공통 에러 포맷으로 응답한다', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
