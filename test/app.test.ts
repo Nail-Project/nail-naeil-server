@@ -40,6 +40,55 @@ describe('app', () => {
     expect(res.body.paths).toHaveProperty('/admin/api/v1/shops/{shopId}');
   });
 
+  it('소셜 로그인 시작은 v1 경로, 콜백은 v1 없는 경로에 등록한다', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const [callbackResponse, oldCallbackResponse] = await Promise.all([
+      request(app).get('/api/auth/kakao/callback'),
+      request(app).get('/api/v1/auth/kakao/callback'),
+    ]);
+
+    expect(callbackResponse.status).toBe(400);
+    expect(callbackResponse.body.error.code).toBe('INVALID_OAUTH_STATE');
+    expect(oldCallbackResponse.status).toBe(404);
+    expect(oldCallbackResponse.body.error.code).toBe('ROUTE_NOT_FOUND');
+
+    const swaggerResponse = await request(app).get('/api-docs/user.json');
+    expect(swaggerResponse.body.paths).toHaveProperty('/api/v1/auth/{provider}');
+    expect(swaggerResponse.body.paths).toHaveProperty('/api/auth/{provider}/callback');
+
+    vi.restoreAllMocks();
+  });
+
+  it('사용자 Swagger에 소셜 토큰 전달과 상세 조회 응답 필드를 노출한다', async () => {
+    const response = await request(app).get('/api-docs/user.json');
+    const spec = response.body;
+
+    const callbackLocation =
+      spec.paths['/api/auth/{provider}/callback'].get.responses['302'].headers.Location;
+    expect(callbackLocation.schema.example).toContain('accessToken=');
+    expect(callbackLocation.schema.example).toContain('refreshToken=');
+
+    const estimateShopProperties =
+      spec.paths['/api/v1/estimate/{proposal_id}/detail'].get.responses['200'].content[
+        'application/json'
+      ].schema.properties.success.properties.shop.properties;
+    expect(estimateShopProperties).toHaveProperty('rating');
+    expect(estimateShopProperties).toHaveProperty('reviewCount');
+
+    const reservationSchema = spec.components.schemas.ReservationDetailResponse;
+    expect(reservationSchema.properties).toMatchObject({
+      shopRating: expect.any(Object),
+      shopReviewCount: expect.any(Object),
+      totalPrice: expect.any(Object),
+      status: expect.any(Object),
+    });
+    expect(
+      spec.paths['/api/v1/reserve/{reservationId}'].get.responses['200'].content['application/json']
+        .schema.$ref,
+    ).toBe('#/components/schemas/ReservationDetailSuccessResponse');
+  });
+
   it('존재하지 않는 경로는 기본 404 HTML이 아니라 공통 에러 포맷으로 응답한다', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 

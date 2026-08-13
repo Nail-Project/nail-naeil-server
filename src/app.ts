@@ -6,6 +6,7 @@ import { errorHandler } from './common/middlewares/error-handler.middleware';
 import { RouteNotFoundError } from './common/errors/common.error';
 import v1Router from './routes/v1.router';
 import adminV1Router from './routes/admin-v1.router';
+import { socialAuthCallbackRouter } from './user/route/social-auth.route';
 
 export const app = express();
 
@@ -57,6 +58,7 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+app.use('/api/auth', socialAuthCallbackRouter);
 app.use('/api/v1', v1Router);
 app.use('/admin/api/v1', adminV1Router);
 

@@ -459,8 +459,10 @@ const estimateResponseRouter = Router();
  *                           type: number
  *                         rating:
  *                           type: number
+ *                           description: 샵 평균 평점. 리뷰가 없으면 0
  *                         reviewCount:
  *                           type: integer
+ *                           description: 샵 리뷰 수. 리뷰가 없으면 0
  *                         businessHours:
  *                           type: object
  *                           nullable: true
