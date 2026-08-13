@@ -10,6 +10,7 @@ import { bookmarkListRouter, bookmarkToggleRouter } from '../shop/bookmark.route
 import imageRouter from '../image/image.route';
 import userAuthRouter from '../user/route/user-auth.route';
 import userRouter from '../user/route/user.route';
+import userAddressRouter from '../user/route/user-address.route';
 import socialAuthRouter from '../user/route/social-auth.route';
 import notificationRouter from '../notification/notification.route';
 import notificationSettingRouter from '../notification/notification-setting.route';
@@ -27,6 +28,7 @@ v1Router.use('/shops', shopQueryRouter);
 v1Router.use('/bookmark', bookmarkToggleRouter);
 v1Router.use('/image', imageRouter);
 v1Router.use('/users', userAuthRouter);
+v1Router.use('/users/me/addresses', userAddressRouter);
 v1Router.use('/users', userRouter);
 v1Router.use('/users/me/bookmark', bookmarkListRouter);
 v1Router.use('/auth', socialAuthRouter);
