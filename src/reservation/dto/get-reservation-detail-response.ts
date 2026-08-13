@@ -4,6 +4,8 @@ import type { JsonValue } from '../../common/types/json';
 // GET /api/v1/reserve/:reservationId - 예약 상세 조회 성공 시 Response
 export interface GetReservationDetailResponse {
   reservationId: number;
+  // 샵 리뷰 목록(GET /api/v1/shops/{shopId}/reviews) 등 다른 API를 이어서 호출할 때 필요하다.
+  shopId: number;
   shopName: string;
   // 예약 변경은 별도 API 없이 프론트에서 이 번호로 안내 팝업을 띄워 처리한다(Figma 기준).
   shopPhoneNumber: string | null;

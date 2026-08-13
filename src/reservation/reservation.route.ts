@@ -170,6 +170,10 @@ const reservationRouter = Router();
  *     responses:
  *       200:
  *         description: 예약 상세 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ReservationDetailSuccessResponse'
  *       400:
  *         description: 유효하지 않은 예약 id
  *         content:
