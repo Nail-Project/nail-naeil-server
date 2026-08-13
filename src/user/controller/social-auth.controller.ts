@@ -40,6 +40,7 @@ export class SocialAuthController {
         httpOnly: true,
         sameSite: 'lax',
         maxAge: STATE_COOKIE_MAX_AGE_MS,
+        path: '/',
       });
       res.redirect(this.socialAuthService.getAuthorizationUrl(provider, state));
     } catch (error) {
@@ -112,7 +113,7 @@ export class SocialAuthController {
         if (!code || !state || !savedState || state !== savedState) {
           throw new InvalidOAuthStateError();
         }
-        res.clearCookie(STATE_COOKIE);
+        res.clearCookie(STATE_COOKIE, { path: '/' });
 
         const tokens = await this.socialAuthService.handleCallback(provider, code, state);
 
