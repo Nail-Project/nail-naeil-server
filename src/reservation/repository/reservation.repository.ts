@@ -76,6 +76,7 @@ export interface ReservationDetailRecord {
     optionExtraPrice: number | null;
     memo: string | null;
     shop: {
+      id: number;
       name: string;
       phoneNumber: string | null;
       address: string;
@@ -285,6 +286,7 @@ export class PrismaReservationRepository implements ReservationRepository {
             memo: true,
             shop: {
               select: {
+                id: true,
                 name: true,
                 phoneNumber: true,
                 address: true,

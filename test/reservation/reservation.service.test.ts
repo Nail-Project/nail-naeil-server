@@ -420,6 +420,7 @@ describe('ReservationService.getReservationDetail', () => {
         optionExtraPrice: 4_000,
         memo: '깔끔하게 해드릴게요',
         shop: {
+          id: 1,
           name: '영찬 네일 강남점',
           phoneNumber: '02-1234-5678',
           address: '서울시 강남구',
@@ -443,6 +444,7 @@ describe('ReservationService.getReservationDetail', () => {
 
     await expect(service.getReservationDetail(1n, userId)).resolves.toMatchObject({
       reservationId: 1,
+      shopId: 1,
       shopName: '영찬 네일 강남점',
       shopPhoneNumber: '02-1234-5678',
       address: '서울시 강남구 2층',
@@ -482,6 +484,7 @@ describe('ReservationService.getReservationDetail', () => {
         optionExtraPrice: 4_000,
         memo: null,
         shop: {
+          id: 1,
           name: '영찬 네일 강남점',
           phoneNumber: null,
           address: '서울시 강남구',
@@ -522,6 +525,7 @@ describe('ReservationService.getReservationDetail', () => {
         optionExtraPrice: 4_000,
         memo: null,
         shop: {
+          id: 1,
           name: '영찬 네일 강남점',
           phoneNumber: null,
           address: '서울시 강남구',
@@ -556,6 +560,7 @@ describe('ReservationService.getReservationDetail', () => {
         optionExtraPrice: 4_000,
         memo: null,
         shop: {
+          id: 1,
           name: '영찬 네일 강남점',
           phoneNumber: null,
           address: '서울시 강남구',
@@ -677,6 +682,7 @@ describe('ReservationService.cancelReservation', () => {
         optionExtraPrice: 4_000,
         memo: null,
         shop: {
+          id: 1,
           name: '영찬 네일 강남점',
           phoneNumber: null,
           address: '서울시 강남구',
@@ -716,6 +722,7 @@ describe('ReservationService.cancelReservation', () => {
         optionExtraPrice: 4_000,
         memo: null,
         shop: {
+          id: 1,
           name: '영찬 네일 강남점',
           phoneNumber: null,
           address: '서울시 강남구',
