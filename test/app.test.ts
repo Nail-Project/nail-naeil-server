@@ -42,12 +42,17 @@ describe('app', () => {
 
   it('소셜 로그인 시작은 v1 경로, 콜백은 v1 없는 경로에 등록한다', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubEnv('KAKAO_CLIENT_ID', 'test-client-id');
+    vi.stubEnv('KAKAO_REDIRECT_URI', 'https://api.example.com/api/auth/kakao/callback');
 
-    const [callbackResponse, oldCallbackResponse] = await Promise.all([
+    const [startResponse, callbackResponse, oldCallbackResponse] = await Promise.all([
+      request(app).get('/api/v1/auth/kakao'),
       request(app).get('/api/auth/kakao/callback'),
       request(app).get('/api/v1/auth/kakao/callback'),
     ]);
 
+    expect(startResponse.status).toBe(302);
+    expect(startResponse.headers['set-cookie']?.[0]).toContain('Path=/');
     expect(callbackResponse.status).toBe(400);
     expect(callbackResponse.body.error.code).toBe('INVALID_OAUTH_STATE');
     expect(oldCallbackResponse.status).toBe(404);
@@ -58,6 +63,7 @@ describe('app', () => {
     expect(swaggerResponse.body.paths).toHaveProperty('/api/auth/{provider}/callback');
 
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('사용자 Swagger에 소셜 토큰 전달과 상세 조회 응답 필드를 노출한다', async () => {
