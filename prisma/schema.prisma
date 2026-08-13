@@ -58,29 +58,47 @@ enum AuthProvider {
 }
 
 model User {
-  id              Int                @id @default(autoincrement())
+  id                  Int                  @id @default(autoincrement())
   // 이메일은 이제 로그인 식별자가 아니라 프로필 정보다.
   // 소셜(연락처 이메일)은 유니크 보장이 안 되고 미제공될 수 있어 nullable + non-unique로 둔다.
-  email           String?            @db.VarChar(100)
-  phoneNumber     String?            @map("phone_number") @db.VarChar(20)
-  nickname        String?            @db.VarChar(100)
+  email               String?              @db.VarChar(100)
+  phoneNumber         String?              @map("phone_number") @db.VarChar(20)
+  nickname            String?              @db.VarChar(100)
   // 마이페이지에서 수정 가능한 프로필 사진 S3 URL. image 도메인에 업로드 후 URL만 저장한다.
-  profileImageUrl String?            @map("profile_image_url") @db.VarChar(255)
-  role            UserRole           @default(CUSTOMER)
-  createdAt       DateTime           @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt       DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
-  authProviders   UserAuthProvider[]
-  refreshTokens   RefreshToken[]
-  notifications   Notification[]
-  deviceTokens    DeviceToken[]
-  reservations    Reservation[]
-  wishDesigns     WishDesign[]
-  wishShops       WishShop[]
-  shopReviews     ShopReview[]
+  profileImageUrl     String?              @map("profile_image_url") @db.VarChar(255)
+  role                UserRole             @default(CUSTOMER)
+  createdAt           DateTime             @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.DateTime(3)
+  authProviders       UserAuthProvider[]
+  refreshTokens       RefreshToken[]
+  notifications       Notification[]
+  deviceTokens        DeviceToken[]
+  reservations        Reservation[]
+  wishDesigns         WishDesign[]
+  wishShops           WishShop[]
+  shopReviews         ShopReview[]
   notificationSetting NotificationSetting?
-  subscriptions   Subscription[]
+  subscriptions       Subscription[]
+  addresses           UserAddress[]
 
   @@map("users")
+}
+
+model UserAddress {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  label         String   @db.VarChar(50)
+  address       String   @db.VarChar(255)
+  addressDetail String?  @map("address_detail") @db.VarChar(255)
+  latitude      Decimal  @db.Decimal(10, 7)
+  longitude     Decimal  @db.Decimal(10, 7)
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isDefault])
+  @@map("user_addresses")
 }
 
 // NPlus 구독. 결제 연동은 범위 밖(P2)이라 상태와 기간만 관리한다.
@@ -370,26 +388,26 @@ enum EstimateStatus {
 }
 
 model EstimateRequest {
-  id            Int                   @id @default(autoincrement())
-  nailType      NailType              @map("nail_type")
-  recommendType RecommendType         @map("recommend_type")
+  id            Int                       @id @default(autoincrement())
+  nailType      NailType                  @map("nail_type")
+  recommendType RecommendType             @map("recommend_type")
   // 견적 요청 생성 시 자동 생성. 예: "8/3 패디 견적", "8/3 핸드 견적"
-  title         String?               @db.VarChar(100)
+  title         String?                   @db.VarChar(100)
   // 샵 탐색 시 사용자가 선택한 반경 (단위: 미터). 예: 3000 → 3km
-  radiusMeters  Int?                  @map("radius_meters")
-  description   String?               @db.Text
-  latitude      Decimal?              @db.Decimal(10, 7)
-  longitude     Decimal?              @db.Decimal(10, 7)
-  status        EstimateStatus        @default(MATCHING)
+  radiusMeters  Int?                      @map("radius_meters")
+  description   String?                   @db.Text
+  latitude      Decimal?                  @db.Decimal(10, 7)
+  longitude     Decimal?                  @db.Decimal(10, 7)
+  status        EstimateStatus            @default(MATCHING)
   // TODO: [yej] User 모델 추가 후 @relation 연결
-  userId        Int                @map("user_id")
+  userId        Int                       @map("user_id")
   // 카탈로그 디자인을 그대로 견적받은 경우에만 채워진다. 사용자가 직접 사진을
   // 올려 요청한 경우 null이며, 참조 디자인이 삭제돼도 요청 기록은 남아야 하므로
   // SetNull로 둔다.
-  designId      Int?               @map("design_id")
-  createdAt     DateTime           @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt     DateTime           @updatedAt @map("updated_at") @db.DateTime(3)
-  design        Design?            @relation(fields: [designId], references: [id], onDelete: SetNull)
+  designId      Int?                      @map("design_id")
+  createdAt     DateTime                  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime                  @updatedAt @map("updated_at") @db.DateTime(3)
+  design        Design?                   @relation(fields: [designId], references: [id], onDelete: SetNull)
   images        RequestImage[]
   proposals     EstimateResponse[]
   smsMessages   SmsMessage[]
@@ -402,10 +420,10 @@ model EstimateRequest {
 }
 
 model EstimateRequestSchedule {
-  requestId   Int             @map("request_id")
-  date        DateTime        @map("date") @db.Date
-  time        PreferredTime   @map("time")
-  request     EstimateRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId Int             @map("request_id")
+  date      DateTime        @map("date") @db.Date
+  time      PreferredTime   @map("time")
+  request   EstimateRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
   // (requestId, date, time) 복합 PK — 같은 날짜에 시간대 복수 선택 지원
   @@id([requestId, date, time])
@@ -477,18 +495,18 @@ model Reservation {
 // ─── Design 도메인 ──────────────────────────────────────────────────────────
 
 model Design {
-  id               Int           @id @default(autoincrement())
-  title            String        @db.VarChar(100)
-  imageUrl         String        @map("image_url") @db.VarChar(255)
-  viewCount        Int           @default(0) @map("view_count")
-  durationMinutes  Int           @map("duration_minutes")
+  id               Int               @id @default(autoincrement())
+  title            String            @db.VarChar(100)
+  imageUrl         String            @map("image_url") @db.VarChar(255)
+  viewCount        Int               @default(0) @map("view_count")
+  durationMinutes  Int               @map("duration_minutes")
   // TODO: [malibu] 값 종류(전체 옵션 목록) 확정되면 enum으로 전환
-  difficulty       String        @db.VarChar(20)
+  difficulty       String            @db.VarChar(20)
   // TODO: [malibu] 값 종류(전체 옵션 목록) 확정되면 enum으로 전환
-  recommendedShape String        @map("recommended_shape") @db.VarChar(20)
-  description      String        @db.Text
-  createdAt        DateTime      @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt        DateTime      @updatedAt @map("updated_at") @db.DateTime(3)
+  recommendedShape String            @map("recommended_shape") @db.VarChar(20)
+  description      String            @db.Text
+  createdAt        DateTime          @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.DateTime(3)
   images           DesignImage[]
   wishes           WishDesign[]
   tags             DesignTag[]
