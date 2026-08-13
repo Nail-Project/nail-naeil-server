@@ -190,6 +190,78 @@ const swaggerSpec = swaggerJsdoc({
             success: { $ref: '#/components/schemas/ReservationDetailResponse' },
           },
         },
+        UserAddress: {
+          type: 'object',
+          required: [
+            'addressId',
+            'label',
+            'address',
+            'addressDetail',
+            'latitude',
+            'longitude',
+            'isDefault',
+          ],
+          properties: {
+            addressId: { type: 'integer', example: 1 },
+            label: { type: 'string', example: '우리 집' },
+            address: { type: 'string', example: '서울특별시 강남구 테헤란로 1' },
+            addressDetail: { type: 'string', nullable: true, example: '101동 101호' },
+            latitude: { type: 'number', format: 'double', example: 37.4979 },
+            longitude: { type: 'number', format: 'double', example: 127.0276 },
+            isDefault: { type: 'boolean', example: true },
+          },
+        },
+        UserAddressRequest: {
+          type: 'object',
+          required: ['label', 'address', 'addressDetail', 'latitude', 'longitude', 'isDefault'],
+          properties: {
+            label: { type: 'string', maxLength: 50, example: '우리 집' },
+            address: { type: 'string', maxLength: 255, example: '서울특별시 강남구 테헤란로 1' },
+            addressDetail: {
+              type: 'string',
+              maxLength: 255,
+              nullable: true,
+              example: '101동 101호',
+            },
+            latitude: { type: 'number', format: 'double', minimum: -90, maximum: 90 },
+            longitude: { type: 'number', format: 'double', minimum: -180, maximum: 180 },
+            isDefault: { type: 'boolean', example: false },
+          },
+        },
+        UserAddressUpdateRequest: {
+          description: '수정할 필드만 전달한다. 하나 이상의 필드가 필요하다.',
+          type: 'object',
+          minProperties: 1,
+          properties: {
+            label: { type: 'string', maxLength: 50 },
+            address: { type: 'string', maxLength: 255 },
+            addressDetail: { type: 'string', maxLength: 255, nullable: true },
+            latitude: { type: 'number', format: 'double', minimum: -90, maximum: 90 },
+            longitude: { type: 'number', format: 'double', minimum: -180, maximum: 180 },
+            isDefault: { type: 'boolean' },
+          },
+        },
+        UserAddressSuccessResponse: {
+          type: 'object',
+          properties: {
+            resultType: { type: 'string', example: 'SUCCESS' },
+            error: { nullable: true, example: null },
+            success: { $ref: '#/components/schemas/UserAddress' },
+          },
+        },
+        UserAddressListSuccessResponse: {
+          type: 'object',
+          properties: {
+            resultType: { type: 'string', example: 'SUCCESS' },
+            error: { nullable: true, example: null },
+            success: {
+              type: 'object',
+              properties: {
+                addresses: { type: 'array', items: { $ref: '#/components/schemas/UserAddress' } },
+              },
+            },
+          },
+        },
         ApiErrorResponse: {
           type: 'object',
           required: ['resultType', 'error', 'success'],
@@ -225,6 +297,40 @@ const swaggerSpec = swaggerJsdoc({
         },
       },
       responses: {
+        InvalidUserAddressResponse: {
+          description: '주소 입력값 검증 실패',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              example: {
+                resultType: 'FAIL',
+                error: {
+                  code: 'USER_ADDRESS_VALIDATION_FAILED',
+                  message: '주소 정보를 다시 확인해주세요.',
+                  data: null,
+                },
+                success: null,
+              },
+            },
+          },
+        },
+        UserAddressNotFoundResponse: {
+          description: '주소를 찾을 수 없음',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              example: {
+                resultType: 'FAIL',
+                error: {
+                  code: 'USER_ADDRESS_NOT_FOUND',
+                  message: '주소를 찾을 수 없습니다.',
+                  data: null,
+                },
+                success: null,
+              },
+            },
+          },
+        },
         InvalidShopQueryResponse: {
           description: '잘못된 샵 조회 요청',
           content: {
