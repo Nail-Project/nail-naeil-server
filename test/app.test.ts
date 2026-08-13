@@ -42,6 +42,7 @@ describe('app', () => {
 
   it('소셜 로그인 시작은 v1 경로, 콜백은 v1 없는 경로에 등록한다', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubEnv('KAKAO_CLIENT_ID', 'test-client-id');
     vi.stubEnv('KAKAO_REDIRECT_URI', 'https://api.example.com/api/auth/kakao/callback');
 
@@ -55,6 +56,16 @@ describe('app', () => {
     expect(startResponse.headers['set-cookie']?.[0]).toContain('Path=/');
     expect(callbackResponse.status).toBe(400);
     expect(callbackResponse.body.error.code).toBe('INVALID_OAUTH_STATE');
+    expect(warn).toHaveBeenCalledWith(
+      '[OAuth] state validation failed',
+      expect.objectContaining({
+        provider: 'kakao',
+        hasCode: false,
+        hasQueryState: false,
+        hasStateCookie: false,
+        stateMatched: false,
+      }),
+    );
     expect(oldCallbackResponse.status).toBe(404);
     expect(oldCallbackResponse.body.error.code).toBe('ROUTE_NOT_FOUND');
 
@@ -93,6 +104,27 @@ describe('app', () => {
       spec.paths['/api/v1/reserve/{reservationId}'].get.responses['200'].content['application/json']
         .schema.$ref,
     ).toBe('#/components/schemas/ReservationDetailSuccessResponse');
+  });
+
+  it('소셜 로그인 콜백은 완료 페이지로 리다이렉트하고, 완료 페이지는 앱 딥링크로 전환한다', async () => {
+    vi.stubEnv('APP_AUTH_DEEPLINK', 'nailnaeil://auth');
+
+    const [missingTokenResponse, completeResponse] = await Promise.all([
+      request(app).get('/api/auth/complete'),
+      request(app).get('/api/auth/complete?accessToken=test-access&refreshToken=test-refresh'),
+    ]);
+
+    expect(missingTokenResponse.status).toBe(400);
+
+    expect(completeResponse.status).toBe(200);
+    expect(completeResponse.text).toContain(
+      'nailnaeil://auth?accessToken=test-access&amp;refreshToken=test-refresh',
+    );
+    expect(completeResponse.text).toContain(
+      'nailnaeil://auth?accessToken=test-access&refreshToken=test-refresh',
+    );
+
+    vi.unstubAllEnvs();
   });
 
   it('존재하지 않는 경로는 기본 404 HTML이 아니라 공통 에러 포맷으로 응답한다', async () => {
